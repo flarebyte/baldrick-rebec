@@ -87,3 +87,60 @@ Design a modular multi-agent chat and execution coordination system written in G
 - `tags`: Relevant for filtering, routing, or reactions
 - `timeout`: Default timeout if not set per message
 - `sensitive`: Indicates if message should be excluded from logging/indexing
+
+**Language: Go**
+
+- **Why**: Concurrency support (goroutines, channels) for handling multi-agent messaging and polling; strong ecosystem for CLI tools and gRPC; suitable for building efficient, lightweight servers.
+
+---
+
+**Communication Protocol: Protocol Buffers + gRPC (optional)**
+
+- **Why**: Efficient serialization for structured messages; cross-language compatibility for future integration (e.g., Flutter GUI); gRPC offers bi-directional streaming and strong typing, useful if a push-based listener is implemented.
+
+---
+
+**CLI Tool (Go)**
+
+- **Why**: Local user interface for interacting with the server (start/stop, send messages, trigger workflows); Go's flag and Cobra libraries support robust CLI design; single binary simplifies distribution.
+
+---
+
+**Data Storage**
+
+1. **Relational Database: PostgreSQL**
+
+   - **Why**: Stores structured data like messages, conversations, attempts, and workflow/task statistics; supports complex queries, transactions, and indexing.
+   - **Use**: Workflow progress tracking, state transitions, conversation/attempt management.
+
+2. **Search/Vector Database: OpenSearch**
+
+   - **Why**: Stores unstructured or semi-structured content (e.g., stdout/stderr, prompts); supports full-text search and vector similarity queries.
+   - **Use**: Future semantic search, message deduplication, embedding comparisons.
+
+---
+
+**Workflow Definition: YAML (GitHub Actions-like syntax)**
+
+- **Why**: Familiar structure for devs; human-readable and easy to define tasks declaratively; supports reusable task configuration and branching logic.
+
+---
+
+**Configuration**
+
+- **Home Config**: Stores global CLI settings (e.g., database credentials, ports).
+- **Project Folder Config**: Contains multiple YAML files for workflows.
+- **Why**: Separation of concerns—global vs. project-level config; predictable structure for tooling.
+
+---
+
+**Listener**
+
+- **Why**: Background component to monitor conversations or messages, triggering actions on specific tags; essential for automation agents.
+- **Tech**: Go routine with polling (or optional gRPC stream if push is feasible and simple).
+
+---
+
+**Future Tech: Flutter Desktop App**
+
+- **Why**: Cross-platform UI to visualize workflows, task states, and message history; connects to the same local server via API.
