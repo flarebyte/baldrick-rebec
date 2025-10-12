@@ -55,3 +55,35 @@ Design a modular multi-agent chat and execution coordination system written in G
 6. Do not perform advanced loop detection; basic cycle-prevention mechanisms only.
 7. No versioning or rollback of workflows or messages.
 8. Do not implement concurrent message sending within the same CLI session; single-threaded usage expected.
+
+---
+
+**Message Fields**
+
+- `stdin`: Text input or command input
+- `stdout`: Command output or agent response
+- `status`: Execution status (e.g., started, in-progress, finished)
+- `title`: Short label for the message
+- `level`: Hierarchical depth (e.g., h1, h2, h3)
+- `shell_command`: Command to be executed
+- `prompt`: Instruction or question for the recipient
+- `from`: Sender identifier (agent or user)
+- `to_recipients`: Target recipients (list or identifier)
+- `conversation_id`: Link to conversation thread
+- `attempt_id`: Execution or run instance
+- `tags`: Categorization or reaction triggers
+- `description`: Longer explanation or context
+- `goal`: Intended outcome of the message
+- `message_profile`: Reference to profile config (see below)
+- `timeout`: Max allowed duration for execution or response
+
+---
+
+**Message Profile (referenced config)**
+
+- `is_vector`: Whether content is indexed in vector DB
+- `description`: Profile purpose
+- `goal`: Functional intent
+- `tags`: Relevant for filtering, routing, or reactions
+- `timeout`: Default timeout if not set per message
+- `sensitive`: Indicates if message should be excluded from logging/indexing
