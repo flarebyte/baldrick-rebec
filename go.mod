@@ -1,4 +1,4 @@
-module github.com/your-org/your-cli
+module github.com/flarebyte/baldrick-rebec
 
 go 1.24.1
 

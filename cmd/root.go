@@ -1,9 +1,9 @@
 package cmd
 
 import (
+	"github.com/flarebyte/baldrick-rebec/cmd/admin"
+	"github.com/flarebyte/baldrick-rebec/cmd/test"
 	"github.com/spf13/cobra"
-	"github.com/your-org/your-cli/cmd/admin"
-	"github.com/your-org/your-cli/cmd/test"
 )
 
 var rootCmd = &cobra.Command{
