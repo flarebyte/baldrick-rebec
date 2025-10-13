@@ -147,22 +147,22 @@ Design a modular multi-agent chat and execution coordination system written in G
 
 ### Commands
 
-| Command                        | Description                                                           | Options / Notes                        |
-| ------------------------------ | --------------------------------------------------------------------- | -------------------------------------- |
-| `rbc admin start-server`       | Start the local server.                                               | `--detach` to run in background.       |
-| `rbc admin stop-server`        | Stop the running server gracefully.                                   | —                                      |
-| `rbc admin status`             | Show current server state, active workflows, attempts, and listeners. | —                                      |
-| `rbc admin init-db`            | Initialize or migrate relational and vector databases.                | —                                      |
-| `rbc admin clean-old`          | Delete messages older than a given number of days.                    | `--days=<n>`                           |
-| `rbc admin list-conversations` | List all conversations with metadata.                                 | —                                      |
-| `rbc admin list-attempts`      | List all attempts, optionally by conversation.                        | `--conversation-id=<id>`               |
-| `rbc admin join-conversation`  | Join an existing conversation.                                        | `--id=<id>`                            |
-| `rbc admin leave-conversation` | Leave a specific conversation.                                        | `--id=<id>`                            |
-| `rbc admin join-attempt`       | Join an existing attempt.                                             | `--id=<id>`                            |
-| `rbc admin leave-attempt`      | Leave a specific attempt.                                             | `--id=<id>`                            |
-| `rbc admin send-message`       | Send a structured message to the server.                              | `--file=<path>` or `--data=<json>`     |
-| `rbc admin dump-db`            | Export database contents to file.                                     | `--output=<path>`                      |
-| `rbc admin stats`              | Display usage statistics for workflows and tasks.                     | —                                      |
-| `rbc admin reload-config`      | Reload configuration files without restart.                           | —                                      |
-| `rbc admin check-loops`        | Detect potential infinite loops in recent message flows.              | —                                      |
-| `rbc admin listener`           | Start listener reacting to message tags.                              | `--detach`, `--react-tags=<tag1,tag2>` |
+| Command                          | Description                                                   | Options / Notes                        |
+| -------------------------------- | ------------------------------------------------------------- | -------------------------------------- |
+| `rbc admin server start`         | Start the local server.                                       | `--detach` to run in background.       |
+| `rbc admin server stop`          | Stop the running server gracefully.                           | —                                      |
+| `rbc admin server status`        | Show current server state and activity.                       | —                                      |
+| `rbc admin server reload-config` | Reload config files without restart.                          | —                                      |
+| `rbc admin db init`              | Initialize or migrate relational and search/vector databases. | —                                      |
+| `rbc admin db dump`              | Export database contents to file.                             | `--output=<path>`                      |
+| `rbc admin db clean-old`         | Delete messages older than a set number of days.              | `--days=<n>`                           |
+| `rbc admin conversation list`    | List all existing conversations.                              | —                                      |
+| `rbc admin conversation join`    | Join a specific conversation.                                 | `--id=<id>`                            |
+| `rbc admin conversation leave`   | Leave a specific conversation.                                | `--id=<id>`                            |
+| `rbc admin attempt list`         | List all attempts (optionally by conversation).               | `--conversation-id=<id>`               |
+| `rbc admin attempt join`         | Join an existing attempt.                                     | `--id=<id>`                            |
+| `rbc admin attempt leave`        | Leave a specific attempt.                                     | `--id=<id>`                            |
+| `rbc admin message send`         | Send a structured message.                                    | `--file=<path>` or `--data=<json>`     |
+| `rbc admin stats show`           | Display usage statistics for workflows and tasks.             | —                                      |
+| `rbc admin loops check`          | Detect potential infinite loops or reaction cycles.           | —                                      |
+| `rbc admin listener start`       | Start a listener reacting to tags.                            | `--detach`, `--react-tags=<tag1,tag2>` |
