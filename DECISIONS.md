@@ -166,3 +166,132 @@ Design a modular multi-agent chat and execution coordination system written in G
 | `rbc admin stats show`           | Display usage statistics for workflows and tasks.             | —                                      |
 | `rbc admin loops check`          | Detect potential infinite loops or reaction cycles.           | —                                      |
 | `rbc admin listener start`       | Start a listener reacting to tags.                            | `--detach`, `--react-tags=<tag1,tag2>` |
+
+## **Data Model Specification**
+
+### **Overview**
+
+The system separates immutable message **content** from mutable **ingest metadata**:
+
+- **`messages_content` (OpenSearch)** → stores each unique message body once.
+- **`messages_events` (PostgreSQL)** → records every ingest or processing event referencing that content.
+
+This design:
+
+- Eliminates duplicate storage of identical messages.
+- Keeps OpenSearch optimized for search & retrieval.
+- Uses PostgreSQL for integrity, history, and joins.
+- Enables efficient synchronization and audit trails.
+
+---
+
+### **1. OpenSearch Index — `messages_content`**
+
+**Purpose:**
+Store and index unique message content for search, deduplication, and retrieval.
+
+**Index name:** `messages_content`
+
+**Document ID:**
+`_id = SHA256(<canonicalized_message_body>)`
+
+**Mappings (simplified):**
+
+```json
+{
+  "mappings": {
+    "properties": {
+      "message_id": { "type": "keyword" }, // same as _id
+      "content": { "type": "text" }, // full searchable text
+      "content_type": { "type": "keyword" }, // e.g. "email", "report"
+      "language": { "type": "keyword" },
+      "metadata": { "type": "object", "enabled": true }
+    }
+  },
+  "settings": {
+    "index.lifecycle.name": "messages-content-ilm", // rollover & retention
+    "refresh_interval": "1s"
+  }
+}
+```
+
+**Ingest behavior:**
+
+- Hash computed client-side over normalized `content` (excluding volatile metadata).
+- 409 conflict ⇒ content already stored → skip body re-upload.
+
+---
+
+### **2. PostgreSQL Table — `messages_events`**
+
+**Purpose:**
+Store ingestion events, metadata, and relational information tied to a message content hash.
+
+**Table definition:**
+
+```sql
+CREATE TABLE messages_events (
+    id BIGSERIAL PRIMARY KEY,
+    content_id TEXT NOT NULL,             -- FK to messages_content._id
+    source TEXT NOT NULL,                 -- e.g. pipeline name, API client
+    received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    status TEXT DEFAULT 'ingested',       -- ingest / processed / error
+    tags TEXT[] DEFAULT '{}',
+    meta JSONB DEFAULT '{}',
+    UNIQUE (content_id, source, received_at)
+);
+
+CREATE INDEX ON messages_events (content_id);
+CREATE INDEX ON messages_events (received_at DESC);
+CREATE INDEX messages_events_tags_gin ON messages_events USING GIN (tags);
+CREATE INDEX messages_events_meta_gin ON messages_events USING GIN (meta);
+```
+
+**Behavior:**
+
+- Each new ingest → one row.
+- Enforces unique combination if desired (`content_id`, `source`, `received_at`).
+- Supports time-partitioning for retention and performance.
+
+---
+
+### **3. Write Flow**
+
+1. **Client receives new message**
+
+   - Canonicalize body (e.g., remove timestamps).
+   - Compute `SHA256` → `content_id`.
+
+2. **Store content in OpenSearch**
+
+   ```http
+   POST messages_content/_create/<content_id>
+   { "content": "...", "content_type": "email", "language": "en" }
+   ```
+
+   - If conflict (409): skip indexing; already present.
+
+3. **Record ingest event in PostgreSQL**
+
+   ```sql
+   INSERT INTO messages_events (content_id, source, tags, meta)
+   VALUES ('<content_id>', 'ingest-A', ARRAY['foo'], '{"ingest_time":"2025-10-13T12:00Z"}');
+   ```
+
+---
+
+### **4. Query Patterns**
+
+| Use Case                      | Query Location     | Example                                                        |
+| ----------------------------- | ------------------ | -------------------------------------------------------------- |
+| Full-text search, similarity  | OpenSearch         | `content:"urgent update"`                                      |
+| Find all events for a message | PostgreSQL         | `SELECT * FROM messages_events WHERE content_id = ...`         |
+| Count ingests per source      | PostgreSQL         | `SELECT source, COUNT(*) FROM messages_events GROUP BY source` |
+| Re-index by recent sources    | Postgres → OS join | App query Postgres → bulk fetch from OpenSearch                |
+
+---
+
+### **5. Lifecycle & Retention**
+
+- **OpenSearch ILM**: rollover by size/age, retain 180 days (content rarely changes).
+- **PostgreSQL partitioning**: monthly partitions on `received_at`, drop/archive old partitions as needed.
