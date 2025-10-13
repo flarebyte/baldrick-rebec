@@ -1,15 +1,17 @@
 package admin
 
 import (
-	"github.com/flarebyte/baldrick-rebec/cmd/admin/conversation"
-	"github.com/spf13/cobra"
+    "github.com/flarebyte/baldrick-rebec/cmd/admin/conversation"
+    "github.com/flarebyte/baldrick-rebec/cmd/admin/message"
+    "github.com/spf13/cobra"
 )
 
 var AdminCmd = &cobra.Command{
-	Use:   "admin",
-	Short: "TODO: Describe the 'admin' command",
+    Use:   "admin",
+    Short: "TODO: Describe the 'admin' command",
 }
 
 func init() {
-	AdminCmd.AddCommand(conversation.ConversationCmd)
+    AdminCmd.AddCommand(conversation.ConversationCmd)
+    AdminCmd.AddCommand(message.MessageCmd)
 }
