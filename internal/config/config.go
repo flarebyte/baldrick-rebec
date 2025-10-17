@@ -20,7 +20,12 @@ type ServerConfig struct {
 }
 
 type OpenSearchConfig struct {
-    Port int `yaml:"port"`
+    Host               string `yaml:"host"`
+    Scheme             string `yaml:"scheme"` // http or https
+    Port               int    `yaml:"port"`
+    Username           string `yaml:"username"`
+    Password           string `yaml:"password"`
+    InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
 }
 
 type Config struct {
@@ -31,7 +36,7 @@ type Config struct {
 func defaults() Config {
     return Config{
         Server:     ServerConfig{Port: DefaultServerPort},
-        OpenSearch: OpenSearchConfig{Port: DefaultOpenSearchPort},
+        OpenSearch: OpenSearchConfig{Host: "127.0.0.1", Scheme: "http", Port: DefaultOpenSearchPort},
     }
 }
 
@@ -60,9 +65,23 @@ func Load() (Config, error) {
     if fileCfg.Server.Port != 0 {
         cfg.Server.Port = fileCfg.Server.Port
     }
+    if fileCfg.OpenSearch.Host != "" {
+        cfg.OpenSearch.Host = fileCfg.OpenSearch.Host
+    }
+    if fileCfg.OpenSearch.Scheme != "" {
+        cfg.OpenSearch.Scheme = fileCfg.OpenSearch.Scheme
+    }
     if fileCfg.OpenSearch.Port != 0 {
         cfg.OpenSearch.Port = fileCfg.OpenSearch.Port
     }
+    if fileCfg.OpenSearch.Username != "" {
+        cfg.OpenSearch.Username = fileCfg.OpenSearch.Username
+    }
+    if fileCfg.OpenSearch.Password != "" {
+        cfg.OpenSearch.Password = fileCfg.OpenSearch.Password
+    }
+    if fileCfg.OpenSearch.InsecureSkipVerify {
+        cfg.OpenSearch.InsecureSkipVerify = true
+    }
     return cfg, nil
 }
-
