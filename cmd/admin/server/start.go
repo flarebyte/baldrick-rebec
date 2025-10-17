@@ -7,6 +7,7 @@ import (
     "path/filepath"
     "runtime"
 
+    cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     srv "github.com/flarebyte/baldrick-rebec/internal/server"
     "github.com/spf13/cobra"
 )
@@ -28,7 +29,11 @@ var startCmd = &cobra.Command{
         pidPath := srv.DefaultPIDPath()
         if flagDetach {
             // Spawn a detached child running in foreground mode
-            child := exec.Command(exe, "admin", "server", "start", "--addr", flagAddr, "--no-detach")
+            args := []string{"admin", "server", "start", "--no-detach"}
+            if flagAddr != "" {
+                args = append(args, "--addr", flagAddr)
+            }
+            child := exec.Command(exe, args...)
             // Best-effort: redirect output to a basic log file next to pid
             logPath := filepath.Join(filepath.Dir(pidPath), "server.log")
             _ = os.MkdirAll(filepath.Dir(pidPath), 0o755)
@@ -50,8 +55,18 @@ var startCmd = &cobra.Command{
             return nil
         }
 
+        // Determine address
+        addr := flagAddr
+        if addr == "" {
+            cfg, _ := cfgpkg.Load()
+            port := cfg.Server.Port
+            if port == 0 {
+                port = cfgpkg.DefaultServerPort
+            }
+            addr = fmt.Sprintf("127.0.0.1:%d", port)
+        }
         // Foreground mode
-        return srv.RunForeground(flagAddr, pidPath)
+        return srv.RunForeground(addr, pidPath)
     },
 }
 
@@ -60,6 +75,5 @@ func init() {
     // Hidden internal flag to prevent loop when re-execing for detach
     startCmd.Flags().Bool("no-detach", false, "internal")
     _ = startCmd.Flags().MarkHidden("no-detach")
-    startCmd.Flags().StringVar(&flagAddr, "addr", srv.DefaultAddr, "Listen address for gRPC server")
+    startCmd.Flags().StringVar(&flagAddr, "addr", "", "Listen address override for gRPC server (defaults to config)")
 }
-

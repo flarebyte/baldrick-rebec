@@ -9,20 +9,16 @@ import (
     "path/filepath"
     "syscall"
 
+    "github.com/flarebyte/baldrick-rebec/internal/config"
+    "github.com/flarebyte/baldrick-rebec/internal/paths"
     "google.golang.org/grpc"
     "google.golang.org/grpc/reflection"
 )
 
-const DefaultAddr = "127.0.0.1:53051"
-
 func DefaultPIDPath() string {
-    dir, err := os.UserConfigDir()
-    if err != nil || dir == "" {
-        dir = "."
-    }
-    p := filepath.Join(dir, "baldrick-rebec")
-    _ = os.MkdirAll(p, 0o755)
-    return filepath.Join(p, "server.pid")
+    h := paths.Home()
+    _ = os.MkdirAll(h, 0o755)
+    return filepath.Join(h, "server.pid")
 }
 
 func RunForeground(addr, pidPath string) error {
@@ -38,12 +34,25 @@ func RunForeground(addr, pidPath string) error {
     s := grpc.NewServer()
     reflection.Register(s)
 
-    // Graceful shutdown on SIGTERM/SIGINT
+    // Graceful shutdown on SIGTERM/SIGINT and config reload on SIGHUP
     sigCh := make(chan os.Signal, 1)
-    signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+    signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
     go func() {
-        <-sigCh
-        s.GracefulStop()
+        for {
+            sig := <-sigCh
+            switch sig {
+            case syscall.SIGTERM, syscall.SIGINT:
+                s.GracefulStop()
+                return
+            case syscall.SIGHUP:
+                // Reload config; dynamic settings (like ports) require restart; we just refresh values.
+                if _, err := config.Load(); err != nil {
+                    fmt.Fprintf(os.Stderr, "server: reload-config failed: %v\n", err)
+                } else {
+                    fmt.Fprintln(os.Stderr, "server: config reloaded")
+                }
+            }
+        }
     }()
 
     if err := s.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
@@ -87,4 +96,3 @@ func ReadPID(pidPath string) (int, error) {
 func DetachAttr() *syscall.SysProcAttr {
     return &syscall.SysProcAttr{Setsid: true}
 }
-
