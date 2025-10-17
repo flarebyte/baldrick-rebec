@@ -3,7 +3,9 @@ package opensearch
 import (
     "context"
     "crypto/tls"
+    "encoding/json"
     "fmt"
+    "io"
     "net/http"
     "time"
 
@@ -54,3 +56,37 @@ func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, err
     return c.httpClient.Do(req)
 }
 
+// ClusterHealth returns the cluster health status string (e.g., green, yellow, red).
+func (c *Client) ClusterHealth(ctx context.Context) (string, error) {
+    req, _ := http.NewRequest(http.MethodGet, c.baseURL+"/_cluster/health", nil)
+    resp, err := c.do(ctx, req)
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return "", fmt.Errorf("cluster health: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    var obj struct{
+        Status string `json:"status"`
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&obj); err != nil {
+        return "", err
+    }
+    return obj.Status, nil
+}
+
+// IndexExists checks if a given index exists.
+func (c *Client) IndexExists(ctx context.Context, index string) (bool, error) {
+    req, _ := http.NewRequest(http.MethodHead, c.baseURL+"/"+index, nil)
+    resp, err := c.do(ctx, req)
+    if err != nil {
+        return false, err
+    }
+    defer resp.Body.Close()
+    if resp.StatusCode == http.StatusOK { return true, nil }
+    if resp.StatusCode == http.StatusNotFound { return false, nil }
+    b, _ := io.ReadAll(resp.Body)
+    return false, fmt.Errorf("index exists check: status=%d body=%s", resp.StatusCode, string(b))
+}
