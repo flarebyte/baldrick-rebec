@@ -31,12 +31,14 @@ type OpenSearchConfig struct {
 type Config struct {
     Server     ServerConfig     `yaml:"server"`
     OpenSearch OpenSearchConfig `yaml:"opensearch"`
+    Postgres   PostgresConfig   `yaml:"postgres"`
 }
 
 func defaults() Config {
     return Config{
         Server:     ServerConfig{Port: DefaultServerPort},
         OpenSearch: OpenSearchConfig{Host: "127.0.0.1", Scheme: "http", Port: DefaultOpenSearchPort},
+        Postgres:   PostgresConfig{Host: "127.0.0.1", Port: 5432, User: "rbc", Password: "rbcpass", DBName: "rbc", SSLMode: "disable"},
     }
 }
 
@@ -83,5 +85,33 @@ func Load() (Config, error) {
     if fileCfg.OpenSearch.InsecureSkipVerify {
         cfg.OpenSearch.InsecureSkipVerify = true
     }
+    // Postgres overrides
+    if fileCfg.Postgres.Host != "" {
+        cfg.Postgres.Host = fileCfg.Postgres.Host
+    }
+    if fileCfg.Postgres.Port != 0 {
+        cfg.Postgres.Port = fileCfg.Postgres.Port
+    }
+    if fileCfg.Postgres.User != "" {
+        cfg.Postgres.User = fileCfg.Postgres.User
+    }
+    if fileCfg.Postgres.Password != "" {
+        cfg.Postgres.Password = fileCfg.Postgres.Password
+    }
+    if fileCfg.Postgres.DBName != "" {
+        cfg.Postgres.DBName = fileCfg.Postgres.DBName
+    }
+    if fileCfg.Postgres.SSLMode != "" {
+        cfg.Postgres.SSLMode = fileCfg.Postgres.SSLMode
+    }
     return cfg, nil
+}
+
+type PostgresConfig struct {
+    Host    string `yaml:"host"`
+    Port    int    `yaml:"port"`
+    User    string `yaml:"user"`
+    Password string `yaml:"password"`
+    DBName  string `yaml:"dbname"`
+    SSLMode string `yaml:"sslmode"` // disable, require, verify-ca, verify-full
 }
