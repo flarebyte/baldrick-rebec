@@ -75,8 +75,9 @@ func (c *Client) EnsureMessagesContentIndex(ctx context.Context) error {
             },
         },
         "settings": map[string]interface{}{
-            "index.lifecycle.name": "messages-content-ilm",
-            "refresh_interval":     "1s",
+            // Keep settings compatible with OpenSearch out of the box.
+            // Lifecycle (ILM/ISM) is attached separately via CLI commands.
+            "refresh_interval": "1s",
         },
     }
     buf, _ := json.Marshal(payload)
@@ -156,4 +157,3 @@ func (c *Client) GetMessageContent(ctx context.Context, id string) (MessageConte
     }
     return envelope.Source, nil
 }
-
