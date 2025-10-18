@@ -394,3 +394,17 @@ func (c *Client) ListISMPolicies(ctx context.Context) ([]byte, error) {
     if err != nil { return nil, err }
     return b, nil
 }
+
+// DeleteISMPolicy deletes an ISM policy by name.
+func (c *Client) DeleteISMPolicy(ctx context.Context, name string) error {
+    if name == "" { return fmt.Errorf("empty ISM policy name") }
+    req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/_plugins/_ism/policies/%s", c.baseURL, name), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return fmt.Errorf("delete ISM policy: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    return nil
+}
