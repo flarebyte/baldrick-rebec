@@ -16,6 +16,8 @@ Autonomous build automation tool and task runner
 
 See DATABASES.md for full workflow, credentials guidance, and a setup checklist.
 
+For ops-focused learning prompts and study entry points, see LEARNING.md.
+
 ## OpenSearch Lifecycle
 
 - The CLI supports both ILM (Elasticsearch-style) and ISM (OpenSearch plugin):
