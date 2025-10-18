@@ -236,3 +236,44 @@ func (c *Client) IndexExists(ctx context.Context, index string) (bool, error) {
     b, _ := io.ReadAll(resp.Body)
     return false, fmt.Errorf("index exists check: status=%d body=%s", resp.StatusCode, string(b))
 }
+
+// IndexLifecycleName returns index.lifecycle.name setting if set, else empty.
+func (c *Client) IndexLifecycleName(ctx context.Context, index string) (string, error) {
+    if index == "" { return "", fmt.Errorf("empty index") }
+    req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/%s/_settings", c.baseURL, index), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return "", err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return "", fmt.Errorf("get index settings: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    var m map[string]struct{ Settings map[string]map[string]map[string]interface{} `json:"settings"` }
+    if err := json.NewDecoder(resp.Body).Decode(&m); err != nil { return "", err }
+    for _, v := range m {
+        if idx, ok := v.Settings["index"]; ok {
+            if lc, ok := idx["lifecycle"]; ok {
+                if name, ok := lc["name"].(string); ok {
+                    return name, nil
+                }
+            }
+        }
+    }
+    return "", nil
+}
+
+// IndexDocCount returns document count via _count API.
+func (c *Client) IndexDocCount(ctx context.Context, index string) (int64, error) {
+    if index == "" { return 0, fmt.Errorf("empty index") }
+    req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/%s/_count", c.baseURL, index), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return 0, err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return 0, fmt.Errorf("get index count: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    var obj struct{ Count int64 `json:"count"` }
+    if err := json.NewDecoder(resp.Body).Decode(&obj); err != nil { return 0, err }
+    return obj.Count, nil
+}
