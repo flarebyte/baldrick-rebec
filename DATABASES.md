@@ -31,39 +31,28 @@ Notes:
 - PostgreSQL schema changes are currently applied directly by `db init` (no versioned migrations yet). For production, consider adopting a migration tool later (e.g., `golang-migrate`).
 - OpenSearch ILM policy is referenced (`messages-content-ilm`) but not installed automatically by the CLI. See “Operator Tasks” below.
 
-## Operator Tasks (Manual)
+## Provisioning Workflow (CLI-first)
 
-PostgreSQL
+PostgreSQL and OpenSearch provisioning is designed to be driven by the CLI.
 
-- Provision roles and databases for least-privilege operation (recommended for staging/prod):
+- Configure global settings (server + DBs):
+  - `rbc admin config init --overwrite [flags]`
+  - Use `--dry-run` to preview changes without writing.
 
-```sql
--- Admin role (schema owner)
-CREATE ROLE rbc_admin LOGIN PASSWORD 'change-me';
--- App role (runtime)
-CREATE ROLE rbc_app LOGIN PASSWORD 'change-me';
+- Preview planned DB changes (no writes):
+  - `rbc admin db plan`
 
--- Dedicated database
-CREATE DATABASE rbc OWNER rbc_admin;
+- Create roles, database, grants, and schema (admin required):
+  - `rbc admin db scaffold --create-roles --create-db --grant-privileges --yes`
+  - Then ensure tables/triggers: `rbc admin db scaffold` (schema-only re-run is safe)
 
--- Privileges for runtime
-GRANT CONNECT ON DATABASE rbc TO rbc_app;
-\c rbc
-GRANT USAGE ON SCHEMA public TO rbc_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO rbc_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO rbc_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO rbc_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO rbc_app;
-```
+- Initialize OpenSearch index and verify:
+  - `rbc admin db init` (ensures `messages_content` index and Postgres schema)
+  - `rbc admin db status`
 
-- For local development (Docker Compose), the compose environment variables can create the database automatically without the above.
+OpenSearch ILM
 
-OpenSearch
-
-- Configure security and users (for secured clusters):
-  - Create a user (e.g., `rbc_app`) with index-level permissions for `messages_content` (read/write) and restricted cluster privileges.
-  - Keep the built‑in `admin` user for bootstrap and operator tasks only.
-- Create/attach an ILM policy (recommended):
+- Attach an ILM policy for `messages_content` (recommended). This is currently an operator action; example payload:
 
 ```json
 PUT _ilm/policy/messages-content-ilm
@@ -134,8 +123,10 @@ opensearch:
      - `docker compose up -d postgres`
      - `docker compose up -d opensearch-node1 opensearch-node2 opensearch-dashboards`
   2. Create config: `rbc admin config init --overwrite [flags]`
-  3. Initialize stores: `rbc admin db init`
-  4. Verify: `rbc admin db status`
+  3. Plan changes: `rbc admin db plan`
+  4. Scaffold DB: `rbc admin db scaffold --create-roles --create-db --grant-privileges --yes`
+  5. Initialize stores: `rbc admin db init`
+  6. Verify: `rbc admin db status`
 
 - Podman users can use `podman-compose` with the same file (adjust commands accordingly).
 
@@ -175,9 +166,9 @@ This table maps each principal (role/user) to where its password should live in 
 | System | Role/User | Purpose | Local dev (single-user) | Docker Compose init | CI/Staging/Prod |
 | --- | --- | --- | --- | --- | --- |
 | PostgreSQL | `rbc_admin` | Schema owner; migrations | Not typically needed at runtime; if used, store in `~/.baldrick-rebec/config.yaml` temporarily | Use `.env` for compose bootstrap only; do NOT commit | Secret manager (e.g., AWS SM, Vault) or Kubernetes Secret; inject to migration job |
-| PostgreSQL | `rbc_app` | Runtime DML by CLI/server | `~/.baldrick-rebec/config.yaml` under `postgres.password` | `.env` passed to app container env; override via secrets when possible | Secret manager / Kubernetes Secret; injected as env/secret volume to the service |
+| PostgreSQL | `rbc_app` | Runtime DML by CLI/server | `~/.baldrick-rebec/config.yaml` under `postgres.app.password` | `.env` passed to app container env; override via secrets when possible | Secret manager / Kubernetes Secret; injected as env/secret volume to the service |
 | OpenSearch | `admin` | Operator tasks (ILM, bootstrap) | Use only when needed; supply via `~/.baldrick-rebec/config.yaml` or env var at run time; remove after | `.env` with `OPENSEARCH_INITIAL_ADMIN_PASSWORD` for demo images | Secret manager / Kubernetes Secret; use sparingly by ops tooling, not app |
-| OpenSearch | `rbc_app` | Index read/write for `messages_content` | `~/.baldrick-rebec/config.yaml` under `opensearch.username/password` | `.env` for local containers; prefer non-admin user | Secret manager / Kubernetes Secret; injected to app; least-privilege role |
+| OpenSearch | `rbc_app` | Index read/write for `messages_content` | `~/.baldrick-rebec/config.yaml` under `opensearch.app.username/password` | `.env` for local containers; prefer non-admin user | Secret manager / Kubernetes Secret; injected to app; least-privilege role |
 
 Guidelines
 - Prefer secrets managers in shared environments; avoid long-lived credentials in files.
