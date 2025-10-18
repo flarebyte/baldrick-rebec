@@ -35,6 +35,7 @@ type Config struct {
     Server     ServerConfig     `yaml:"server"`
     OpenSearch OpenSearchConfig `yaml:"opensearch"`
     Postgres   PostgresConfig   `yaml:"postgres"`
+    Features   FeaturesConfig   `yaml:"features"`
 }
 
 func defaults() Config {
@@ -44,6 +45,7 @@ func defaults() Config {
             Admin: OSRole{Username: "admin"}, App: OSRole{Username: "rbc_app"}},
         Postgres:   PostgresConfig{Host: "127.0.0.1", Port: 5432, DBName: "rbc", SSLMode: "disable",
             Admin: PGRole{User: "rbc_admin"}, App: PGRole{User: "rbc_app"}},
+        Features:   FeaturesConfig{PGOnly: false},
     }
 }
 
@@ -123,7 +125,15 @@ func Load() (Config, error) {
     if fileCfg.Postgres.App.Password != "" {
         cfg.Postgres.App.Password = fileCfg.Postgres.App.Password
     }
+    // Features
+    if fileCfg.Features.PGOnly {
+        cfg.Features.PGOnly = true
+    }
     return cfg, nil
+}
+
+type FeaturesConfig struct {
+    PGOnly bool `yaml:"pg_only"`
 }
 
 type PostgresConfig struct {

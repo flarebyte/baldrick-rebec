@@ -7,7 +7,12 @@ import (
     "io"
     "os"
     "strings"
+    "encoding/json"
+    "context"
+    "time"
 
+    cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
+    pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
     "github.com/spf13/cobra"
 )
 
@@ -31,6 +36,7 @@ var sendCmd = &cobra.Command{
     Use:   "send",
     Short: "Send a structured message (logs stdin, echoes to stdout)",
     RunE: func(cmd *cobra.Command, args []string) error {
+        cfg, _ := cfgpkg.Load()
         // Validate mandatory params
         if strings.TrimSpace(flagConversation) == "" {
             return errors.New("missing required flag: --conversation")
@@ -75,6 +81,42 @@ var sendCmd = &cobra.Command{
             if _, err := os.Stdout.Write(stdinData); err != nil {
                 return fmt.Errorf("write stdout: %w", err)
             }
+        }
+        // If pg-only, persist content + event to Postgres
+        if cfg.Features.PGOnly {
+            ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+            defer cancel()
+            db, err := pgdao.OpenApp(ctx, cfg)
+            if err != nil { return err }
+            defer db.Close()
+            if err := pgdao.EnsureContentSchema(ctx, db); err != nil { return err }
+            // Prepare metadata as JSON
+            meta := map[string]interface{}{
+                "title": flagTitle,
+                "level": flagLevel,
+                "from":  flagFrom,
+                "to":    flagTo,
+                "tags":  flagTags,
+                "description": flagDescription,
+                "goal":  flagGoal,
+            }
+            metaJSON, _ := json.Marshal(meta)
+            id, err := pgdao.PutMessageContent(ctx, db, string(stdinData), flagProfile, "", metaJSON)
+            if err != nil { return err }
+            // Insert event referencing content
+            ev := &pgdao.MessageEvent{
+                ContentID: id,
+                ConversationID: flagConversation,
+                AttemptID: flagAttempt,
+                ProfileName: flagProfile,
+                Source: "cli",
+                Status: "ingested",
+                Attempt: 1,
+                Recipients: flagTo,
+                Tags: flagTags,
+            }
+            if _, err := pgdao.InsertMessageEvent(ctx, db, ev); err != nil { return err }
+            fmt.Fprintf(os.Stderr, "pg-only: stored content id=%s and event\n", id)
         }
         return nil
     },

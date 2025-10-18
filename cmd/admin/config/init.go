@@ -13,6 +13,7 @@ import (
 var (
     flagOverwrite  bool
     flagDryRun     bool
+    flagPGOnly     bool
     // Server
     flagServerPort int
     // Postgres base
@@ -87,6 +88,9 @@ var initCmd = &cobra.Command{
         if cmd.Flags().Changed("os-admin-password") { cfg.OpenSearch.Admin.Password = flagOSAdminPassword }
         if cmd.Flags().Changed("os-admin-password-temp") { cfg.OpenSearch.Admin.PasswordTemp = flagOSAdminPasswordTmp }
 
+        // Features
+        if cmd.Flags().Changed("pg-only") { cfg.Features.PGOnly = flagPGOnly }
+
         b, err := yaml.Marshal(cfg)
         if err != nil { return err }
         if flagDryRun {
@@ -130,5 +134,6 @@ func init() {
     initCmd.Flags().StringVar(&flagOSAdminUsername, "os-admin-username", "admin", "OpenSearch admin username (operator)")
     initCmd.Flags().StringVar(&flagOSAdminPassword, "os-admin-password", "", "OpenSearch admin password (avoid; prefer --os-admin-password-temp)")
     initCmd.Flags().StringVar(&flagOSAdminPasswordTmp, "os-admin-password-temp", "", "OpenSearch admin temporary password (preferred; remove after use)")
+    // Features
+    initCmd.Flags().BoolVar(&flagPGOnly, "pg-only", false, "Enable PostgreSQL-only mode (disables OpenSearch usage)")
 }
-

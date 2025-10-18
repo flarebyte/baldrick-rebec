@@ -127,60 +127,65 @@ var statusCmd = &cobra.Command{
             }
         }
 
-        // OpenSearch (app role)
-        fmt.Fprintln(os.Stderr, "db:status - checking OpenSearch (app)...")
-        osc := osdao.NewClientFromConfigApp(cfg)
-        health, err := osc.ClusterHealth(ctx)
-        if err != nil {
-            fmt.Fprintf(os.Stderr, "opensearch: error: %v\n", err)
-            st.OpenSearch.Error = err.Error()
+        if cfg.Features.PGOnly {
+            fmt.Fprintln(os.Stderr, "db:status - pg_only=true; skipping OpenSearch checks")
+            st.OpenSearch.Error = "pg_only=true"
         } else {
-            fmt.Fprintf(os.Stderr, "opensearch: cluster health=%s\n", health)
-            st.OpenSearch.Health = health
-        }
-        if exists, err := osc.IndexExists(ctx, "messages_content"); err == nil {
-            if exists {
-                fmt.Fprintln(os.Stderr, "opensearch: index 'messages_content': present")
-                st.OpenSearch.Index.Exists = true
-                if name, err := osc.IndexLifecycleName(ctx, "messages_content"); err == nil && name != "" {
-                    fmt.Fprintf(os.Stderr, "opensearch: index ILM policy=%q\n", name)
-                    st.OpenSearch.Index.ILMPolicy = name
-                    // Check ILM policy existence via admin
-                    adminOSC := osdao.NewClientFromConfigAdmin(cfg)
-                    if _, err := adminOSC.GetILMPolicy(ctx, name); err == nil {
-                        fmt.Fprintln(os.Stderr, "opensearch: ILM policy exists: ok")
-                        v := true
-                        st.OpenSearch.Index.ILMPolicyExists = &v
+            // OpenSearch (app role)
+            fmt.Fprintln(os.Stderr, "db:status - checking OpenSearch (app)...")
+            osc := osdao.NewClientFromConfigApp(cfg)
+            health, err := osc.ClusterHealth(ctx)
+            if err != nil {
+                fmt.Fprintf(os.Stderr, "opensearch: error: %v\n", err)
+                st.OpenSearch.Error = err.Error()
+            } else {
+                fmt.Fprintf(os.Stderr, "opensearch: cluster health=%s\n", health)
+                st.OpenSearch.Health = health
+            }
+            if exists, err := osc.IndexExists(ctx, "messages_content"); err == nil {
+                if exists {
+                    fmt.Fprintln(os.Stderr, "opensearch: index 'messages_content': present")
+                    st.OpenSearch.Index.Exists = true
+                    if name, err := osc.IndexLifecycleName(ctx, "messages_content"); err == nil && name != "" {
+                        fmt.Fprintf(os.Stderr, "opensearch: index ILM policy=%q\n", name)
+                        st.OpenSearch.Index.ILMPolicy = name
+                        // Check ILM policy existence via admin
+                        adminOSC := osdao.NewClientFromConfigAdmin(cfg)
+                        if _, err := adminOSC.GetILMPolicy(ctx, name); err == nil {
+                            fmt.Fprintln(os.Stderr, "opensearch: ILM policy exists: ok")
+                            v := true
+                            st.OpenSearch.Index.ILMPolicyExists = &v
+                        } else {
+                            fmt.Fprintf(os.Stderr, "opensearch: ILM policy missing or inaccessible: %v\n", err)
+                            v := false
+                            st.OpenSearch.Index.ILMPolicyExists = &v
+                        }
+                    } else if pid, err := osc.IndexISMPolicyID(ctx, "messages_content"); err == nil && pid != "" {
+                        fmt.Fprintf(os.Stderr, "opensearch: index ISM policy=%q\n", pid)
+                        st.OpenSearch.Index.ILMPolicy = pid
+                        adminOSC := osdao.NewClientFromConfigAdmin(cfg)
+                        if _, err := adminOSC.GetISMPolicy(ctx, pid); err == nil {
+                            fmt.Fprintln(os.Stderr, "opensearch: ISM policy exists: ok")
+                            v := true
+                            st.OpenSearch.Index.ILMPolicyExists = &v
+                        } else {
+                            fmt.Fprintf(os.Stderr, "opensearch: ISM policy missing or inaccessible: %v\n", err)
+                            v := false
+                            st.OpenSearch.Index.ILMPolicyExists = &v
+                        }
                     } else {
-                        fmt.Fprintf(os.Stderr, "opensearch: ILM policy missing or inaccessible: %v\n", err)
-                        v := false
-                        st.OpenSearch.Index.ILMPolicyExists = &v
+                        fmt.Fprintln(os.Stderr, "opensearch: index lifecycle policy: not set (use 'rbc admin os ilm ensure --attach-to-index messages_content' or ISM policy)")
                     }
-                } else if pid, err := osc.IndexISMPolicyID(ctx, "messages_content"); err == nil && pid != "" {
-                    fmt.Fprintf(os.Stderr, "opensearch: index ISM policy=%q\n", pid)
-                    st.OpenSearch.Index.ILMPolicy = pid
-                    adminOSC := osdao.NewClientFromConfigAdmin(cfg)
-                    if _, err := adminOSC.GetISMPolicy(ctx, pid); err == nil {
-                        fmt.Fprintln(os.Stderr, "opensearch: ISM policy exists: ok")
-                        v := true
-                        st.OpenSearch.Index.ILMPolicyExists = &v
-                    } else {
-                        fmt.Fprintf(os.Stderr, "opensearch: ISM policy missing or inaccessible: %v\n", err)
-                        v := false
-                        st.OpenSearch.Index.ILMPolicyExists = &v
+                    if cnt, err := osc.IndexDocCount(ctx, "messages_content"); err == nil {
+                        fmt.Fprintf(os.Stderr, "opensearch: index doc count=%d\n", cnt)
+                        st.OpenSearch.Index.DocCount = cnt
                     }
                 } else {
-                    fmt.Fprintln(os.Stderr, "opensearch: index lifecycle policy: not set (use 'rbc admin os ilm ensure --attach-to-index messages_content' or ISM policy)")
-                }
-                if cnt, err := osc.IndexDocCount(ctx, "messages_content"); err == nil {
-                    fmt.Fprintf(os.Stderr, "opensearch: index doc count=%d\n", cnt)
-                    st.OpenSearch.Index.DocCount = cnt
+                    fmt.Fprintln(os.Stderr, "opensearch: index 'messages_content': missing (run 'rbc admin db init')")
                 }
             } else {
-                fmt.Fprintln(os.Stderr, "opensearch: index 'messages_content': missing (run 'rbc admin db init')")
+                fmt.Fprintf(os.Stderr, "opensearch: index check error: %v\n", err)
             }
-        } else {
-            fmt.Fprintf(os.Stderr, "opensearch: index check error: %v\n", err)
         }
 
         if flagStatusJSON {

@@ -41,12 +41,20 @@ var initCmd = &cobra.Command{
             return err
         }
 
-        // OpenSearch: ensure index (use admin if available)
-        fmt.Fprintln(os.Stderr, "db:init - connecting to OpenSearch (admin/app)...")
-        osc := osdao.NewClientFromConfigAdmin(cfg)
-        fmt.Fprintln(os.Stderr, "db:init - ensuring OpenSearch index 'messages_content'...")
-        if err := osc.EnsureMessagesContentIndex(ctx); err != nil {
-            return err
+        // If PG-only feature enabled, ensure content table in PG and skip OpenSearch
+        if cfg.Features.PGOnly {
+            fmt.Fprintln(os.Stderr, "db:init - pg_only=true; ensuring PostgreSQL content table...")
+            if err := pgdao.EnsureContentSchema(ctx, db); err != nil {
+                return err
+            }
+        } else {
+            // OpenSearch: ensure index (use admin if available)
+            fmt.Fprintln(os.Stderr, "db:init - connecting to OpenSearch (admin/app)...")
+            osc := osdao.NewClientFromConfigAdmin(cfg)
+            fmt.Fprintln(os.Stderr, "db:init - ensuring OpenSearch index 'messages_content'...")
+            if err := osc.EnsureMessagesContentIndex(ctx); err != nil {
+                return err
+            }
         }
 
         fmt.Fprintln(os.Stderr, "db:init - done")
