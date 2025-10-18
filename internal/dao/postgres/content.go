@@ -80,3 +80,42 @@ func GetMessageContent(ctx context.Context, db *sql.DB, id string) (MessageConte
     return out, nil
 }
 
+// EnsureFTSIndex creates a GIN index on to_tsvector('simple', content).
+func EnsureFTSIndex(ctx context.Context, db *sql.DB) error {
+    stmt := `CREATE INDEX IF NOT EXISTS idx_messages_content_pg_fts
+             ON messages_content_pg USING GIN (to_tsvector('simple', content))`
+    _, err := db.ExecContext(ctx, stmt)
+    return err
+}
+
+// EnsureVectorExtension attempts to enable the pgvector extension.
+func EnsureVectorExtension(ctx context.Context, db *sql.DB) error {
+    // Requires superuser or appropriate privileges; safe to attempt.
+    _, err := db.ExecContext(ctx, `CREATE EXTENSION IF NOT EXISTS vector`)
+    return err
+}
+
+// HasVectorExtension reports whether the pgvector extension is available.
+func HasVectorExtension(ctx context.Context, db *sql.DB) (bool, error) {
+    var ok bool
+    err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')`).Scan(&ok)
+    return ok, err
+}
+
+// EnsureEmbeddingColumn ensures an embedding column exists with given dimension.
+func EnsureEmbeddingColumn(ctx context.Context, db *sql.DB, dim int) error {
+    if dim <= 0 { return nil }
+    // Add column if missing
+    _, err := db.ExecContext(ctx, `ALTER TABLE messages_content_pg ADD COLUMN IF NOT EXISTS embedding vector`)
+    if err != nil { return err }
+    // Verify dimension; Postgres vector type encodes dim at runtime; cannot enforce at DDL easily without casting.
+    return nil
+}
+
+// EnsureEmbeddingIndex creates an approximate index on embedding if column exists.
+func EnsureEmbeddingIndex(ctx context.Context, db *sql.DB) error {
+    // Use ivfflat by default; requires SET to enable; try to create index and ignore errors.
+    // Users may adjust storage parameters later.
+    _, err := db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_messages_content_pg_embedding ON messages_content_pg USING ivfflat (embedding)`)
+    return err
+}

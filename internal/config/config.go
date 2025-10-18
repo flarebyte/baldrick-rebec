@@ -45,7 +45,7 @@ func defaults() Config {
             Admin: OSRole{Username: "admin"}, App: OSRole{Username: "rbc_app"}},
         Postgres:   PostgresConfig{Host: "127.0.0.1", Port: 5432, DBName: "rbc", SSLMode: "disable",
             Admin: PGRole{User: "rbc_admin"}, App: PGRole{User: "rbc_app"}},
-        Features:   FeaturesConfig{PGOnly: false},
+        Features:   FeaturesConfig{PGOnly: false, PGVectorDim: 0},
     }
 }
 
@@ -129,11 +129,16 @@ func Load() (Config, error) {
     if fileCfg.Features.PGOnly {
         cfg.Features.PGOnly = true
     }
+    if fileCfg.Features.PGVectorDim > 0 {
+        cfg.Features.PGVectorDim = fileCfg.Features.PGVectorDim
+    }
     return cfg, nil
 }
 
 type FeaturesConfig struct {
     PGOnly bool `yaml:"pg_only"`
+    // Optional: dimension of the embedding vector column. 0 disables it.
+    PGVectorDim int `yaml:"pg_vector_dim"`
 }
 
 type PostgresConfig struct {

@@ -125,6 +125,47 @@ var statusCmd = &cobra.Command{
                     fmt.Fprintf(os.Stderr, "postgres: privileges for %q: missing (scaffold --grant-privileges)\n", cfg.Postgres.App.User)
                 }
             }
+            if cfg.Features.PGOnly {
+                // Content table
+                var exists bool
+                _ = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='messages_content_pg')`).Scan(&exists)
+                if exists {
+                    fmt.Fprintln(os.Stderr, "postgres: content table: ok")
+                } else {
+                    fmt.Fprintln(os.Stderr, "postgres: content table: missing (run 'rbc admin db init')")
+                }
+                // FTS index readiness: rely on index name we create
+                var fts bool
+                _ = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_messages_content_pg_fts')`).Scan(&fts)
+                if fts {
+                    fmt.Fprintln(os.Stderr, "postgres: FTS index: ok")
+                } else {
+                    fmt.Fprintln(os.Stderr, "postgres: FTS index: missing (run 'rbc admin db init')")
+                }
+                // Vector extension presence
+                if ok, _ := pgdao.HasVectorExtension(ctx, db); ok {
+                    fmt.Fprintln(os.Stderr, "postgres: pgvector extension: present")
+                } else {
+                    fmt.Fprintln(os.Stderr, "postgres: pgvector extension: not installed (optional)")
+                }
+                // Embedding column/index check when configured
+                if cfg.Features.PGVectorDim > 0 {
+                    var hasCol bool
+                    _ = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='messages_content_pg' AND column_name='embedding')`).Scan(&hasCol)
+                    if hasCol {
+                        fmt.Fprintln(os.Stderr, "postgres: embedding column: ok")
+                    } else {
+                        fmt.Fprintln(os.Stderr, "postgres: embedding column: missing (run 'rbc admin db init')")
+                    }
+                    var hasEmbIdx bool
+                    _ = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_messages_content_pg_embedding')`).Scan(&hasEmbIdx)
+                    if hasEmbIdx {
+                        fmt.Fprintln(os.Stderr, "postgres: embedding index: ok")
+                    } else {
+                        fmt.Fprintln(os.Stderr, "postgres: embedding index: missing (run 'rbc admin db init')")
+                    }
+                }
+            }
         }
 
         if cfg.Features.PGOnly {
