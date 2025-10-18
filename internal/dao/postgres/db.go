@@ -58,6 +58,23 @@ func OpenAdmin(ctx context.Context, cfg config.Config) (*sql.DB, error) {
     return openDSN(ctx, dsn)
 }
 
+// OpenAdminWithDB opens using admin role to a specific database name.
+func OpenAdminWithDB(ctx context.Context, cfg config.Config, dbName string) (*sql.DB, error) {
+    user := cfg.Postgres.Admin.User
+    pass := firstNonEmpty(cfg.Postgres.Admin.Password, cfg.Postgres.Admin.PasswordTemp)
+    if user == "" {
+        // fallback to app, then legacy
+        user = cfg.Postgres.App.User
+        pass = cfg.Postgres.App.Password
+        if user == "" {
+            user = cfg.Postgres.User
+            pass = cfg.Postgres.Password
+        }
+    }
+    dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, dbName, cfg.Postgres.SSLMode)
+    return openDSN(ctx, dsn)
+}
+
 func openDSN(ctx context.Context, dsn string) (*sql.DB, error) {
     db, err := sql.Open("postgres", dsn)
     if err != nil {
