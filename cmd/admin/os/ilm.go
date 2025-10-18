@@ -120,6 +120,7 @@ func init() {
 
     ilmCmd.AddCommand(showCmd)
     ilmCmd.AddCommand(deleteCmd)
+    ilmCmd.AddCommand(listCmd)
 }
 
 var showCmd = &cobra.Command{
@@ -175,4 +176,45 @@ func init() {
     showCmd.Flags().StringVar(&flagILMName, "name", "messages-content-ilm", "ILM policy name")
     deleteCmd.Flags().StringVar(&flagILMName, "name", "messages-content-ilm", "ILM policy name")
     deleteCmd.Flags().BoolVar(&flagYesDelete, "yes", false, "Confirm deletion")
+}
+
+var (
+    flagNamesOnly bool
+)
+
+var listCmd = &cobra.Command{
+    Use:   "list",
+    Short: "List ILM policies (names or JSON)",
+    RunE: func(cmd *cobra.Command, args []string) error {
+        cfg, err := cfgpkg.Load()
+        if err != nil { return err }
+        ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+        client := osdao.NewClientFromConfigAdmin(cfg)
+        raw, err := client.ListILMPolicies(ctx)
+        if err != nil { return err }
+        if flagNamesOnly {
+            var m map[string]interface{}
+            if err := json.Unmarshal(raw, &m); err != nil { return err }
+            // Print keys (policy names), one per line
+            for name := range m {
+                fmt.Fprintln(os.Stdout, name)
+            }
+            return nil
+        }
+        // Pretty print full JSON
+        var out map[string]interface{}
+        if err := json.Unmarshal(raw, &out); err == nil {
+            enc := json.NewEncoder(os.Stdout)
+            enc.SetIndent("", "  ")
+            return enc.Encode(out)
+        }
+        os.Stdout.Write(raw)
+        if len(raw) == 0 || raw[len(raw)-1] != '\n' { fmt.Fprintln(os.Stdout) }
+        return nil
+    },
+}
+
+func init() {
+    listCmd.Flags().BoolVar(&flagNamesOnly, "names-only", false, "List only policy names (one per line)")
 }

@@ -179,6 +179,21 @@ func (c *Client) DeleteILMPolicy(ctx context.Context, name string) error {
     return nil
 }
 
+// ListILMPolicies returns the raw JSON of all ILM policies.
+func (c *Client) ListILMPolicies(ctx context.Context) ([]byte, error) {
+    req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/_ilm/policy", c.baseURL), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return nil, err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return nil, fmt.Errorf("list ILM policies: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    b, err := io.ReadAll(resp.Body)
+    if err != nil { return nil, err }
+    return b, nil
+}
+
 func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, error) {
     req = req.WithContext(ctx)
     if c.username != "" {
