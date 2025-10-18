@@ -12,6 +12,7 @@ import (
 
 var (
     flagOverwrite  bool
+    flagDryRun     bool
     // Server
     flagServerPort int
     // Postgres base
@@ -48,43 +49,92 @@ var configureCmd = &cobra.Command{
             return err
         }
         path := cfgpkg.Path()
-        if !flagOverwrite {
+        if !flagOverwrite && !flagDryRun {
             if _, err := os.Stat(path); err == nil {
                 return fmt.Errorf("config already exists at %s (use --overwrite to replace)", path)
             }
         }
 
-        cfg := cfgpkg.Config{
-            Server: cfgpkg.ServerConfig{Port: flagServerPort},
-            Postgres: cfgpkg.PostgresConfig{
-                Host: flagPGHost, Port: flagPGPort, DBName: flagPGDBName, SSLMode: flagPGSSLMode,
-                App:   cfgpkg.PGRole{User: flagPGAppUser, Password: flagPGAppPassword},
-                Admin: cfgpkg.PGRole{User: flagPGAdminUser, Password: flagPGAdminPassword, PasswordTemp: flagPGAdminPasswordTmp},
-            },
-            OpenSearch: cfgpkg.OpenSearchConfig{
-                Scheme: flagOSScheme, Host: flagOSHost, Port: flagOSPort, InsecureSkipVerify: flagOSInsecure,
-                App:   cfgpkg.OSRole{Username: flagOSAppUsername, Password: flagOSAppPassword},
-                Admin: cfgpkg.OSRole{Username: flagOSAdminUsername, Password: flagOSAdminPassword, PasswordTemp: flagOSAdminPasswordTmp},
-            },
+        // Start from existing config (or defaults if missing) to preserve secrets
+        cfg, _ := cfgpkg.Load()
+
+        // Server
+        if cmd.Flags().Changed("server-port") {
+            cfg.Server.Port = flagServerPort
         }
 
-        // Fill defaults when zero
-        if cfg.Server.Port == 0 { cfg.Server.Port = cfgpkg.DefaultServerPort }
-        if cfg.Postgres.Host == "" { cfg.Postgres.Host = "127.0.0.1" }
-        if cfg.Postgres.Port == 0 { cfg.Postgres.Port = 5432 }
-        if cfg.Postgres.DBName == "" { cfg.Postgres.DBName = "rbc" }
-        if cfg.Postgres.SSLMode == "" { cfg.Postgres.SSLMode = "disable" }
-        if cfg.Postgres.App.User == "" { cfg.Postgres.App.User = "rbc_app" }
-        if cfg.Postgres.Admin.User == "" { cfg.Postgres.Admin.User = "rbc_admin" }
-        if cfg.OpenSearch.Scheme == "" { cfg.OpenSearch.Scheme = "http" }
-        if cfg.OpenSearch.Host == "" { cfg.OpenSearch.Host = "127.0.0.1" }
-        if cfg.OpenSearch.Port == 0 { cfg.OpenSearch.Port = cfgpkg.DefaultOpenSearchPort }
-        if cfg.OpenSearch.App.Username == "" { cfg.OpenSearch.App.Username = "rbc_app" }
-        if cfg.OpenSearch.Admin.Username == "" { cfg.OpenSearch.Admin.Username = "admin" }
+        // Postgres base
+        if cmd.Flags().Changed("pg-host") {
+            cfg.Postgres.Host = flagPGHost
+        }
+        if cmd.Flags().Changed("pg-port") {
+            cfg.Postgres.Port = flagPGPort
+        }
+        if cmd.Flags().Changed("pg-dbname") {
+            cfg.Postgres.DBName = flagPGDBName
+        }
+        if cmd.Flags().Changed("pg-sslmode") {
+            cfg.Postgres.SSLMode = flagPGSSLMode
+        }
+        // Postgres roles
+        if cmd.Flags().Changed("pg-app-user") {
+            cfg.Postgres.App.User = flagPGAppUser
+        }
+        if cmd.Flags().Changed("pg-app-password") {
+            cfg.Postgres.App.Password = flagPGAppPassword
+        }
+        if cmd.Flags().Changed("pg-admin-user") {
+            cfg.Postgres.Admin.User = flagPGAdminUser
+        }
+        if cmd.Flags().Changed("pg-admin-password") {
+            cfg.Postgres.Admin.Password = flagPGAdminPassword
+        }
+        if cmd.Flags().Changed("pg-admin-password-temp") {
+            cfg.Postgres.Admin.PasswordTemp = flagPGAdminPasswordTmp
+        }
+
+        // OpenSearch base
+        if cmd.Flags().Changed("os-scheme") {
+            cfg.OpenSearch.Scheme = flagOSScheme
+        }
+        if cmd.Flags().Changed("os-host") {
+            cfg.OpenSearch.Host = flagOSHost
+        }
+        if cmd.Flags().Changed("os-port") {
+            cfg.OpenSearch.Port = flagOSPort
+        }
+        if cmd.Flags().Changed("os-insecure") {
+            cfg.OpenSearch.InsecureSkipVerify = flagOSInsecure
+        }
+        // OpenSearch roles
+        if cmd.Flags().Changed("os-app-username") {
+            cfg.OpenSearch.App.Username = flagOSAppUsername
+        }
+        if cmd.Flags().Changed("os-app-password") {
+            cfg.OpenSearch.App.Password = flagOSAppPassword
+        }
+        if cmd.Flags().Changed("os-admin-username") {
+            cfg.OpenSearch.Admin.Username = flagOSAdminUsername
+        }
+        if cmd.Flags().Changed("os-admin-password") {
+            cfg.OpenSearch.Admin.Password = flagOSAdminPassword
+        }
+        if cmd.Flags().Changed("os-admin-password-temp") {
+            cfg.OpenSearch.Admin.PasswordTemp = flagOSAdminPasswordTmp
+        }
 
         b, err := yaml.Marshal(cfg)
         if err != nil {
             return err
+        }
+        if flagDryRun {
+            // Print merged config to stdout without writing
+            os.Stdout.Write(b)
+            if len(b) == 0 || b[len(b)-1] != '\n' {
+                fmt.Fprintln(os.Stdout)
+            }
+            fmt.Fprintf(os.Stderr, "dry-run: not writing %s\n", path)
+            return nil
         }
         if err := os.WriteFile(path, b, 0o644); err != nil {
             return err
@@ -98,6 +148,7 @@ func init() {
     DBCmd.AddCommand(configureCmd)
 
     configureCmd.Flags().BoolVar(&flagOverwrite, "overwrite", false, "Overwrite existing config.yaml if present")
+    configureCmd.Flags().BoolVar(&flagDryRun, "dry-run", false, "Print merged config to stdout without writing")
 
     configureCmd.Flags().IntVar(&flagServerPort, "server-port", cfgpkg.DefaultServerPort, "Server port")
 
