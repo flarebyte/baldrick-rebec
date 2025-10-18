@@ -91,3 +91,68 @@ func GrantRuntimePrivileges(ctx context.Context, db *sql.DB, appRole string) err
     return nil
 }
 
+// RevokeRuntimePrivileges revokes typical runtime privileges for the app role in the connected DB.
+func RevokeRuntimePrivileges(ctx context.Context, db *sql.DB, appRole string) error {
+    if appRole == "" { return errors.New("empty app role") }
+    ar, err := safeIdent(appRole)
+    if err != nil { return err }
+    stmts := []string{
+        fmt.Sprintf("REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM %s", ar),
+        fmt.Sprintf("REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM %s", ar),
+        fmt.Sprintf("REVOKE USAGE ON SCHEMA public FROM %s", ar),
+        fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM %s", ar),
+        fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE USAGE, SELECT ON SEQUENCES FROM %s", ar),
+    }
+    for _, s := range stmts {
+        if _, err := db.ExecContext(ctx, s); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+// RoleExists checks if a role exists.
+func RoleExists(ctx context.Context, db *sql.DB, roleName string) (bool, error) {
+    if roleName == "" { return false, errors.New("empty role name") }
+    var ok bool
+    err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", roleName).Scan(&ok)
+    return ok, err
+}
+
+// DatabaseExists checks if a database exists.
+func DatabaseExists(ctx context.Context, db *sql.DB, name string) (bool, error) {
+    if name == "" { return false, errors.New("empty db name") }
+    var ok bool
+    err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", name).Scan(&ok)
+    return ok, err
+}
+
+// HasSchemaUsage returns true if role has USAGE on schema.
+func HasSchemaUsage(ctx context.Context, db *sql.DB, role, schema string) (bool, error) {
+    if role == "" || schema == "" { return false, errors.New("empty role or schema") }
+    var ok bool
+    err := db.QueryRowContext(ctx, "SELECT has_schema_privilege($1, $2, 'USAGE')", role, schema).Scan(&ok)
+    return ok, err
+}
+
+// MissingTableDML returns true if any table in schema lacks DML privileges for role.
+func MissingTableDML(ctx context.Context, db *sql.DB, role, schema string) (bool, error) {
+    if role == "" || schema == "" { return false, errors.New("empty role or schema") }
+    // Check for any table where role lacks at least one of SELECT/INSERT/UPDATE/DELETE
+    q := `SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables t
+            WHERE t.table_schema=$1 AND t.table_type='BASE TABLE'
+              AND (
+                NOT has_table_privilege($2, quote_ident(t.table_schema)||'.'||quote_ident(t.table_name), 'SELECT') OR
+                NOT has_table_privilege($2, quote_ident(t.table_schema)||'.'||quote_ident(t.table_name), 'INSERT') OR
+                NOT has_table_privilege($2, quote_ident(t.table_schema)||'.'||quote_ident(t.table_name), 'UPDATE') OR
+                NOT has_table_privilege($2, quote_ident(t.table_schema)||'.'||quote_ident(t.table_name), 'DELETE')
+              )
+          )`
+    var anyMissing bool
+    if err := db.QueryRowContext(ctx, q, schema, role).Scan(&anyMissing); err != nil {
+        return false, err
+    }
+    return anyMissing, nil
+}
