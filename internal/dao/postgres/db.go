@@ -12,13 +12,53 @@ import (
 
 // Open returns a sql.DB with sane defaults using the provided config.
 func Open(ctx context.Context, cfg config.Config) (*sql.DB, error) {
-    host := cfg.Postgres.Host
-    port := cfg.Postgres.Port
-    user := cfg.Postgres.User
-    pass := cfg.Postgres.Password
-    dbname := cfg.Postgres.DBName
-    sslmode := cfg.Postgres.SSLMode
-    dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", host, port, user, pass, dbname, sslmode)
+    // Prefer app role; fallback to admin; then legacy
+    user := cfg.Postgres.App.User
+    pass := cfg.Postgres.App.Password
+    if user == "" {
+        user = cfg.Postgres.Admin.User
+        if pass == "" {
+            pass = firstNonEmpty(cfg.Postgres.Admin.Password, cfg.Postgres.Admin.PasswordTemp)
+        }
+    }
+    if user == "" {
+        user = cfg.Postgres.User
+        pass = cfg.Postgres.Password
+    }
+    dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
+    return openDSN(ctx, dsn)
+}
+
+// OpenApp opens using app role credentials (or legacy fallback).
+func OpenApp(ctx context.Context, cfg config.Config) (*sql.DB, error) {
+    user := cfg.Postgres.App.User
+    pass := cfg.Postgres.App.Password
+    if user == "" {
+        user = cfg.Postgres.User
+        pass = cfg.Postgres.Password
+    }
+    dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
+    return openDSN(ctx, dsn)
+}
+
+// OpenAdmin opens using admin role credentials (prefers password_temp).
+func OpenAdmin(ctx context.Context, cfg config.Config) (*sql.DB, error) {
+    user := cfg.Postgres.Admin.User
+    pass := firstNonEmpty(cfg.Postgres.Admin.Password, cfg.Postgres.Admin.PasswordTemp)
+    if user == "" {
+        // fallback to app, then legacy
+        user = cfg.Postgres.App.User
+        pass = cfg.Postgres.App.Password
+        if user == "" {
+            user = cfg.Postgres.User
+            pass = cfg.Postgres.Password
+        }
+    }
+    dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
+    return openDSN(ctx, dsn)
+}
+
+func openDSN(ctx context.Context, dsn string) (*sql.DB, error) {
     db, err := sql.Open("postgres", dsn)
     if err != nil {
         return nil, err
@@ -36,3 +76,11 @@ func Open(ctx context.Context, cfg config.Config) (*sql.DB, error) {
     return db, nil
 }
 
+func firstNonEmpty(values ...string) string {
+    for _, v := range values {
+        if v != "" {
+            return v
+        }
+    }
+    return ""
+}

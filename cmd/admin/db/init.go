@@ -25,11 +25,15 @@ var initCmd = &cobra.Command{
         ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
         defer cancel()
 
-        // Postgres: open and ensure schema
-        fmt.Fprintln(os.Stderr, "db:init - connecting to Postgres...")
-        db, err := pgdao.Open(ctx, cfg)
+        // Postgres: prefer admin for schema changes, fallback to app
+        fmt.Fprintln(os.Stderr, "db:init - connecting to Postgres (admin/app)...")
+        db, err := pgdao.OpenAdmin(ctx, cfg)
         if err != nil {
-            return err
+            // fallback to app
+            db, err = pgdao.OpenApp(ctx, cfg)
+            if err != nil {
+                return err
+            }
         }
         defer db.Close()
         fmt.Fprintln(os.Stderr, "db:init - ensuring Postgres schema...")
@@ -37,9 +41,9 @@ var initCmd = &cobra.Command{
             return err
         }
 
-        // OpenSearch: ensure index
-        fmt.Fprintln(os.Stderr, "db:init - connecting to OpenSearch...")
-        osc := osdao.NewClientFromConfig(cfg)
+        // OpenSearch: ensure index (use admin if available)
+        fmt.Fprintln(os.Stderr, "db:init - connecting to OpenSearch (admin/app)...")
+        osc := osdao.NewClientFromConfigAdmin(cfg)
         fmt.Fprintln(os.Stderr, "db:init - ensuring OpenSearch index 'messages_content'...")
         if err := osc.EnsureMessagesContentIndex(ctx); err != nil {
             return err
@@ -49,4 +53,3 @@ var initCmd = &cobra.Command{
         return nil
     },
 }
-

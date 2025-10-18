@@ -19,8 +19,8 @@ type Client struct {
     password   string
 }
 
-// NewClientFromConfig builds a simple HTTP client using the OpenSearch config.
-func NewClientFromConfig(cfg config.Config) *Client {
+// NewClientFromConfigApp builds a client using the app role credentials.
+func NewClientFromConfigApp(cfg config.Config) *Client {
     scheme := cfg.OpenSearch.Scheme
     if scheme == "" {
         scheme = "http"
@@ -43,9 +43,58 @@ func NewClientFromConfig(cfg config.Config) *Client {
     return &Client{
         httpClient: hc,
         baseURL:    baseURL,
-        username:   cfg.OpenSearch.Username,
-        password:   cfg.OpenSearch.Password,
+        username:   firstNonEmpty(cfg.OpenSearch.App.Username, cfg.OpenSearch.Admin.Username),
+        password:   firstNonEmpty(cfg.OpenSearch.App.Password, cfg.OpenSearch.App.Password, cfg.OpenSearch.Admin.Password, cfg.OpenSearch.Admin.PasswordTemp),
     }
+}
+
+// NewClientFromConfigAdmin builds a client using the admin role credentials.
+func NewClientFromConfigAdmin(cfg config.Config) *Client {
+    scheme := cfg.OpenSearch.Scheme
+    if scheme == "" {
+        scheme = "http"
+    }
+    host := cfg.OpenSearch.Host
+    if host == "" {
+        host = "127.0.0.1"
+    }
+    port := cfg.OpenSearch.Port
+    if port == 0 {
+        port = config.DefaultOpenSearchPort
+    }
+    baseURL := fmt.Sprintf("%s://%s:%d", scheme, host, port)
+
+    tr := &http.Transport{}
+    if scheme == "https" && cfg.OpenSearch.InsecureSkipVerify {
+        tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+    }
+    hc := &http.Client{Transport: tr, Timeout: 30 * time.Second}
+    return &Client{
+        httpClient: hc,
+        baseURL:    baseURL,
+        username:   firstNonEmpty(cfg.OpenSearch.Admin.Username, cfg.OpenSearch.App.Username),
+        password:   firstNonEmpty(cfg.OpenSearch.Admin.Password, cfg.OpenSearch.Admin.PasswordTemp, cfg.OpenSearch.App.Password),
+    }
+}
+
+// Backward-compat constructor: use app, then legacy fields if present.
+func NewClientFromConfig(cfg config.Config) *Client {
+    c := NewClientFromConfigApp(cfg)
+    // If neither admin nor app is configured but legacy exists, set from legacy
+    if c.username == "" && cfg.OpenSearch.Admin.Username == "" && cfg.OpenSearch.App.Username == "" {
+        c.username = cfg.OpenSearch.Username
+        c.password = cfg.OpenSearch.Password
+    }
+    return c
+}
+
+func firstNonEmpty(values ...string) string {
+    for _, v := range values {
+        if v != "" {
+            return v
+        }
+    }
+    return ""
 }
 
 func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, error) {

@@ -23,9 +23,12 @@ type OpenSearchConfig struct {
     Host               string `yaml:"host"`
     Scheme             string `yaml:"scheme"` // http or https
     Port               int    `yaml:"port"`
-    Username           string `yaml:"username"`
-    Password           string `yaml:"password"`
     InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+    Admin              OSRole `yaml:"admin"`
+    App                OSRole `yaml:"app"`
+    // Legacy fields (deprecated)
+    Username           string `yaml:"username,omitempty"`
+    Password           string `yaml:"password,omitempty"`
 }
 
 type Config struct {
@@ -37,8 +40,10 @@ type Config struct {
 func defaults() Config {
     return Config{
         Server:     ServerConfig{Port: DefaultServerPort},
-        OpenSearch: OpenSearchConfig{Host: "127.0.0.1", Scheme: "http", Port: DefaultOpenSearchPort},
-        Postgres:   PostgresConfig{Host: "127.0.0.1", Port: 5432, User: "rbc", Password: "rbcpass", DBName: "rbc", SSLMode: "disable"},
+        OpenSearch: OpenSearchConfig{Host: "127.0.0.1", Scheme: "http", Port: DefaultOpenSearchPort,
+            Admin: OSRole{Username: "admin"}, App: OSRole{Username: "rbc_app"}},
+        Postgres:   PostgresConfig{Host: "127.0.0.1", Port: 5432, DBName: "rbc", SSLMode: "disable",
+            Admin: PGRole{User: "rbc_admin"}, App: PGRole{User: "rbc_app"}},
     }
 }
 
@@ -76,14 +81,21 @@ func Load() (Config, error) {
     if fileCfg.OpenSearch.Port != 0 {
         cfg.OpenSearch.Port = fileCfg.OpenSearch.Port
     }
-    if fileCfg.OpenSearch.Username != "" {
-        cfg.OpenSearch.Username = fileCfg.OpenSearch.Username
-    }
-    if fileCfg.OpenSearch.Password != "" {
-        cfg.OpenSearch.Password = fileCfg.OpenSearch.Password
-    }
     if fileCfg.OpenSearch.InsecureSkipVerify {
         cfg.OpenSearch.InsecureSkipVerify = true
+    }
+    if fileCfg.OpenSearch.Admin.Username != "" {
+        cfg.OpenSearch.Admin.Username = fileCfg.OpenSearch.Admin.Username
+    }
+    if fileCfg.OpenSearch.Admin.Password != "" || fileCfg.OpenSearch.Admin.PasswordTemp != "" {
+        cfg.OpenSearch.Admin.Password = fileCfg.OpenSearch.Admin.Password
+        cfg.OpenSearch.Admin.PasswordTemp = fileCfg.OpenSearch.Admin.PasswordTemp
+    }
+    if fileCfg.OpenSearch.App.Username != "" {
+        cfg.OpenSearch.App.Username = fileCfg.OpenSearch.App.Username
+    }
+    if fileCfg.OpenSearch.App.Password != "" {
+        cfg.OpenSearch.App.Password = fileCfg.OpenSearch.App.Password
     }
     // Postgres overrides
     if fileCfg.Postgres.Host != "" {
@@ -92,17 +104,24 @@ func Load() (Config, error) {
     if fileCfg.Postgres.Port != 0 {
         cfg.Postgres.Port = fileCfg.Postgres.Port
     }
-    if fileCfg.Postgres.User != "" {
-        cfg.Postgres.User = fileCfg.Postgres.User
-    }
-    if fileCfg.Postgres.Password != "" {
-        cfg.Postgres.Password = fileCfg.Postgres.Password
-    }
     if fileCfg.Postgres.DBName != "" {
         cfg.Postgres.DBName = fileCfg.Postgres.DBName
     }
     if fileCfg.Postgres.SSLMode != "" {
         cfg.Postgres.SSLMode = fileCfg.Postgres.SSLMode
+    }
+    if fileCfg.Postgres.Admin.User != "" {
+        cfg.Postgres.Admin.User = fileCfg.Postgres.Admin.User
+    }
+    if fileCfg.Postgres.Admin.Password != "" || fileCfg.Postgres.Admin.PasswordTemp != "" {
+        cfg.Postgres.Admin.Password = fileCfg.Postgres.Admin.Password
+        cfg.Postgres.Admin.PasswordTemp = fileCfg.Postgres.Admin.PasswordTemp
+    }
+    if fileCfg.Postgres.App.User != "" {
+        cfg.Postgres.App.User = fileCfg.Postgres.App.User
+    }
+    if fileCfg.Postgres.App.Password != "" {
+        cfg.Postgres.App.Password = fileCfg.Postgres.App.Password
     }
     return cfg, nil
 }
@@ -110,8 +129,25 @@ func Load() (Config, error) {
 type PostgresConfig struct {
     Host    string `yaml:"host"`
     Port    int    `yaml:"port"`
-    User    string `yaml:"user"`
-    Password string `yaml:"password"`
     DBName  string `yaml:"dbname"`
     SSLMode string `yaml:"sslmode"` // disable, require, verify-ca, verify-full
+    Admin   PGRole `yaml:"admin"`
+    App     PGRole `yaml:"app"`
+    // Legacy fields (deprecated)
+    User    string `yaml:"user,omitempty"`
+    Password string `yaml:"password,omitempty"`
+}
+
+type PGRole struct {
+    User         string `yaml:"user"`
+    Password     string `yaml:"password,omitempty"`
+    // For admin role, prefer using password_temp and remove it after use.
+    PasswordTemp string `yaml:"password_temp,omitempty"`
+}
+
+type OSRole struct {
+    Username     string `yaml:"username"`
+    Password     string `yaml:"password,omitempty"`
+    // For admin role, prefer using password_temp and remove it after use.
+    PasswordTemp string `yaml:"password_temp,omitempty"`
 }

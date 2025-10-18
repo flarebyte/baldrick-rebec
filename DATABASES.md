@@ -91,14 +91,24 @@ server:
 postgres:
   host: 127.0.0.1
   port: 5432
-  user: rbc
-  password: rbcpass
   dbname: rbc
   sslmode: disable
+  app:
+    user: rbc_app
+    password: rbcpass
+  admin:
+    user: rbc_admin
+    password_temp: ""   # Temporary only; remove after use
 opensearch:
   scheme: http
   host: 127.0.0.1
   port: 9200
+  app:
+    username: rbc_app
+    password: ""
+  admin:
+    username: admin
+    password_temp: ""   # Temporary only; remove after use
 ```
 
 - If your OpenSearch is secured via TLS and auth:
@@ -108,9 +118,13 @@ opensearch:
   scheme: https
   host: 127.0.0.1
   port: 9200
-  username: admin
-  password: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
   insecure_skip_verify: true # dev only
+  app:
+    username: rbc_app
+    password: ""
+  admin:
+    username: admin
+    password_temp: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD} # Use temporarily; remove after use
 ```
 
 ## Local Development (Docker/Podman)
@@ -154,12 +168,18 @@ OpenSearch
 - The CLI creates the OpenSearch index but does not create ILM policies. Add `rbc admin os ilm ensure` if you prefer full automation.
 - Add health endpoints and richer diagnostics in `rbc admin db status` (doc counts, table existence, index settings) as needed.
 
-## Summary Table
+## Credentials Map (Roles → Password Location)
 
-| Component | Name | Purpose | Roles/Users | Where to store passwords |
-| --- | --- | --- | --- | --- |
-| PostgreSQL database | `rbc` | Primary relational store for events and profiles | `rbc_admin` (schema owner), `rbc_app` (runtime DML) | Dev: `~/.baldrick-rebec/config.yaml` (`pg-password`) or `.env` for compose; Prod: secret manager/Kubernetes Secret/host env (never in repo) |
-| PostgreSQL table | `messages_events` | Ingest/processing events referencing OpenSearch content | Owned by `rbc_admin`; `rbc_app`: SELECT/INSERT/UPDATE/DELETE | Same as DB user (`rbc_app`) password location |
-| PostgreSQL table | `message_profiles` | Reusable message profile definitions and defaults | Owned by `rbc_admin`; `rbc_app`: SELECT/INSERT/UPDATE/DELETE | Same as DB user (`rbc_app`) password location |
-| OpenSearch index | `messages_content` | Unique message bodies for search/deduplication | `rbc_app` (read/write index), `admin` (operator only) | Dev: `~/.baldrick-rebec/config.yaml` (`os-username`/`os-password`); Prod: secret manager/Kubernetes Secret/host env |
-| OpenSearch ILM policy | `messages-content-ilm` | Rollover/retention policy attached to `messages_content` | `admin` (operator) | Use operator credentials; never commit to repo |
+This table maps each principal (role/user) to where its password should live in different environments. Avoid committing any credentials to version control.
+
+| System | Role/User | Purpose | Local dev (single-user) | Docker Compose init | CI/Staging/Prod |
+| --- | --- | --- | --- | --- | --- |
+| PostgreSQL | `rbc_admin` | Schema owner; migrations | Not typically needed at runtime; if used, store in `~/.baldrick-rebec/config.yaml` temporarily | Use `.env` for compose bootstrap only; do NOT commit | Secret manager (e.g., AWS SM, Vault) or Kubernetes Secret; inject to migration job |
+| PostgreSQL | `rbc_app` | Runtime DML by CLI/server | `~/.baldrick-rebec/config.yaml` under `postgres.password` | `.env` passed to app container env; override via secrets when possible | Secret manager / Kubernetes Secret; injected as env/secret volume to the service |
+| OpenSearch | `admin` | Operator tasks (ILM, bootstrap) | Use only when needed; supply via `~/.baldrick-rebec/config.yaml` or env var at run time; remove after | `.env` with `OPENSEARCH_INITIAL_ADMIN_PASSWORD` for demo images | Secret manager / Kubernetes Secret; use sparingly by ops tooling, not app |
+| OpenSearch | `rbc_app` | Index read/write for `messages_content` | `~/.baldrick-rebec/config.yaml` under `opensearch.username/password` | `.env` for local containers; prefer non-admin user | Secret manager / Kubernetes Secret; injected to app; least-privilege role |
+
+Guidelines
+- Prefer secrets managers in shared environments; avoid long-lived credentials in files.
+- For Docker Compose, `.env` must be gitignored and only used for local bootstrap.
+- In production, use a non-admin OpenSearch user with index-scoped privileges and a runtime-only Postgres user (`rbc_app`).

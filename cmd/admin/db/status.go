@@ -23,9 +23,9 @@ var statusCmd = &cobra.Command{
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
         defer cancel()
 
-        // Postgres
-        fmt.Fprintln(os.Stderr, "db:status - checking Postgres...")
-        pgres, err := pgdao.Open(ctx, cfg)
+        // Postgres (app role)
+        fmt.Fprintln(os.Stderr, "db:status - checking Postgres (app)...")
+        pgres, err := pgdao.OpenApp(ctx, cfg)
         if err != nil {
             fmt.Fprintf(os.Stderr, "postgres: error: %v\n", err)
         } else {
@@ -35,9 +35,9 @@ var statusCmd = &cobra.Command{
             fmt.Fprintf(os.Stderr, "postgres: ok db=%s user=%s\n", dbname, user)
         }
 
-        // OpenSearch
-        fmt.Fprintln(os.Stderr, "db:status - checking OpenSearch...")
-        osc := osdao.NewClientFromConfig(cfg)
+        // OpenSearch (app role)
+        fmt.Fprintln(os.Stderr, "db:status - checking OpenSearch (app)...")
+        osc := osdao.NewClientFromConfigApp(cfg)
         health, err := osc.ClusterHealth(ctx)
         if err != nil {
             fmt.Fprintf(os.Stderr, "opensearch: error: %v\n", err)
