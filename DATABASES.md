@@ -154,3 +154,12 @@ OpenSearch
 - The CLI creates the OpenSearch index but does not create ILM policies. Add `rbc admin os ilm ensure` if you prefer full automation.
 - Add health endpoints and richer diagnostics in `rbc admin db status` (doc counts, table existence, index settings) as needed.
 
+## Summary Table
+
+| Component | Name | Purpose | Roles/Users | Where to store passwords |
+| --- | --- | --- | --- | --- |
+| PostgreSQL database | `rbc` | Primary relational store for events and profiles | `rbc_admin` (schema owner), `rbc_app` (runtime DML) | Dev: `~/.baldrick-rebec/config.yaml` (`pg-password`) or `.env` for compose; Prod: secret manager/Kubernetes Secret/host env (never in repo) |
+| PostgreSQL table | `messages_events` | Ingest/processing events referencing OpenSearch content | Owned by `rbc_admin`; `rbc_app`: SELECT/INSERT/UPDATE/DELETE | Same as DB user (`rbc_app`) password location |
+| PostgreSQL table | `message_profiles` | Reusable message profile definitions and defaults | Owned by `rbc_admin`; `rbc_app`: SELECT/INSERT/UPDATE/DELETE | Same as DB user (`rbc_app`) password location |
+| OpenSearch index | `messages_content` | Unique message bodies for search/deduplication | `rbc_app` (read/write index), `admin` (operator only) | Dev: `~/.baldrick-rebec/config.yaml` (`os-username`/`os-password`); Prod: secret manager/Kubernetes Secret/host env |
+| OpenSearch ILM policy | `messages-content-ilm` | Rollover/retention policy attached to `messages_content` | `admin` (operator) | Use operator credentials; never commit to repo |
