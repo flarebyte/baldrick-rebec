@@ -46,13 +46,22 @@ PostgreSQL and OpenSearch provisioning is designed to be driven by the CLI.
   - `rbc admin db scaffold --create-roles --create-db --grant-privileges --yes`
   - Then ensure tables/triggers: `rbc admin db scaffold` (schema-only re-run is safe)
 
+- Configure OpenSearch security + lifecycle for localhost:
+  - `rbc admin os bootstrap` (writes https config with admin password_temp, ensures lifecycle policy, and attaches to `messages_content`)
+  - This command tries ILM first; if ILM is not available, it falls back to ISM automatically.
+
 - Initialize OpenSearch index and verify:
   - `rbc admin db init` (ensures `messages_content` index and Postgres schema)
-  - `rbc admin db status`
+  - `rbc admin db status` (reports index presence and lifecycle policy via ILM or ISM)
 
-OpenSearch ILM
+OpenSearch Lifecycle (ILM/ISM)
 
-- Attach an ILM policy for `messages_content` (recommended). This is currently an operator action; example payload:
+- OpenSearch often uses the Index State Management (ISM) plugin rather than Elasticsearch ILM. The CLI supports both:
+  - ILM commands: `rbc admin os ilm ensure|show|list|delete`
+  - ISM commands: `rbc admin os ism ensure|show|list|delete`
+  - For secured local images, `os bootstrap` will configure https and ensure+attach ILM or ISM automatically.
+
+- Example ILM policy (if ILM is available):
 
 ```json
 PUT _ilm/policy/messages-content-ilm
@@ -67,7 +76,7 @@ PUT _ilm/policy/messages-content-ilm
 }
 ```
 
-The CLI sets the index’s `index.lifecycle.name` when creating `messages_content`, but does not create the ILM policy itself.
+If ILM is not available, an equivalent ISM policy is created and attached by the CLI. The status command detects and reports either ILM or ISM.
 
 ## Configuration
 
@@ -125,8 +134,9 @@ opensearch:
   2. Create config: `rbc admin config init --overwrite [flags]`
   3. Plan changes: `rbc admin db plan`
   4. Scaffold DB: `rbc admin db scaffold --create-roles --create-db --grant-privileges --yes`
-  5. Initialize stores: `rbc admin db init`
-  6. Verify: `rbc admin db status`
+  5. Configure OpenSearch secure localhost and lifecycle: `rbc admin os bootstrap`
+  6. Initialize stores: `rbc admin db init`
+  7. Verify: `rbc admin db status`
 
 - Podman users can use `podman-compose` with the same file (adjust commands accordingly).
 
