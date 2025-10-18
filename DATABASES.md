@@ -21,7 +21,7 @@ This document explains how the Baldrick‑Rebec CLI uses its databases (PostgreS
 
 ## What the CLI Manages
 
-- `rbc admin db configure` — Creates `~/.baldrick-rebec/config.yaml` with server/DB settings.
+- `rbc admin config init` — Creates `~/.baldrick-rebec/config.yaml` with server/DB settings.
 - `rbc admin db init` — Initializes data stores:
   - PostgreSQL: creates or updates core tables and a trigger to maintain `updated_at` on `message_profiles`.
   - OpenSearch: ensures the `messages_content` index with simplified mappings/settings exists.
@@ -133,7 +133,7 @@ opensearch:
   1. Start services:
      - `docker compose up -d postgres`
      - `docker compose up -d opensearch-node1 opensearch-node2 opensearch-dashboards`
-  2. Create config: `rbc admin db configure --overwrite [flags]`
+  2. Create config: `rbc admin config init --overwrite [flags]`
   3. Initialize stores: `rbc admin db init`
   4. Verify: `rbc admin db status`
 

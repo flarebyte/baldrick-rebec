@@ -2,6 +2,7 @@ package admin
 
 import (
     "github.com/flarebyte/baldrick-rebec/cmd/admin/conversation"
+    configcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/config"
     dbcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/db"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/message"
     srvcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/server"
@@ -15,6 +16,7 @@ var AdminCmd = &cobra.Command{
 
 func init() {
     AdminCmd.AddCommand(conversation.ConversationCmd)
+    AdminCmd.AddCommand(configcmd.ConfigCmd)
     AdminCmd.AddCommand(dbcmd.DBCmd)
     AdminCmd.AddCommand(message.MessageCmd)
     AdminCmd.AddCommand(srvcmd.ServerCmd)
