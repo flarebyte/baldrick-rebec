@@ -1,6 +1,7 @@
 package opensearch
 
 import (
+    "bytes"
     "context"
     "crypto/tls"
     "encoding/json"
@@ -95,6 +96,87 @@ func firstNonEmpty(values ...string) string {
         }
     }
     return ""
+}
+
+// EnsureILMPolicy ensures an ILM policy exists; if force is true, updates/overwrites.
+func (c *Client) EnsureILMPolicy(ctx context.Context, name string, policy map[string]interface{}, force bool) error {
+    if name == "" { return fmt.Errorf("empty ILM policy name") }
+    // Check existence
+    req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/_ilm/policy/%s", c.baseURL, name), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return err }
+    resp.Body.Close()
+    exists := resp.StatusCode == http.StatusOK
+    if exists && !force {
+        return nil
+    }
+    body, err := json.Marshal(policy)
+    if err != nil { return err }
+    putReq, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/_ilm/policy/%s", c.baseURL, name), bytes.NewReader(body))
+    putReq.Header.Set("Content-Type", "application/json")
+    putResp, err := c.do(ctx, putReq)
+    if err != nil { return err }
+    defer putResp.Body.Close()
+    if putResp.StatusCode >= 300 {
+        b, _ := io.ReadAll(putResp.Body)
+        return fmt.Errorf("ensure ILM policy: status=%d body=%s", putResp.StatusCode, string(b))
+    }
+    return nil
+}
+
+// AttachILMToIndex attaches a policy to an index via settings update.
+func (c *Client) AttachILMToIndex(ctx context.Context, index, policyName string) error {
+    if index == "" || policyName == "" {
+        return fmt.Errorf("empty index or policy name")
+    }
+    payload := map[string]interface{}{
+        "index": map[string]interface{}{
+            "lifecycle": map[string]interface{}{
+                "name": policyName,
+            },
+        },
+    }
+    body, _ := json.Marshal(payload)
+    req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/%s/_settings", c.baseURL, index), bytes.NewReader(body))
+    req.Header.Set("Content-Type", "application/json")
+    resp, err := c.do(ctx, req)
+    if err != nil { return err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return fmt.Errorf("attach ILM to index: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    return nil
+}
+
+// GetILMPolicy returns the raw ILM policy JSON for the given name.
+func (c *Client) GetILMPolicy(ctx context.Context, name string) ([]byte, error) {
+    if name == "" { return nil, fmt.Errorf("empty ILM policy name") }
+    req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/_ilm/policy/%s", c.baseURL, name), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return nil, err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return nil, fmt.Errorf("get ILM policy: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    body, err := io.ReadAll(resp.Body)
+    if err != nil { return nil, err }
+    return body, nil
+}
+
+// DeleteILMPolicy deletes the ILM policy with the given name.
+func (c *Client) DeleteILMPolicy(ctx context.Context, name string) error {
+    if name == "" { return fmt.Errorf("empty ILM policy name") }
+    req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/_ilm/policy/%s", c.baseURL, name), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return fmt.Errorf("delete ILM policy: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    return nil
 }
 
 func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, error) {
