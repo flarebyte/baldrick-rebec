@@ -22,3 +22,10 @@ See DATABASES.md for full workflow, credentials guidance, and a setup checklist.
   - `rbc admin os ilm ensure|show|list|delete`
   - `rbc admin os ism ensure|show|list|delete`
 - `rbc admin os bootstrap` detects which is available and configures lifecycle automatically for `messages_content`.
+
+Note on admin passwords (temporary)
+- For bootstrap, set the OpenSearch admin temporary password via `--admin-password-temp` or the `OPENSEARCH_INITIAL_ADMIN_PASSWORD` env.
+- After bootstrap, clear it to avoid lingering admin creds in your config:
+  - `rbc admin config init --os-admin-password-temp ''`
+- Optionally add an app user for day-to-day operations and stop relying on admin:
+  - `rbc admin config init --os-app-username rbc_app --os-app-password '<app-pass>'`
