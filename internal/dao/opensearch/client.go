@@ -277,3 +277,120 @@ func (c *Client) IndexDocCount(ctx context.Context, index string) (int64, error)
     if err := json.NewDecoder(resp.Body).Decode(&obj); err != nil { return 0, err }
     return obj.Count, nil
 }
+
+// ISM support for OpenSearch
+
+// EnsureISMPolicy ensures an ISM policy exists; if force is true, it will delete and recreate.
+func (c *Client) EnsureISMPolicy(ctx context.Context, name string, policy map[string]interface{}, force bool) error {
+    if name == "" { return fmt.Errorf("empty ISM policy name") }
+    // Check existence
+    req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/_plugins/_ism/policies/%s", c.baseURL, name), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return err }
+    defer resp.Body.Close()
+    exists := resp.StatusCode == http.StatusOK
+    if exists && !force { return nil }
+    if exists && force {
+        // delete first
+        delReq, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/_plugins/_ism/policies/%s", c.baseURL, name), nil)
+        delResp, err := c.do(ctx, delReq)
+        if err != nil { return err }
+        delResp.Body.Close()
+    }
+    bodyMap := map[string]interface{}{"policy": policy}
+    body, _ := json.Marshal(bodyMap)
+    putReq, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/_plugins/_ism/policies/%s", c.baseURL, name), bytes.NewReader(body))
+    putReq.Header.Set("Content-Type", "application/json")
+    putResp, err := c.do(ctx, putReq)
+    if err != nil { return err }
+    defer putResp.Body.Close()
+    if putResp.StatusCode >= 300 {
+        b, _ := io.ReadAll(putResp.Body)
+        return fmt.Errorf("ensure ISM policy: status=%d body=%s", putResp.StatusCode, string(b))
+    }
+    return nil
+}
+
+// AttachISMToIndex attaches an ISM policy to an index.
+func (c *Client) AttachISMToIndex(ctx context.Context, index, policyName string) error {
+    if index == "" || policyName == "" { return fmt.Errorf("empty index or policy name") }
+    payload := map[string]interface{}{
+        "index": map[string]interface{}{
+            "plugins": map[string]interface{}{
+                "index_state_management": map[string]interface{}{
+                    "policy_id": policyName,
+                },
+            },
+        },
+    }
+    body, _ := json.Marshal(payload)
+    req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/%s/_settings", c.baseURL, index), bytes.NewReader(body))
+    req.Header.Set("Content-Type", "application/json")
+    resp, err := c.do(ctx, req)
+    if err != nil { return err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return fmt.Errorf("attach ISM to index: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    return nil
+}
+
+// IndexISMPolicyID returns the ISM policy_id set on the index, if any.
+func (c *Client) IndexISMPolicyID(ctx context.Context, index string) (string, error) {
+    if index == "" { return "", fmt.Errorf("empty index") }
+    req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/%s/_settings", c.baseURL, index), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return "", err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return "", fmt.Errorf("get index settings: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    var m map[string]struct{ Settings map[string]map[string]map[string]map[string]interface{} `json:"settings"` }
+    if err := json.NewDecoder(resp.Body).Decode(&m); err != nil { return "", err }
+    for _, v := range m {
+        // index.plugins.index_state_management.policy_id
+        if idx, ok := v.Settings["index"]; ok {
+            if plugins, ok := idx["plugins"]; ok {
+                if ism, ok := plugins["index_state_management"]; ok {
+                    if pid, ok := ism["policy_id"].(string); ok {
+                        return pid, nil
+                    }
+                }
+            }
+        }
+    }
+    return "", nil
+}
+
+// GetISMPolicy returns the raw ISM policy JSON.
+func (c *Client) GetISMPolicy(ctx context.Context, name string) ([]byte, error) {
+    if name == "" { return nil, fmt.Errorf("empty ISM policy name") }
+    req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/_plugins/_ism/policies/%s", c.baseURL, name), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return nil, err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return nil, fmt.Errorf("get ISM policy: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    body, err := io.ReadAll(resp.Body)
+    if err != nil { return nil, err }
+    return body, nil
+}
+
+// ListISMPolicies returns raw JSON of all ISM policies.
+func (c *Client) ListISMPolicies(ctx context.Context) ([]byte, error) {
+    req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/_plugins/_ism/policies", c.baseURL), nil)
+    resp, err := c.do(ctx, req)
+    if err != nil { return nil, err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        b, _ := io.ReadAll(resp.Body)
+        return nil, fmt.Errorf("list ISM policies: status=%d body=%s", resp.StatusCode, string(b))
+    }
+    b, err := io.ReadAll(resp.Body)
+    if err != nil { return nil, err }
+    return b, nil
+}

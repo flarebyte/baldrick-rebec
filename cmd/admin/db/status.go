@@ -156,8 +156,21 @@ var statusCmd = &cobra.Command{
                         v := false
                         st.OpenSearch.Index.ILMPolicyExists = &v
                     }
+                } else if pid, err := osc.IndexISMPolicyID(ctx, "messages_content"); err == nil && pid != "" {
+                    fmt.Fprintf(os.Stderr, "opensearch: index ISM policy=%q\n", pid)
+                    st.OpenSearch.Index.ILMPolicy = pid
+                    adminOSC := osdao.NewClientFromConfigAdmin(cfg)
+                    if _, err := adminOSC.GetISMPolicy(ctx, pid); err == nil {
+                        fmt.Fprintln(os.Stderr, "opensearch: ISM policy exists: ok")
+                        v := true
+                        st.OpenSearch.Index.ILMPolicyExists = &v
+                    } else {
+                        fmt.Fprintf(os.Stderr, "opensearch: ISM policy missing or inaccessible: %v\n", err)
+                        v := false
+                        st.OpenSearch.Index.ILMPolicyExists = &v
+                    }
                 } else {
-                    fmt.Fprintln(os.Stderr, "opensearch: index ILM policy: not set (use 'rbc admin os ilm ensure --attach-to-index messages_content')")
+                    fmt.Fprintln(os.Stderr, "opensearch: index lifecycle policy: not set (use 'rbc admin os ilm ensure --attach-to-index messages_content' or ISM policy)")
                 }
                 if cnt, err := osc.IndexDocCount(ctx, "messages_content"); err == nil {
                     fmt.Fprintf(os.Stderr, "opensearch: index doc count=%d\n", cnt)

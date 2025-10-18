@@ -61,8 +61,21 @@ var bootstrapCmd = &cobra.Command{
         ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
         defer cancel()
         client := osdao.NewClientFromConfigAdmin(cfg)
+        // Try ILM first; if endpoint not found, fallback to ISM
         if err := client.EnsureILMPolicy(ctx, policyName, defaultPolicy(), false); err != nil {
-            return fmt.Errorf("ensure ILM policy: %w", err)
+            // Fallback to ISM
+            fmt.Fprintln(os.Stderr, "bootstrap: ILM API not available; falling back to ISM policy")
+            ismPolicy := defaultISMPolicy()
+            if err2 := client.EnsureISMPolicy(ctx, policyName, ismPolicy, true); err2 != nil {
+                return fmt.Errorf("ensure ISM policy: %w", err2)
+            }
+            idx := flagBSAttachIndex
+            if idx == "" { idx = "messages_content" }
+            if err2 := client.AttachISMToIndex(ctx, idx, policyName); err2 != nil {
+                return fmt.Errorf("attach ISM policy to %s: %w", idx, err2)
+            }
+            fmt.Fprintln(os.Stderr, "bootstrap: ISM ensured and attached to index")
+            return nil
         }
         idx := flagBSAttachIndex
         if idx == "" { idx = "messages_content" }
@@ -85,3 +98,30 @@ func init() {
     bootstrapCmd.Flags().StringVar(&flagBSAttachIndex, "attach-index", "messages_content", "Index to attach the ILM policy to")
 }
 
+// defaultISMPolicy returns a simple rollover+delete policy for OpenSearch ISM.
+func defaultISMPolicy() map[string]interface{} {
+    // This ISM policy approximates the ILM policy behavior with rollover at ~30d or size and delete at 180d.
+    return map[string]interface{}{
+        "description": "messages content rollover+retention",
+        "default_state": "hot",
+        "states": []map[string]interface{}{
+            {
+                "name": "hot",
+                "actions": []map[string]interface{}{
+                    {"rollover": map[string]interface{}{
+                        "min_index_age": "30d",
+                        "min_primary_shard_size": "50gb",
+                    }},
+                },
+                "transitions": []map[string]interface{}{
+                    {"state_name": "delete", "conditions": map[string]interface{}{"min_index_age": "180d"}},
+                },
+            },
+            {
+                "name": "delete",
+                "actions": []map[string]interface{}{{"delete": map[string]interface{}{}}},
+                "transitions": []map[string]interface{}{},
+            },
+        },
+    }
+}
