@@ -6,6 +6,7 @@ import (
     "errors"
     "fmt"
     "regexp"
+    pqpkg "github.com/lib/pq"
 )
 
 var identRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -32,8 +33,10 @@ func EnsureRole(ctx context.Context, db *sql.DB, roleName, password string) erro
     if err != nil { return err }
     // Set password if provided
     if password != "" {
-        _, err = db.ExecContext(ctx, fmt.Sprintf("ALTER ROLE %s WITH LOGIN PASSWORD $1", rn), password)
-        if err != nil { return err }
+        // Use literal quoting to avoid placeholder issues in ALTER ROLE
+        quoted := pqpkg.QuoteLiteral(password)
+        stmt := fmt.Sprintf("ALTER ROLE %s WITH LOGIN PASSWORD %s", rn, quoted)
+        if _, err := db.ExecContext(ctx, stmt); err != nil { return err }
     }
     return nil
 }
