@@ -8,7 +8,6 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    osdao "github.com/flarebyte/baldrick-rebec/internal/dao/opensearch"
     "github.com/spf13/cobra"
 )
 
@@ -41,46 +40,35 @@ var initCmd = &cobra.Command{
             return err
         }
 
-        // If PG-only feature enabled, ensure content table in PG and skip OpenSearch
-        if cfg.Features.PGOnly {
-            fmt.Fprintln(os.Stderr, "db:init - pg_only=true; ensuring PostgreSQL content table...")
-            if err := pgdao.EnsureContentSchema(ctx, db); err != nil {
-                return err
-            }
-            if err := pgdao.EnsureFTSIndex(ctx, db); err != nil {
-                fmt.Fprintf(os.Stderr, "db:init - warn: ensure FTS index: %v\n", err)
-            } else {
-                fmt.Fprintln(os.Stderr, "db:init - FTS index: ok")
-            }
-            if err := pgdao.EnsureVectorExtension(ctx, db); err != nil {
-                fmt.Fprintf(os.Stderr, "db:init - note: pgvector extension not enabled (%v)\n", err)
-            } else {
-                fmt.Fprintln(os.Stderr, "db:init - pgvector extension: present")
-            }
-            // Optional embedding column + index based on feature dim
-            if cfg.Features.PGVectorDim > 0 {
-                if ok, _ := pgdao.HasVectorExtension(ctx, db); ok {
-                    if err := pgdao.EnsureEmbeddingColumn(ctx, db, cfg.Features.PGVectorDim); err != nil {
-                        fmt.Fprintf(os.Stderr, "db:init - warn: ensure embedding column: %v\n", err)
-                    } else {
-                        fmt.Fprintln(os.Stderr, "db:init - embedding column: ok")
-                    }
-                    if err := pgdao.EnsureEmbeddingIndex(ctx, db); err != nil {
-                        fmt.Fprintf(os.Stderr, "db:init - warn: ensure embedding index: %v\n", err)
-                    } else {
-                        fmt.Fprintln(os.Stderr, "db:init - embedding index: ok")
-                    }
-                } else {
-                    fmt.Fprintln(os.Stderr, "db:init - note: pgvector not present; skipping embedding column/index")
-                }
-            }
+        // PG-only: ensure content table and FTS readiness
+        fmt.Fprintln(os.Stderr, "db:init - ensuring PostgreSQL content table...")
+        if err := pgdao.EnsureContentSchema(ctx, db); err != nil {
+            return err
+        }
+        if err := pgdao.EnsureFTSIndex(ctx, db); err != nil {
+            fmt.Fprintf(os.Stderr, "db:init - warn: ensure FTS index: %v\n", err)
         } else {
-            // OpenSearch: ensure index (use admin if available)
-            fmt.Fprintln(os.Stderr, "db:init - connecting to OpenSearch (admin/app)...")
-            osc := osdao.NewClientFromConfigAdmin(cfg)
-            fmt.Fprintln(os.Stderr, "db:init - ensuring OpenSearch index 'messages_content'...")
-            if err := osc.EnsureMessagesContentIndex(ctx); err != nil {
-                return err
+            fmt.Fprintln(os.Stderr, "db:init - FTS index: ok")
+        }
+        if err := pgdao.EnsureVectorExtension(ctx, db); err != nil {
+            fmt.Fprintf(os.Stderr, "db:init - note: pgvector extension not enabled (%v)\n", err)
+        } else {
+            fmt.Fprintln(os.Stderr, "db:init - pgvector extension: present")
+        }
+        if cfg.Features.PGVectorDim > 0 {
+            if ok, _ := pgdao.HasVectorExtension(ctx, db); ok {
+                if err := pgdao.EnsureEmbeddingColumn(ctx, db, cfg.Features.PGVectorDim); err != nil {
+                    fmt.Fprintf(os.Stderr, "db:init - warn: ensure embedding column: %v\n", err)
+                } else {
+                    fmt.Fprintln(os.Stderr, "db:init - embedding column: ok")
+                }
+                if err := pgdao.EnsureEmbeddingIndex(ctx, db); err != nil {
+                    fmt.Fprintf(os.Stderr, "db:init - warn: ensure embedding index: %v\n", err)
+                } else {
+                    fmt.Fprintln(os.Stderr, "db:init - embedding index: ok")
+                }
+            } else {
+                fmt.Fprintln(os.Stderr, "db:init - note: pgvector not present; skipping embedding column/index")
             }
         }
 
