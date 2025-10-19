@@ -23,11 +23,7 @@ var validateCmd = &cobra.Command{
         if cfg.Postgres.Port <= 0 { problems = append(problems, "postgres.port must be > 0") }
         if cfg.Postgres.DBName == "" { problems = append(problems, "postgres.dbname is required") }
 
-        if cfg.OpenSearch.Scheme != "http" && cfg.OpenSearch.Scheme != "https" {
-            problems = append(problems, "opensearch.scheme must be 'http' or 'https'")
-        }
-        if cfg.OpenSearch.Host == "" { problems = append(problems, "opensearch.host is required") }
-        if cfg.OpenSearch.Port <= 0 { problems = append(problems, "opensearch.port must be > 0") }
+        // OpenSearch removed in PG-only mode; no validation
 
         if len(problems) > 0 {
             fmt.Fprintln(os.Stderr, "Configuration issues:")
@@ -38,4 +34,3 @@ var validateCmd = &cobra.Command{
         return nil
     },
 }
-

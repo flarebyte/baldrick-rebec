@@ -16,7 +16,7 @@ var (
 
 var clearAdminTempCmd = &cobra.Command{
     Use:   "clear-admin-temp",
-    Short: "Clear temporary admin passwords for Postgres and OpenSearch",
+    Short: "Clear temporary admin passwords (PostgreSQL)",
     RunE: func(cmd *cobra.Command, args []string) error {
         if _, err := paths.EnsureHome(); err != nil { return err }
         cfg, err := cfgpkg.Load()
@@ -24,7 +24,6 @@ var clearAdminTempCmd = &cobra.Command{
 
         // Clear temp admin passwords
         cfg.Postgres.Admin.PasswordTemp = ""
-        cfg.OpenSearch.Admin.PasswordTemp = ""
 
         b, err := yaml.Marshal(cfg)
         if err != nil { return err }
@@ -44,4 +43,3 @@ func init() {
     ConfigCmd.AddCommand(clearAdminTempCmd)
     clearAdminTempCmd.Flags().BoolVar(&flagClearDryRun, "dry-run", false, "Print merged config to stdout without writing")
 }
-
