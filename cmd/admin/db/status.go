@@ -57,7 +57,7 @@ var statusCmd = &cobra.Command{
         } else {
             defer pgres.Close()
             var dbname, user, version string
-            _ = pgres.QueryRowContext(ctx, "select current_database(), current_user, version()").Scan(&dbname, &user, &version)
+            _ = pgres.QueryRow(ctx, "select current_database(), current_user, version()").Scan(&dbname, &user, &version)
             fmt.Fprintf(os.Stderr, "postgres: ok db=%s user=%s\n", dbname, user)
             st.Postgres.AppConnection = pgAppConn{OK:true, DB:dbname, User:user}
         }
@@ -93,7 +93,7 @@ var statusCmd = &cobra.Command{
         if db, err := pgdao.OpenAdmin(ctx, cfg); err == nil {
             defer db.Close()
             var cnt int
-            _ = db.QueryRowContext(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages_events','message_profiles')").Scan(&cnt)
+            _ = db.QueryRow(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages_events','message_profiles')").Scan(&cnt)
             if cnt == 2 {
                 fmt.Fprintln(os.Stderr, "postgres: schema tables: ok")
                 st.Postgres.Schema.TablesOK = true
@@ -115,7 +115,7 @@ var statusCmd = &cobra.Command{
             if cfg.Features.PGOnly {
                 // Content table
                 var exists bool
-                _ = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='messages_content_pg')`).Scan(&exists)
+                _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='messages_content_pg')`).Scan(&exists)
                 if exists {
                     fmt.Fprintln(os.Stderr, "postgres: content table: ok")
                 } else {
@@ -123,7 +123,7 @@ var statusCmd = &cobra.Command{
                 }
                 // FTS index readiness: rely on index name we create
                 var fts bool
-                _ = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_messages_content_pg_fts')`).Scan(&fts)
+                _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_messages_content_pg_fts')`).Scan(&fts)
                 if fts {
                     fmt.Fprintln(os.Stderr, "postgres: FTS index: ok")
                 } else {
@@ -138,14 +138,14 @@ var statusCmd = &cobra.Command{
                 // Embedding column/index check when configured
                 if cfg.Features.PGVectorDim > 0 {
                     var hasCol bool
-                    _ = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='messages_content_pg' AND column_name='embedding')`).Scan(&hasCol)
+                    _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='messages_content_pg' AND column_name='embedding')`).Scan(&hasCol)
                     if hasCol {
                         fmt.Fprintln(os.Stderr, "postgres: embedding column: ok")
                     } else {
                         fmt.Fprintln(os.Stderr, "postgres: embedding column: missing (run 'rbc admin db init')")
                     }
                     var hasEmbIdx bool
-                    _ = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_messages_content_pg_embedding')`).Scan(&hasEmbIdx)
+                    _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_messages_content_pg_embedding')`).Scan(&hasEmbIdx)
                     if hasEmbIdx {
                         fmt.Fprintln(os.Stderr, "postgres: embedding index: ok")
                     } else {

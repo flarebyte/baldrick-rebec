@@ -7,10 +7,12 @@ import (
     "encoding/hex"
     "errors"
     "strings"
+
+    "github.com/jackc/pgx/v5/pgxpool"
 )
 
 // EnsureContentSchema creates the content table if missing.
-func EnsureContentSchema(ctx context.Context, db *sql.DB) error {
+func EnsureContentSchema(ctx context.Context, db *pgxpool.Pool) error {
     stmt := `CREATE TABLE IF NOT EXISTS messages_content_pg (
         id TEXT PRIMARY KEY,
         content TEXT NOT NULL,
@@ -19,7 +21,7 @@ func EnsureContentSchema(ctx context.Context, db *sql.DB) error {
         metadata JSONB DEFAULT '{}',
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`
-    _, err := db.ExecContext(ctx, stmt)
+    _, err := db.Exec(ctx, stmt)
     return err
 }
 
@@ -50,7 +52,7 @@ type MessageContent struct {
 }
 
 // PutMessageContent inserts or ignores an existing content row; returns the content id.
-func PutMessageContent(ctx context.Context, db *sql.DB, content, contentType, language string, metadata []byte) (string, error) {
+func PutMessageContent(ctx context.Context, db *pgxpool.Pool, content, contentType, language string, metadata []byte) (string, error) {
     if strings.TrimSpace(content) == "" {
         return "", errors.New("empty content")
     }
@@ -58,20 +60,20 @@ func PutMessageContent(ctx context.Context, db *sql.DB, content, contentType, la
     q := `INSERT INTO messages_content_pg (id, content, content_type, language, metadata)
           VALUES ($1,$2, NULLIF($3,''), NULLIF($4,''), COALESCE($5,'{}'::jsonb))
           ON CONFLICT (id) DO NOTHING`
-    if _, err := db.ExecContext(ctx, q, id, content, contentType, language, metadata); err != nil {
+    if _, err := db.Exec(ctx, q, id, content, contentType, language, metadata); err != nil {
         return "", err
     }
     return id, nil
 }
 
-func GetMessageContent(ctx context.Context, db *sql.DB, id string) (MessageContent, error) {
+func GetMessageContent(ctx context.Context, db *pgxpool.Pool, id string) (MessageContent, error) {
     var out MessageContent
     if strings.TrimSpace(id) == "" {
         return out, errors.New("empty id")
     }
     q := `SELECT id, content, content_type, language, COALESCE(metadata,'{}'::jsonb)
           FROM messages_content_pg WHERE id=$1`
-    row := db.QueryRowContext(ctx, q, id)
+    row := db.QueryRow(ctx, q, id)
     var meta []byte
     if err := row.Scan(&out.ID, &out.Content, &out.ContentType, &out.Language, &meta); err != nil {
         return out, err
@@ -81,41 +83,41 @@ func GetMessageContent(ctx context.Context, db *sql.DB, id string) (MessageConte
 }
 
 // EnsureFTSIndex creates a GIN index on to_tsvector('simple', content).
-func EnsureFTSIndex(ctx context.Context, db *sql.DB) error {
+func EnsureFTSIndex(ctx context.Context, db *pgxpool.Pool) error {
     stmt := `CREATE INDEX IF NOT EXISTS idx_messages_content_pg_fts
              ON messages_content_pg USING GIN (to_tsvector('simple', content))`
-    _, err := db.ExecContext(ctx, stmt)
+    _, err := db.Exec(ctx, stmt)
     return err
 }
 
 // EnsureVectorExtension attempts to enable the pgvector extension.
-func EnsureVectorExtension(ctx context.Context, db *sql.DB) error {
+func EnsureVectorExtension(ctx context.Context, db *pgxpool.Pool) error {
     // Requires superuser or appropriate privileges; safe to attempt.
-    _, err := db.ExecContext(ctx, `CREATE EXTENSION IF NOT EXISTS vector`)
+    _, err := db.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS vector`)
     return err
 }
 
 // HasVectorExtension reports whether the pgvector extension is available.
-func HasVectorExtension(ctx context.Context, db *sql.DB) (bool, error) {
+func HasVectorExtension(ctx context.Context, db *pgxpool.Pool) (bool, error) {
     var ok bool
-    err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')`).Scan(&ok)
+    err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')`).Scan(&ok)
     return ok, err
 }
 
 // EnsureEmbeddingColumn ensures an embedding column exists with given dimension.
-func EnsureEmbeddingColumn(ctx context.Context, db *sql.DB, dim int) error {
+func EnsureEmbeddingColumn(ctx context.Context, db *pgxpool.Pool, dim int) error {
     if dim <= 0 { return nil }
     // Add column if missing
-    _, err := db.ExecContext(ctx, `ALTER TABLE messages_content_pg ADD COLUMN IF NOT EXISTS embedding vector`)
+    _, err := db.Exec(ctx, `ALTER TABLE messages_content_pg ADD COLUMN IF NOT EXISTS embedding vector`)
     if err != nil { return err }
     // Verify dimension; Postgres vector type encodes dim at runtime; cannot enforce at DDL easily without casting.
     return nil
 }
 
 // EnsureEmbeddingIndex creates an approximate index on embedding if column exists.
-func EnsureEmbeddingIndex(ctx context.Context, db *sql.DB) error {
+func EnsureEmbeddingIndex(ctx context.Context, db *pgxpool.Pool) error {
     // Use ivfflat by default; requires SET to enable; try to create index and ignore errors.
     // Users may adjust storage parameters later.
-    _, err := db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_messages_content_pg_embedding ON messages_content_pg USING ivfflat (embedding)`)
+    _, err := db.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_messages_content_pg_embedding ON messages_content_pg USING ivfflat (embedding)`)
     return err
 }

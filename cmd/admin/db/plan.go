@@ -67,7 +67,7 @@ var planCmd = &cobra.Command{
 
             // Schema objects
             var cnt int
-            _ = admdb.QueryRowContext(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages_events','message_profiles')").Scan(&cnt)
+            _ = admdb.QueryRow(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages_events','message_profiles')").Scan(&cnt)
             if cnt < 2 {
                 fmt.Println("PLAN: CREATE TABLE messages_events (...);")
                 fmt.Println("PLAN: CREATE TABLE message_profiles (...);")
@@ -82,4 +82,3 @@ var planCmd = &cobra.Command{
 func init() {
     DBCmd.AddCommand(planCmd)
 }
-

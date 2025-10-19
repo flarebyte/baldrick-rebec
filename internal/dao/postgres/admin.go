@@ -2,11 +2,12 @@ package postgres
 
 import (
     "context"
-    "database/sql"
     "errors"
     "fmt"
     "regexp"
-    pqpkg "github.com/lib/pq"
+    
+    "github.com/jackc/pgx/v5/pgxpool"
+    "strings"
 )
 
 var identRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -19,30 +20,29 @@ func safeIdent(name string) (string, error) {
 }
 
 // EnsureRole creates a role with LOGIN if it doesn't exist and sets password if provided.
-func EnsureRole(ctx context.Context, db *sql.DB, roleName, password string) error {
+func EnsureRole(ctx context.Context, db *pgxpool.Pool, roleName, password string) error {
     if roleName == "" {
         return errors.New("empty role name")
     }
     rn, err := safeIdent(roleName)
     if err != nil { return err }
     // Create role if missing
-    _, err = db.ExecContext(ctx, fmt.Sprintf(
+    _, err = db.Exec(ctx, fmt.Sprintf(
         "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') THEN CREATE ROLE %s LOGIN; END IF; END $$;",
         rn, rn,
     ))
     if err != nil { return err }
     // Set password if provided
     if password != "" {
-        // Use literal quoting to avoid placeholder issues in ALTER ROLE
-        quoted := pqpkg.QuoteLiteral(password)
-        stmt := fmt.Sprintf("ALTER ROLE %s WITH LOGIN PASSWORD %s", rn, quoted)
-        if _, err := db.ExecContext(ctx, stmt); err != nil { return err }
+        // Safely quote identifier and literal
+        stmt := fmt.Sprintf("ALTER ROLE %s WITH LOGIN PASSWORD %s", rn, quoteLiteral(password))
+        if _, err := db.Exec(ctx, stmt); err != nil { return err }
     }
     return nil
 }
 
 // EnsureDatabase creates a database if it doesn't exist, with an optional owner.
-func EnsureDatabase(ctx context.Context, db *sql.DB, dbName, owner string) error {
+func EnsureDatabase(ctx context.Context, db *pgxpool.Pool, dbName, owner string) error {
     if dbName == "" { return errors.New("empty database name") }
     dn, err := safeIdent(dbName)
     if err != nil { return err }
@@ -52,30 +52,30 @@ func EnsureDatabase(ctx context.Context, db *sql.DB, dbName, owner string) error
     }
     // Check existence
     var exists bool
-    if err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", dn).Scan(&exists); err != nil {
+    if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", dn).Scan(&exists); err != nil {
         return err
     }
     if exists { return nil }
     // Create
     stmt := fmt.Sprintf("CREATE DATABASE %s", dn)
     if ow != "" { stmt += fmt.Sprintf(" OWNER %s", ow) }
-    _, err = db.ExecContext(ctx, stmt)
+    _, err = db.Exec(ctx, stmt)
     return err
 }
 
 // GrantConnect grants CONNECT on database to app role.
-func GrantConnect(ctx context.Context, db *sql.DB, dbName, appRole string) error {
+func GrantConnect(ctx context.Context, db *pgxpool.Pool, dbName, appRole string) error {
     if dbName == "" || appRole == "" { return errors.New("empty db or role") }
     dn, err := safeIdent(dbName)
     if err != nil { return err }
     ar, err := safeIdent(appRole)
     if err != nil { return err }
-    _, err = db.ExecContext(ctx, fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dn, ar))
+    _, err = db.Exec(ctx, fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dn, ar))
     return err
 }
 
 // GrantRuntimePrivileges grants typical privileges for app role inside the connected database.
-func GrantRuntimePrivileges(ctx context.Context, db *sql.DB, appRole string) error {
+func GrantRuntimePrivileges(ctx context.Context, db *pgxpool.Pool, appRole string) error {
     if appRole == "" { return errors.New("empty app role") }
     ar, err := safeIdent(appRole)
     if err != nil { return err }
@@ -87,7 +87,7 @@ func GrantRuntimePrivileges(ctx context.Context, db *sql.DB, appRole string) err
         fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO %s", ar),
     }
     for _, s := range stmts {
-        if _, err := db.ExecContext(ctx, s); err != nil {
+        if _, err := db.Exec(ctx, s); err != nil {
             return err
         }
     }
@@ -95,7 +95,7 @@ func GrantRuntimePrivileges(ctx context.Context, db *sql.DB, appRole string) err
 }
 
 // RevokeRuntimePrivileges revokes typical runtime privileges for the app role in the connected DB.
-func RevokeRuntimePrivileges(ctx context.Context, db *sql.DB, appRole string) error {
+func RevokeRuntimePrivileges(ctx context.Context, db *pgxpool.Pool, appRole string) error {
     if appRole == "" { return errors.New("empty app role") }
     ar, err := safeIdent(appRole)
     if err != nil { return err }
@@ -107,7 +107,7 @@ func RevokeRuntimePrivileges(ctx context.Context, db *sql.DB, appRole string) er
         fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE USAGE, SELECT ON SEQUENCES FROM %s", ar),
     }
     for _, s := range stmts {
-        if _, err := db.ExecContext(ctx, s); err != nil {
+        if _, err := db.Exec(ctx, s); err != nil {
             return err
         }
     }
@@ -115,31 +115,31 @@ func RevokeRuntimePrivileges(ctx context.Context, db *sql.DB, appRole string) er
 }
 
 // RoleExists checks if a role exists.
-func RoleExists(ctx context.Context, db *sql.DB, roleName string) (bool, error) {
+func RoleExists(ctx context.Context, db *pgxpool.Pool, roleName string) (bool, error) {
     if roleName == "" { return false, errors.New("empty role name") }
     var ok bool
-    err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", roleName).Scan(&ok)
+    err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", roleName).Scan(&ok)
     return ok, err
 }
 
 // DatabaseExists checks if a database exists.
-func DatabaseExists(ctx context.Context, db *sql.DB, name string) (bool, error) {
+func DatabaseExists(ctx context.Context, db *pgxpool.Pool, name string) (bool, error) {
     if name == "" { return false, errors.New("empty db name") }
     var ok bool
-    err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", name).Scan(&ok)
+    err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", name).Scan(&ok)
     return ok, err
 }
 
 // HasSchemaUsage returns true if role has USAGE on schema.
-func HasSchemaUsage(ctx context.Context, db *sql.DB, role, schema string) (bool, error) {
+func HasSchemaUsage(ctx context.Context, db *pgxpool.Pool, role, schema string) (bool, error) {
     if role == "" || schema == "" { return false, errors.New("empty role or schema") }
     var ok bool
-    err := db.QueryRowContext(ctx, "SELECT has_schema_privilege($1, $2, 'USAGE')", role, schema).Scan(&ok)
+    err := db.QueryRow(ctx, "SELECT has_schema_privilege($1, $2, 'USAGE')", role, schema).Scan(&ok)
     return ok, err
 }
 
 // MissingTableDML returns true if any table in schema lacks DML privileges for role.
-func MissingTableDML(ctx context.Context, db *sql.DB, role, schema string) (bool, error) {
+func MissingTableDML(ctx context.Context, db *pgxpool.Pool, role, schema string) (bool, error) {
     if role == "" || schema == "" { return false, errors.New("empty role or schema") }
     // Check for any table where role lacks at least one of SELECT/INSERT/UPDATE/DELETE
     q := `SELECT EXISTS (
@@ -154,8 +154,13 @@ func MissingTableDML(ctx context.Context, db *sql.DB, role, schema string) (bool
               )
           )`
     var anyMissing bool
-    if err := db.QueryRowContext(ctx, q, schema, role).Scan(&anyMissing); err != nil {
+    if err := db.QueryRow(ctx, q, schema, role).Scan(&anyMissing); err != nil {
         return false, err
     }
     return anyMissing, nil
+}
+
+// quoteLiteral returns a SQL string literal with proper escaping for single quotes.
+func quoteLiteral(s string) string {
+    return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }

@@ -2,11 +2,12 @@ package postgres
 
 import (
     "context"
-    "database/sql"
+
+    "github.com/jackc/pgx/v5/pgxpool"
 )
 
 // EnsureSchema creates the required tables if they do not exist.
-func EnsureSchema(ctx context.Context, db *sql.DB) error {
+func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
     stmts := []string{
         `CREATE TABLE IF NOT EXISTS messages_events (
             id BIGSERIAL PRIMARY KEY,
@@ -66,10 +67,9 @@ func EnsureSchema(ctx context.Context, db *sql.DB) error {
         END $$;`,
     }
     for _, s := range stmts {
-        if _, err := db.ExecContext(ctx, s); err != nil {
+        if _, err := db.Exec(ctx, s); err != nil {
             return err
         }
     }
     return nil
 }
-

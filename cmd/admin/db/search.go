@@ -47,7 +47,7 @@ var searchCmd = &cobra.Command{
               FROM messages_content_pg
               WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', $1)
               LIMIT $2`
-        rows, err := db.QueryContext(ctx, q, flagSearchText, flagSearchTopK)
+        rows, err := db.Query(ctx, q, flagSearchText, flagSearchTopK)
         if err != nil { return err }
         defer rows.Close()
         results := []searchResult{}
