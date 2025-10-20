@@ -357,3 +357,94 @@ A system must define and register _task agents_ in a PostgreSQL database. Each t
 - A company registers `acme/text-summarizer/python` v1.0.0 describing a summarization task.
 - Another registers `openai/code-reviewer/js` v2.1.1 for code analysis.
 - Updating `acme/text-summarizer/python` to v1.1.0 with improved prompt and new metrics.
+
+## Workflow configuration
+
+**Problem Definition:**
+
+A system must manage _documentation metadata_ for individual tasks and for _workflows_ composed of tasks. Both types of documentation must be stored and retrievable from a PostgreSQL database. Locally, workflow definitions should be manageable through YAML configuration files, supporting version tracking, environment profiles, and update checks similar to a package manager (e.g., npm).
+
+---
+
+**Documentation Metadata Requirements:**
+
+Each **task documentation** must include:
+
+- title (string)
+- description (text)
+- goal (text)
+- links (list of objects containing `title` and `url`)
+
+Each **workflow documentation** must include:
+
+- title (string)
+- description (text)
+- tasks (list of task references: name and version)
+
+Both documentation types should be persistable in PostgreSQL and retrievable by ID, name, or related entity.
+
+---
+
+**Workflow Management Requirements:**
+
+A **workflow** represents a sequence or collection of registered tasks.
+Each workflow definition (in database or local YAML) must specify:
+
+- name (string)
+- profile (string, e.g., dev-ai, dev-basic, qa, ci)
+- tasks (key-value mapping of `task_name`: `version`)
+- optional metadata (title, description)
+
+Local YAML format example:
+
+```
+workflow:
+  name: example-workflow
+  profile: dev-ai
+  tasks:
+    summarizer: "1.2.1"
+    translator: "1.3.0"
+```
+
+---
+
+**Capabilities and Use Cases:**
+
+1. Store documentation metadata for tasks and workflows in PostgreSQL.
+2. Retrieve, update, or delete documentation records by name or workflow reference.
+3. Load a local YAML workflow file and validate its structure and task version references.
+4. Check for outdated task versions based on stored registry data (compare YAML vs DB).
+5. Upgrade tasks within a workflow definition to the latest available versions.
+6. Support multiple workflow profiles, each maintaining its own task versions and configurations.
+7. Allow exporting or syncing local YAML workflow definitions with database-stored documentation.
+
+---
+
+**Edge Cases:**
+
+- Missing or invalid links (no title or malformed URL).
+- Inconsistent task versions (referencing a task that does not exist or is unregistered).
+- Conflicting task definitions between profiles.
+- YAML parsing errors due to indentation or type mismatch.
+- Workflow referencing tasks without associated documentation.
+- Attempt to upgrade tasks beyond available versions.
+
+---
+
+**Limitations and Non-Goals:**
+
+- No execution or validation of workflow logic or task dependencies.
+- No real-time synchronization between local YAML and the database.
+- No automated conflict resolution when profiles define different versions of the same task.
+- No authentication or permission control for documentation updates.
+- No version diffing beyond version number comparison.
+
+---
+
+**Example Contexts:**
+
+- A YAML workflow for `qa` uses task versions optimized for testing (`summarizer: 1.2.0`), while `dev-ai` uses newer experimental ones (`summarizer: 1.3.0`).
+- The system checks the registry and flags that `summarizer 1.2.0` is outdated.
+- The database stores the full documentation for each task and workflow, allowing browsing or linking to related docs via stored URLs.
+
+This section defines the storage, retrieval, and version-checking context for documentation metadata and workflow definitions, without specifying implementation logic or schema.
