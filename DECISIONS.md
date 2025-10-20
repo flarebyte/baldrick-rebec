@@ -295,3 +295,65 @@ CREATE INDEX messages_events_meta_gin ON messages_events USING GIN (meta);
 
 - **OpenSearch ILM**: rollover by size/age, retain 180 days (content rarely changes).
 - **PostgreSQL partitioning**: monthly partitions on `received_at`, drop/archive old partitions as needed.
+
+## Agent task definition
+
+**Problem Definition:**
+
+A system must define and register _task agents_ in a PostgreSQL database. Each task agent represents a defined executable unit of work that can be uniquely identified, versioned, and described through structured metadata. The system should ensure that agents can be uniquely referenced, queried, and updated in a consistent manner.
+
+**Core Requirements:**
+
+- Each task agent must have a _unique name_ and a _version_. Together, they act as the unique identifier (similar to a package registry like npm).
+- The name may follow a convention such as `company/name/language`, where:
+
+  - `company` identifies the organization or namespace.
+  - `name` identifies the agent itself.
+  - `language` identifies the primary implementation or runtime environment.
+
+- The version follows semantic or incremental versioning rules to distinguish agent revisions.
+
+**Stored Definition (fields to persist):**
+
+- name (string)
+- version (string)
+- title (string)
+- description (text)
+- goal (text)
+- prompt (text)
+- shell_command (text)
+- tags (array or text)
+- timeout (integer, representing seconds)
+- metrics (structured data; includes cost per token, quality score, etc.)
+- created_at and updated_at timestamps (auto-generated)
+
+**Behavior and Use Cases:**
+
+1. Register a new task agent with full metadata into the database.
+2. Retrieve an existing agent by name and version.
+3. List all versions for a given agent name.
+4. Update an existing agent’s definition when a new version is released.
+5. Validate that names and versions are unique and comply with naming conventions.
+6. Allow filtering by tags or language when querying agents.
+
+**Edge Cases:**
+
+- Attempting to register an agent with an existing (name, version) pair should be rejected.
+- Missing required fields (name, version, or title) should cause validation failure.
+- Invalid name format (not following convention or containing disallowed characters).
+- Version rollback attempts (registering an older version number after a newer one).
+- Excessively large descriptions or prompts should be rejected to prevent data overflow.
+
+**Limitations and Non-Goals:**
+
+- The system should not execute or interpret the agent’s prompt or shell command.
+- No dependency resolution between agents (unlike npm dependencies).
+- No version conflict resolution or semantic version management.
+- No authentication, permissions, or access control for now.
+- No runtime management of agent processes (registration only).
+
+**Example Contexts:**
+
+- A company registers `acme/text-summarizer/python` v1.0.0 describing a summarization task.
+- Another registers `openai/code-reviewer/js` v2.1.1 for code analysis.
+- Updating `acme/text-summarizer/python` to v1.1.0 with improved prompt and new metrics.
