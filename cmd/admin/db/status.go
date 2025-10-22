@@ -61,6 +61,33 @@ var statusCmd = &cobra.Command{
             fmt.Fprintf(os.Stderr, "postgres: ok db=%s user=%s\n", dbname, user)
             st.Postgres.AppConnection = pgAppConn{OK:true, DB:dbname, User:user}
         }
+
+        // From app connection, sanity-check configured admin role existence/superuser
+        var adminExists, adminSuper, adminCanLogin bool
+        var superCandidates []string
+        if st.Postgres.AppConnection.OK {
+            // Check configured admin role info
+            _ = pgres.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)`, cfg.Postgres.Admin.User).Scan(&adminExists)
+            if adminExists {
+                _ = pgres.QueryRow(ctx, `SELECT rolsuper, rolcanlogin FROM pg_roles WHERE rolname=$1`, cfg.Postgres.Admin.User).Scan(&adminSuper, &adminCanLogin)
+                fmt.Fprintf(os.Stderr, "postgres: admin role %q: exists=%v superuser=%v can_login=%v (via app view)\n", cfg.Postgres.Admin.User, adminExists, adminSuper, adminCanLogin)
+            } else {
+                fmt.Fprintf(os.Stderr, "postgres: admin role %q: not found (via app view)\n", cfg.Postgres.Admin.User)
+            }
+            // Gather candidate superusers for hints
+            rows, err := pgres.Query(ctx, `SELECT rolname FROM pg_roles WHERE rolsuper AND rolcanlogin ORDER BY rolname LIMIT 5`)
+            if err == nil {
+                for rows.Next() {
+                    var rn string
+                    _ = rows.Scan(&rn)
+                    superCandidates = append(superCandidates, rn)
+                }
+                rows.Close()
+                if len(superCandidates) > 0 {
+                    fmt.Fprintf(os.Stderr, "postgres: superuser candidates: %v\n", superCandidates)
+                }
+            }
+        }
         // Admin/system DB for role/db checks
         var sysdbOK bool
         if sysdb, err := pgdao.OpenAdminWithDB(ctx, cfg, "postgres"); err == nil {
@@ -90,6 +117,11 @@ var statusCmd = &cobra.Command{
             // We cannot directly test CONNECT privilege easily cross-db here; implied by ability to connect as app.
         } else {
             fmt.Fprintf(os.Stderr, "postgres: admin connect to system DB failed: %v\n", err)
+            if !adminExists && len(superCandidates) > 0 {
+                fmt.Fprintf(os.Stderr, "hint: configured admin user %q not found; try one of: %v\n", cfg.Postgres.Admin.User, superCandidates)
+            } else if adminExists && (!adminSuper || !adminCanLogin) {
+                fmt.Fprintf(os.Stderr, "hint: admin role %q exists but superuser=%v can_login=%v; use a superuser with login\n", cfg.Postgres.Admin.User, adminSuper, adminCanLogin)
+            }
         }
         // In target DB: tables and privileges
         if db, err := pgdao.OpenAdmin(ctx, cfg); err == nil {
@@ -157,6 +189,11 @@ var statusCmd = &cobra.Command{
             }
         } else {
             fmt.Fprintf(os.Stderr, "postgres: admin connect to target DB failed: %v\n", err)
+            if !adminExists && len(superCandidates) > 0 {
+                fmt.Fprintf(os.Stderr, "hint: configured admin user %q not found; try one of: %v\n", cfg.Postgres.Admin.User, superCandidates)
+            } else if adminExists && (!adminSuper || !adminCanLogin) {
+                fmt.Fprintf(os.Stderr, "hint: admin role %q exists but superuser=%v can_login=%v; use a superuser with login\n", cfg.Postgres.Admin.User, adminSuper, adminCanLogin)
+            }
         }
 
         // OpenSearch removed in PG-only path
