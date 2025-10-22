@@ -2,10 +2,12 @@ package postgres
 
 import (
     "context"
+    "errors"
     "fmt"
     "time"
 
     "github.com/flarebyte/baldrick-rebec/internal/config"
+    "github.com/jackc/pgx/v5/pgconn"
     "github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -90,16 +92,25 @@ func openPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
     if err != nil {
         return nil, err
     }
-    // Retry ping with simple exponential backoff to handle container boot delays
+    // Retry ping with short exponential backoff. Fail fast on auth errors.
     var lastErr error
-    for i := 0; i < 5; i++ {
-        pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+    attempts := 3
+    for i := 0; i < attempts; i++ {
+        // Short per-attempt timeout
+        pingCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
         lastErr = pool.Ping(pingCtx)
         cancel()
         if lastErr == nil {
             return pool, nil
         }
-        time.Sleep(time.Duration(1<<i) * 200 * time.Millisecond)
+        var pgErr *pgconn.PgError
+        if errors.As(lastErr, &pgErr) {
+            // Authentication or authorization error: do not retry.
+            if pgErr.Code == "28P01" || pgErr.Code == "28000" {
+                break
+            }
+        }
+        time.Sleep(time.Duration(1<<i) * 100 * time.Millisecond)
     }
     pool.Close()
     return nil, lastErr
