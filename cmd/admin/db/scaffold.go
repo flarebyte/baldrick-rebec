@@ -103,14 +103,6 @@ var scaffoldCmd = &cobra.Command{
             if err := pgdao.EnsureFTSIndex(ctx, db); err != nil {
                 fmt.Fprintf(os.Stderr, "db:scaffold - warn: ensure FTS index: %v\n", err)
             }
-            if err := pgdao.EnsureVectorExtension(ctx, db); err == nil && cfg.Features.PGVectorDim > 0 {
-                if err := pgdao.EnsureEmbeddingColumn(ctx, db, cfg.Features.PGVectorDim); err != nil {
-                    fmt.Fprintf(os.Stderr, "db:scaffold - warn: ensure embedding column: %v\n", err)
-                }
-                if err := pgdao.EnsureEmbeddingIndex(ctx, db); err != nil {
-                    fmt.Fprintf(os.Stderr, "db:scaffold - warn: ensure embedding index: %v\n", err)
-                }
-            }
         }
 
         fmt.Fprintln(os.Stderr, "db:scaffold - done")

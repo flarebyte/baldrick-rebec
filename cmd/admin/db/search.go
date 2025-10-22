@@ -34,9 +34,6 @@ var searchCmd = &cobra.Command{
         }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
-        if !cfg.Features.PGOnly {
-            return errors.New("pg_only=false: this search uses PostgreSQL FTS; enable --pg-only in config")
-        }
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
         defer cancel()
         db, err := pgdao.OpenApp(ctx, cfg)

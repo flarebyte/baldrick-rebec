@@ -82,8 +82,7 @@ var sendCmd = &cobra.Command{
                 return fmt.Errorf("write stdout: %w", err)
             }
         }
-        // If pg-only, persist content + event to Postgres
-        if cfg.Features.PGOnly {
+        // Persist content + event to Postgres
             ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
             defer cancel()
             db, err := pgdao.OpenApp(ctx, cfg)
@@ -116,8 +115,7 @@ var sendCmd = &cobra.Command{
                 Tags: flagTags,
             }
             if _, err := pgdao.InsertMessageEvent(ctx, db, ev); err != nil { return err }
-            fmt.Fprintf(os.Stderr, "pg-only: stored content id=%s and event\n", id)
-        }
+            fmt.Fprintf(os.Stderr, "stored content id=%s and event\n", id)
         return nil
     },
 }

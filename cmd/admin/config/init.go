@@ -13,8 +13,6 @@ import (
 var (
     flagOverwrite  bool
     flagDryRun     bool
-    flagPGOnly     bool
-    flagPGVectorDim int
     // Server
     flagServerPort int
     // Postgres base
@@ -65,9 +63,7 @@ var initCmd = &cobra.Command{
         if cmd.Flags().Changed("pg-admin-password") { cfg.Postgres.Admin.Password = flagPGAdminPassword }
         // no temp password; single admin password
 
-        // Features
-        if cmd.Flags().Changed("pg-only") { cfg.Features.PGOnly = flagPGOnly }
-        if cmd.Flags().Changed("pg-vector-dim") && flagPGVectorDim >= 0 { cfg.Features.PGVectorDim = flagPGVectorDim }
+        // No feature flags
 
         b, err := yaml.Marshal(cfg)
         if err != nil { return err }
@@ -101,7 +97,5 @@ func init() {
     initCmd.Flags().StringVar(&flagPGAdminUser, "pg-admin-user", "rbc_admin", "Postgres admin user (migrations)")
     initCmd.Flags().StringVar(&flagPGAdminPassword, "pg-admin-password", "", "Postgres admin password")
 
-    // Features
-    initCmd.Flags().BoolVar(&flagPGOnly, "pg-only", false, "Enable PostgreSQL-only mode")
-    initCmd.Flags().IntVar(&flagPGVectorDim, "pg-vector-dim", 0, "Embedding vector dimension (0 disables embeddings)")
+    // No feature flags
 }

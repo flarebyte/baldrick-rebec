@@ -40,7 +40,7 @@ var initCmd = &cobra.Command{
             return err
         }
 
-        // PG-only: ensure content table and FTS readiness
+        // Ensure content table and FTS readiness
         fmt.Fprintln(os.Stderr, "db:init - ensuring PostgreSQL content table...")
         if err := pgdao.EnsureContentSchema(ctx, db); err != nil {
             return err
@@ -49,27 +49,6 @@ var initCmd = &cobra.Command{
             fmt.Fprintf(os.Stderr, "db:init - warn: ensure FTS index: %v\n", err)
         } else {
             fmt.Fprintln(os.Stderr, "db:init - FTS index: ok")
-        }
-        if err := pgdao.EnsureVectorExtension(ctx, db); err != nil {
-            fmt.Fprintf(os.Stderr, "db:init - note: pgvector extension not enabled (%v)\n", err)
-        } else {
-            fmt.Fprintln(os.Stderr, "db:init - pgvector extension: present")
-        }
-        if cfg.Features.PGVectorDim > 0 {
-            if ok, _ := pgdao.HasVectorExtension(ctx, db); ok {
-                if err := pgdao.EnsureEmbeddingColumn(ctx, db, cfg.Features.PGVectorDim); err != nil {
-                    fmt.Fprintf(os.Stderr, "db:init - warn: ensure embedding column: %v\n", err)
-                } else {
-                    fmt.Fprintln(os.Stderr, "db:init - embedding column: ok")
-                }
-                if err := pgdao.EnsureEmbeddingIndex(ctx, db); err != nil {
-                    fmt.Fprintf(os.Stderr, "db:init - warn: ensure embedding index: %v\n", err)
-                } else {
-                    fmt.Fprintln(os.Stderr, "db:init - embedding index: ok")
-                }
-            } else {
-                fmt.Fprintln(os.Stderr, "db:init - note: pgvector not present; skipping embedding column/index")
-            }
         }
 
         fmt.Fprintln(os.Stderr, "db:init - done")
