@@ -5,7 +5,7 @@ import (
     "errors"
     "fmt"
     "regexp"
-    
+
     "github.com/jackc/pgx/v5/pgxpool"
     "strings"
 )
@@ -163,4 +163,60 @@ func MissingTableDML(ctx context.Context, db *pgxpool.Pool, role, schema string)
 // quoteLiteral returns a SQL string literal with proper escaping for single quotes.
 func quoteLiteral(s string) string {
     return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+}
+
+// TerminateConnections forcibly terminates connections to the specified database.
+func TerminateConnections(ctx context.Context, sysdb *pgxpool.Pool, dbName string) error {
+    if dbName == "" { return errors.New("empty db name") }
+    _, err := sysdb.Exec(ctx, `SELECT pg_terminate_backend(pid)
+        FROM pg_stat_activity WHERE datname=$1 AND pid <> pg_backend_pid()`, dbName)
+    return err
+}
+
+// DropDatabase drops a database if it exists.
+func DropDatabase(ctx context.Context, sysdb *pgxpool.Pool, dbName string) error {
+    if dbName == "" { return errors.New("empty db name") }
+    dn, err := safeIdent(dbName)
+    if err != nil { return err }
+    _, err = sysdb.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s", dn))
+    return err
+}
+
+// ResetPublicSchema drops and recreates the public schema in the connected DB.
+func ResetPublicSchema(ctx context.Context, db *pgxpool.Pool) error {
+    stmts := []string{
+        "DROP SCHEMA IF EXISTS public CASCADE",
+        "CREATE SCHEMA public",
+        // Re-grant default privileges to public schema for owner
+        "GRANT ALL ON SCHEMA public TO CURRENT_USER",
+        "GRANT ALL ON SCHEMA public TO PUBLIC",
+    }
+    for _, s := range stmts {
+        if _, err := db.Exec(ctx, s); err != nil { return err }
+    }
+    return nil
+}
+
+// DropRole attempts to drop a role; it will reassign and drop owned objects first.
+func DropRole(ctx context.Context, sysdb *pgxpool.Pool, roleName string) error {
+    if roleName == "" { return errors.New("empty role name") }
+    rn, err := safeIdent(roleName)
+    if err != nil { return err }
+    // Avoid dropping current_user
+    var current string
+    if err := sysdb.QueryRow(ctx, "SELECT current_user").Scan(&current); err == nil {
+        if strings.EqualFold(current, roleName) {
+            return fmt.Errorf("refusing to drop current user %q; connect as a different superuser", roleName)
+        }
+    }
+    // Reassign and drop owned objects where possible, then drop role
+    stmts := []string{
+        fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", rn),
+        fmt.Sprintf("DROP OWNED BY %s", rn),
+        fmt.Sprintf("DROP ROLE IF EXISTS %s", rn),
+    }
+    for _, s := range stmts {
+        if _, err := sysdb.Exec(ctx, s); err != nil { return err }
+    }
+    return nil
 }
