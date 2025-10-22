@@ -47,7 +47,7 @@ PostgreSQL and OpenSearch provisioning is designed to be driven by the CLI.
   - Then ensure tables/triggers: `rbc admin db scaffold` (schema-only re-run is safe)
 
 - Configure OpenSearch security + lifecycle for localhost:
-  - `rbc admin os bootstrap` (writes https config with admin password_temp, ensures lifecycle policy, and attaches to `messages_content`)
+  - `rbc admin os bootstrap` (removed in PG-only; previous guidance for OpenSearch)
   - This command tries ILM first; if ILM is not available, it falls back to ISM automatically.
 
 - Initialize OpenSearch index and verify:
@@ -96,7 +96,7 @@ postgres:
     password: rbcpass
   admin:
     user: rbc_admin
-    password_temp: ""   # Temporary only; remove after use
+    password: ""        # Admin password used for admin operations
 opensearch:
   scheme: http
   host: 127.0.0.1
@@ -106,7 +106,7 @@ opensearch:
     password: ""
   admin:
     username: admin
-    password_temp: ""   # Temporary only; remove after use
+    password: ""        # Admin password used for admin operations
 ```
 
 - If your OpenSearch is secured via TLS and auth:
@@ -122,7 +122,7 @@ opensearch:
     password: ""
   admin:
     username: admin
-    password_temp: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD} # Use temporarily; remove after use
+    password: ${OPENSEARCH_ADMIN_PASSWORD}
 ```
 
 ## Local Development (Docker/Podman)

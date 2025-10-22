@@ -12,6 +12,6 @@ var ConfigCmd = &cobra.Command{
 func init() {
     ConfigCmd.AddCommand(initCmd)
     ConfigCmd.AddCommand(printCmd)
+    ConfigCmd.AddCommand(checkCmd)
     ConfigCmd.AddCommand(validateCmd)
 }
-

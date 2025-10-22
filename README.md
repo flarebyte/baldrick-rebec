@@ -33,8 +33,8 @@ Note on admin passwords (temporary)
   - `rbc admin config init --os-app-username rbc_app --os-app-password '<app-pass>'`
 
 Note on Postgres admin passwords (temporary)
-- For initial provisioning (roles/db/privileges/schema), set the Postgres admin temporary password via `--pg-admin-password-temp`.
+- For initial provisioning (roles/db/privileges/schema), set the Postgres admin password via `--pg-admin-password`.
 - After scaffolding/initialization, clear it to avoid lingering admin creds in your config:
-  - `rbc admin config init --pg-admin-password-temp ''`
+  - `rbc admin config init --pg-admin-password ''`
 - Ensure app credentials are configured for runtime use:
   - `rbc admin config init --pg-app-user rbc_app --pg-app-password '<app-pass>'`

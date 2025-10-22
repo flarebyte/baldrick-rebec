@@ -74,9 +74,8 @@ func Load() (Config, error) {
     if fileCfg.Postgres.Admin.User != "" {
         cfg.Postgres.Admin.User = fileCfg.Postgres.Admin.User
     }
-    if fileCfg.Postgres.Admin.Password != "" || fileCfg.Postgres.Admin.PasswordTemp != "" {
+    if fileCfg.Postgres.Admin.Password != "" {
         cfg.Postgres.Admin.Password = fileCfg.Postgres.Admin.Password
-        cfg.Postgres.Admin.PasswordTemp = fileCfg.Postgres.Admin.PasswordTemp
     }
     if fileCfg.Postgres.App.User != "" {
         cfg.Postgres.App.User = fileCfg.Postgres.App.User
@@ -107,21 +106,9 @@ type PostgresConfig struct {
     SSLMode string `yaml:"sslmode"` // disable, require, verify-ca, verify-full
     Admin   PGRole `yaml:"admin"`
     App     PGRole `yaml:"app"`
-    // Legacy fields (deprecated)
-    User    string `yaml:"user,omitempty"`
-    Password string `yaml:"password,omitempty"`
 }
 
 type PGRole struct {
     User         string `yaml:"user"`
     Password     string `yaml:"password,omitempty"`
-    // For admin role, prefer using password_temp and remove it after use.
-    PasswordTemp string `yaml:"password_temp,omitempty"`
-}
-
-// OSRole retained temporarily for backward-compatibility with existing configs.
-type OSRole struct {
-    Username     string `yaml:"username,omitempty"`
-    Password     string `yaml:"password,omitempty"`
-    PasswordTemp string `yaml:"password_temp,omitempty"`
 }

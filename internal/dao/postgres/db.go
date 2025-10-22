@@ -13,48 +13,29 @@ import (
 
 // Open returns a pgxpool.Pool with sane defaults using the provided config.
 func Open(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
-    // Prefer app role; fallback to admin; then legacy
+    // Prefer app role; fallback to admin
     user := cfg.Postgres.App.User
     pass := cfg.Postgres.App.Password
     if user == "" {
         user = cfg.Postgres.Admin.User
-        if pass == "" {
-            pass = firstNonEmpty(cfg.Postgres.Admin.Password, cfg.Postgres.Admin.PasswordTemp)
-        }
-    }
-    if user == "" {
-        user = cfg.Postgres.User
-        pass = cfg.Postgres.Password
+        pass = cfg.Postgres.Admin.Password
     }
     dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
     return openPool(ctx, dsn)
 }
 
-// OpenApp opens using app role credentials (or legacy fallback).
+// OpenApp opens using app role credentials.
 func OpenApp(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
     user := cfg.Postgres.App.User
     pass := cfg.Postgres.App.Password
-    if user == "" {
-        user = cfg.Postgres.User
-        pass = cfg.Postgres.Password
-    }
     dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
     return openPool(ctx, dsn)
 }
 
-// OpenAdmin opens using admin role credentials (prefers password_temp).
+// OpenAdmin opens using admin role credentials.
 func OpenAdmin(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
     user := cfg.Postgres.Admin.User
-    pass := firstNonEmpty(cfg.Postgres.Admin.Password, cfg.Postgres.Admin.PasswordTemp)
-    if user == "" {
-        // fallback to app, then legacy
-        user = cfg.Postgres.App.User
-        pass = cfg.Postgres.App.Password
-        if user == "" {
-            user = cfg.Postgres.User
-            pass = cfg.Postgres.Password
-        }
-    }
+    pass := cfg.Postgres.Admin.Password
     dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
     return openPool(ctx, dsn)
 }
@@ -62,16 +43,7 @@ func OpenAdmin(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 // OpenAdminWithDB opens using admin role to a specific database name.
 func OpenAdminWithDB(ctx context.Context, cfg config.Config, dbName string) (*pgxpool.Pool, error) {
     user := cfg.Postgres.Admin.User
-    pass := firstNonEmpty(cfg.Postgres.Admin.Password, cfg.Postgres.Admin.PasswordTemp)
-    if user == "" {
-        // fallback to app, then legacy
-        user = cfg.Postgres.App.User
-        pass = cfg.Postgres.App.Password
-        if user == "" {
-            user = cfg.Postgres.User
-            pass = cfg.Postgres.Password
-        }
-    }
+    pass := cfg.Postgres.Admin.Password
     dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, dbName, cfg.Postgres.SSLMode)
     return openPool(ctx, dsn)
 }

@@ -22,8 +22,8 @@ var scaffoldCmd = &cobra.Command{
         }
 
         // Require admin credentials to be present
-        if cfg.Postgres.Admin.User == "" || (cfg.Postgres.Admin.Password == "" && cfg.Postgres.Admin.PasswordTemp == "") {
-            return errors.New("postgres admin credentials missing; set postgres.admin.user and one of postgres.admin.password or postgres.admin.password_temp in config.yaml")
+        if cfg.Postgres.Admin.User == "" || cfg.Postgres.Admin.Password == "" {
+            return errors.New("postgres admin credentials missing; set postgres.admin.user and postgres.admin.password in config.yaml")
         }
 
         ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
