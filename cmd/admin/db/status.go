@@ -88,6 +88,8 @@ var statusCmd = &cobra.Command{
             }
             // Grant connect
             // We cannot directly test CONNECT privilege easily cross-db here; implied by ability to connect as app.
+        } else {
+            fmt.Fprintf(os.Stderr, "postgres: admin connect to system DB failed: %v\n", err)
         }
         // In target DB: tables and privileges
         if db, err := pgdao.OpenAdmin(ctx, cfg); err == nil {
@@ -153,6 +155,8 @@ var statusCmd = &cobra.Command{
                     }
                 }
             }
+        } else {
+            fmt.Fprintf(os.Stderr, "postgres: admin connect to target DB failed: %v\n", err)
         }
 
         // OpenSearch removed in PG-only path
