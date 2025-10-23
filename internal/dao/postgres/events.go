@@ -15,6 +15,7 @@ type MessageEvent struct {
     ContentID      string
     ConversationID string
     AttemptID      string
+    TaskID         sql.NullInt64
     SenderID       sql.NullString
     Recipients     []string
     Source         string
@@ -34,12 +35,12 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
     metaJSON, _ := json.Marshal(ev.Meta)
     q := `INSERT INTO messages_events (
             content_id, conversation_id, attempt_id,
-            sender_id, recipients,
+            task_id, sender_id, recipients,
             source, received_at, processed_at, status, error_message, tags, meta, attempt
         ) VALUES (
             $1,$2,$3,
-            $4,$5::text[],
-            $6,COALESCE($7, now()),$8,$9,$10,$11::text[],$12,$13
+            $4,$5,$6::text[],
+            $7,COALESCE($8, now()),$9,$10,$11,$12::text[],$13,$14
         ) RETURNING id`
     var id int64
     var receivedAt any
@@ -50,7 +51,7 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
     }
     err := db.QueryRow(ctx, q,
         ev.ContentID, ev.ConversationID, ev.AttemptID,
-        nullOrString(ev.SenderID), ev.Recipients,
+        nullOrInt64(ev.TaskID), nullOrString(ev.SenderID), ev.Recipients,
         ev.Source, receivedAt, nullOrTime(ev.ProcessedAt), ev.Status, nullOrString(ev.ErrorMessage), ev.Tags, metaJSON, ev.Attempt,
     ).Scan(&id)
     if err != nil {
@@ -62,21 +63,23 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
 
 func GetMessageEventByID(ctx context.Context, db *pgxpool.Pool, id int64) (*MessageEvent, error) {
     q := `SELECT id, content_id, conversation_id, attempt_id,
-                 sender_id, recipients,
+                 task_id, sender_id, recipients,
                  source, received_at, processed_at, status, error_message, tags, meta, attempt
           FROM messages_events WHERE id=$1`
     row := db.QueryRow(ctx, q, id)
     var out MessageEvent
     var metaBytes []byte
     var recipients, tags []string
+    var taskID sql.NullInt64
     err := row.Scan(
         &out.ID, &out.ContentID, &out.ConversationID, &out.AttemptID,
-        &out.SenderID, &recipients,
+        &taskID, &out.SenderID, &recipients,
         &out.Source, &out.ReceivedAt, &out.ProcessedAt, &out.Status, &out.ErrorMessage, &tags, &metaBytes, &out.Attempt,
     )
     if err != nil {
         return nil, err
     }
+    out.TaskID = taskID
     out.Recipients = recipients
     out.Tags = tags
     if len(metaBytes) > 0 {
@@ -100,3 +103,4 @@ func nullOrTime(nt sql.NullTime) any {
 }
 
 func stringOrEmpty(ns sql.NullString) string { if ns.Valid { return ns.String }; return "" }
+func nullOrInt64(ni sql.NullInt64) any { if ni.Valid { return ni.Int64 }; return nil }

@@ -14,6 +14,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             content_id TEXT NOT NULL,
             conversation_id TEXT NOT NULL,
             attempt_id TEXT NOT NULL,
+            task_id BIGINT REFERENCES tasks(id),
             sender_id TEXT,
             recipients TEXT[] DEFAULT '{}',
             source TEXT NOT NULL,
@@ -33,6 +34,16 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         `ALTER TABLE messages_events DROP COLUMN IF EXISTS description`,
         `ALTER TABLE messages_events DROP COLUMN IF EXISTS goal`,
         `ALTER TABLE messages_events DROP COLUMN IF EXISTS timeout`,
+        `ALTER TABLE messages_events ADD COLUMN IF NOT EXISTS task_id BIGINT`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.constraint_column_usage 
+                WHERE table_name='messages_events' AND constraint_name='messages_events_task_id_fkey'
+            ) THEN
+                ALTER TABLE messages_events ADD CONSTRAINT messages_events_task_id_fkey 
+                FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL;
+            END IF;
+        END $$;`,
         // Workflows table (name as unique identifier) with created/updated timestamps and notes (markdown)
         `CREATE TABLE IF NOT EXISTS workflows (
             name TEXT PRIMARY KEY,
@@ -62,6 +73,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         END $$;`,
         // Tasks table: versioned execution units under a workflow
         `CREATE TABLE IF NOT EXISTS tasks (
+            id BIGSERIAL UNIQUE NOT NULL,
             workflow_id TEXT NOT NULL REFERENCES workflows(name) ON DELETE CASCADE,
             name TEXT NOT NULL,
             title TEXT,
@@ -78,6 +90,14 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             PRIMARY KEY (workflow_id, name, version)
         )`,
         // Backfill columns if table existed prior to adding new fields
+        `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS id BIGSERIAL`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'tasks_id_unique'
+            ) THEN
+                ALTER TABLE tasks ADD CONSTRAINT tasks_id_unique UNIQUE (id);
+            END IF;
+        END $$;`,
         `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS timeout INTERVAL`,
         `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'`,
         `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS level TEXT`,
