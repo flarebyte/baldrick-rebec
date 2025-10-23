@@ -344,14 +344,6 @@ A system must define and register _task agents_ in a PostgreSQL database. Each t
 - Version rollback attempts (registering an older version number after a newer one).
 - Excessively large descriptions or prompts should be rejected to prevent data overflow.
 
-**Limitations and Non-Goals:**
-
-- The system should not execute or interpret the agent’s prompt or shell command.
-- No dependency resolution between agents (unlike npm dependencies).
-- No version conflict resolution or semantic version management.
-- No authentication, permissions, or access control for now.
-- No runtime management of agent processes (registration only).
-
 **Example Contexts:**
 
 - A company registers `acme/text-summarizer/python` v1.0.0 describing a summarization task.
@@ -431,16 +423,6 @@ workflow:
 
 ---
 
-**Limitations and Non-Goals:**
-
-- No execution or validation of workflow logic or task dependencies.
-- No real-time synchronization between local YAML and the database.
-- No automated conflict resolution when profiles define different versions of the same task.
-- No authentication or permission control for documentation updates.
-- No version diffing beyond version number comparison.
-
----
-
 **Example Contexts:**
 
 - A YAML workflow for `qa` uses task versions optimized for testing (`summarizer: 1.2.0`), while `dev-ai` uses newer experimental ones (`summarizer: 1.3.0`).
@@ -448,3 +430,53 @@ workflow:
 - The database stores the full documentation for each task and workflow, allowing browsing or linking to related docs via stored URLs.
 
 This section defines the storage, retrieval, and version-checking context for documentation metadata and workflow definitions, without specifying implementation logic or schema.
+
+## Spec: Workflow and Task Tables in PostgreSQL (Go with pgx)
+
+**Problem Overview**
+Define two PostgreSQL tables to represent workflows and their associated tasks. Workflows group related tasks. Tasks belong to workflows and contain structured metadata including semantic versioning and command execution definitions. The system must support uniquely versioned tasks per workflow, markdown content, and future execution interfaces like `workflow task`.
+
+**Workflow Table**
+Represents a named collection of tasks, including metadata.
+
+- Fields:
+
+  - `name`: string, unique identifier
+  - `title`: string, human-readable label
+  - `description`: string, plain text
+  - `created`: timestamp with timezone
+  - `updated`: timestamp with timezone
+  - `notes`: string, markdown-formatted
+
+**Task Table**
+Represents a versioned execution unit under a workflow.
+
+- Fields:
+
+  - `name`: string, required
+  - `title`: string, human-readable label
+  - `description`: string, plain text
+  - `motivation`: string, purpose or context
+  - `version`: string, must follow semantic versioning (e.g. 1.0.0)
+  - `created`: timestamp with timezone
+  - `notes`: string, markdown-formatted
+  - `shell`: string, shell environment (e.g. "bash", "python")
+  - `run`: string, command to execute
+  - `workflow_id`: foreign key to Workflow (`name`)
+
+**Use Cases**
+
+- Insert a new workflow with metadata.
+- Insert a new task tied to a specific workflow and version.
+- Retrieve all tasks under a workflow by name (e.g. list tasks in `test`).
+- Retrieve a task by workflow and name (e.g. run `test unit`).
+- Display markdown notes for a task or workflow.
+- Store command metadata per task for automated runners.
+
+**Edge Cases**
+
+- Attempting to insert a task with the same name and version under a workflow must fail.
+- A task with the same name but a different version is valid within the same workflow.
+- Workflow names are globally unique; task names are only unique within workflow+version.
+- Markdown notes may contain special characters or very large text blocks.
+- Tasks may use non-standard shells (e.g. `zsh`, `sh`, `powershell`).
