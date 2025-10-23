@@ -104,8 +104,22 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             notes TEXT,
             shell TEXT,
             run TEXT,
+            timeout INTERVAL,
+            tags TEXT[] DEFAULT '{}',
+            level TEXT CHECK (level IN ('h1','h2','h3') OR level IS NULL),
             PRIMARY KEY (workflow_id, name, version)
         )`,
+        // Backfill columns if table existed prior to adding new fields
+        `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS timeout INTERVAL`,
+        `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'`,
+        `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS level TEXT`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'tasks_level_check'
+            ) THEN
+                ALTER TABLE tasks ADD CONSTRAINT tasks_level_check CHECK (level IN ('h1','h2','h3') OR level IS NULL);
+            END IF;
+        END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_workflow ON tasks(workflow_id)`,
     }
     for _, s := range stmts {
