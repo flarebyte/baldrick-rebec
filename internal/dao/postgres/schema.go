@@ -38,7 +38,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         END $$;`,
         // Tasks table: versioned execution units under a workflow
         `CREATE TABLE IF NOT EXISTS tasks (
-            id BIGSERIAL UNIQUE NOT NULL,
+            id BIGSERIAL PRIMARY KEY,
             workflow_id TEXT NOT NULL REFERENCES workflows(name) ON DELETE CASCADE,
             name TEXT NOT NULL,
             title TEXT,
@@ -52,7 +52,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             timeout INTERVAL,
             tags TEXT[] DEFAULT '{}',
             level TEXT CHECK (level IN ('h1','h2','h3') OR level IS NULL),
-            PRIMARY KEY (workflow_id, name, version)
+            UNIQUE (workflow_id, name, version)
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_workflow ON tasks(workflow_id)`,
         // Messages events: references tasks.id; lean schema (no legacy cols)
