@@ -8,7 +8,7 @@ Learn to manage Postgres roles and privileges for a small app: create an admin r
 
 Learn to provision and secure a dedicated database: create a database owned by the admin role, grant CONNECT to the app role, and understand identifier safety; connect with `psql` and confirm with queries; map these steps to `rbc admin db scaffold --create-db`.
 
-Learn schema lifecycle basics without overengineering migrations: create the two core tables (`messages_events`, `message_profiles`) and a trigger maintaining `updated_at` on profiles; practice idempotent DDL and how the CLI does this in `db init`/`db scaffold`.
+Learn schema lifecycle basics without overengineering migrations: create the core tables (`messages_events`, `workflows`, `tasks`) and a trigger maintaining `updated` on workflows; practice idempotent DDL and how the CLI does this in `db init`/`db scaffold`.
 
 Learn connection hygiene and credentials handling: configure localhost connectivity, SSL modes, env and config file usage; understand temporary admin passwords vs app credentials; practice clearing temporary secrets with `rbc admin config clear-admin-temp`.
 

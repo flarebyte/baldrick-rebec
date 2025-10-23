@@ -6,11 +6,11 @@ This document explains how the Baldrick‑Rebec CLI uses its databases (PostgreS
 
 1) PostgreSQL (relational)
 
-- Purpose: Stores message ingest “events” and reusable “profiles”.
+- Purpose: Stores message ingest “events” and workflow/task definitions.
 - Core tables created/managed by CLI:
-  - `messages_events`: one row per ingest/processing event referencing content stored in OpenSearch.
-  - `message_profiles`: named profiles containing behavioral defaults and metadata.
-- Access patterns: inserts/reads, filtering by conversation/attempt/profile, later joins to operational reports.
+  - `messages_events`: one row per ingest/processing event referencing stored content.
+  - `workflows` and `tasks`: organize versioned execution units.
+- Access patterns: inserts/reads, filtering by conversation/attempt; workflows/tasks for orchestration.
 
 2) OpenSearch (search/vector)
 

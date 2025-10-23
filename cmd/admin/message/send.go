@@ -20,7 +20,6 @@ import (
 var (
     flagConversation string
     flagAttempt      string
-    flagProfile      string
 
     flagTitle       string
     flagLevel       string
@@ -44,9 +43,6 @@ var sendCmd = &cobra.Command{
         if strings.TrimSpace(flagAttempt) == "" {
             return errors.New("missing required flag: --attempt")
         }
-        if strings.TrimSpace(flagProfile) == "" {
-            return errors.New("missing required flag: --profile")
-        }
 
         // Read stdin if piped; avoid blocking if attached to TTY
         var stdinData []byte
@@ -68,8 +64,8 @@ var sendCmd = &cobra.Command{
         }
 
         // Log parsed parameters to stderr, to avoid polluting stdout pipeline
-        fmt.Fprintf(os.Stderr, "rbc admin message send: conversation=%q attempt=%q profile=%q title=%q level=%q from=%q to=%q tags=%q timeout=%q\n",
-            flagConversation, flagAttempt, flagProfile, flagTitle, flagLevel, flagFrom,
+        fmt.Fprintf(os.Stderr, "rbc admin message send: conversation=%q attempt=%q title=%q level=%q from=%q to=%q tags=%q timeout=%q\n",
+            flagConversation, flagAttempt, flagTitle, flagLevel, flagFrom,
             strings.Join(flagTo, ","), strings.Join(flagTags, ","), flagTimeout,
         )
         if flagDescription != "" || flagGoal != "" {
@@ -100,14 +96,13 @@ var sendCmd = &cobra.Command{
                 "goal":  flagGoal,
             }
             metaJSON, _ := json.Marshal(meta)
-            id, err := pgdao.PutMessageContent(ctx, db, string(stdinData), flagProfile, "", metaJSON)
+            id, err := pgdao.PutMessageContent(ctx, db, string(stdinData), "", "", metaJSON)
             if err != nil { return err }
             // Insert event referencing content
             ev := &pgdao.MessageEvent{
                 ContentID: id,
                 ConversationID: flagConversation,
                 AttemptID: flagAttempt,
-                ProfileName: flagProfile,
                 Source: "cli",
                 Status: "ingested",
                 Attempt: 1,
@@ -124,7 +119,7 @@ func init() {
     // Mandatory
     sendCmd.Flags().StringVar(&flagConversation, "conversation", "", "Conversation identifier")
     sendCmd.Flags().StringVar(&flagAttempt, "attempt", "", "Attempt identifier")
-    sendCmd.Flags().StringVar(&flagProfile, "profile", "", "Profile name for message metadata")
+    // Profile removed
 
     // Optional
     sendCmd.Flags().StringVar(&flagTitle, "title", "", "Short label for the message")

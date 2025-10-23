@@ -127,8 +127,8 @@ var statusCmd = &cobra.Command{
         if db, err := pgdao.OpenAdmin(ctx, cfg); err == nil {
             defer db.Close()
             var cnt int
-            _ = db.QueryRow(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages_events','message_profiles')").Scan(&cnt)
-            if cnt == 2 {
+            _ = db.QueryRow(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages_events')").Scan(&cnt)
+            if cnt == 1 {
                 fmt.Fprintln(os.Stderr, "postgres: schema tables: ok")
                 st.Postgres.Schema.TablesOK = true
             } else {
