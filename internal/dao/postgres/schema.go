@@ -51,7 +51,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             run TEXT,
             timeout INTERVAL,
             tags TEXT[] DEFAULT '{}',
-            level TEXT CHECK (level IN ('h1','h2','h3') OR level IS NULL),
+            level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
             UNIQUE (workflow_id, name, version)
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_workflow ON tasks(workflow_id)`,
