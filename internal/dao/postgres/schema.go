@@ -65,6 +65,48 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
                 EXECUTE PROCEDURE set_updated_at();
             END IF;
         END $$;`,
+        // Workflows table (name as unique identifier) with created/updated timestamps and notes (markdown)
+        `CREATE TABLE IF NOT EXISTS workflows (
+            name TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT
+        )`,
+        // Trigger function to maintain 'updated' column on workflows
+        `CREATE OR REPLACE FUNCTION set_updated()
+         RETURNS TRIGGER AS $$
+         BEGIN
+            NEW.updated = now();
+            RETURN NEW;
+         END;
+         $$ LANGUAGE plpgsql;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'workflows_set_updated'
+            ) THEN
+                CREATE TRIGGER workflows_set_updated
+                BEFORE UPDATE ON workflows
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        // Tasks table: versioned execution units under a workflow
+        `CREATE TABLE IF NOT EXISTS tasks (
+            workflow_id TEXT NOT NULL REFERENCES workflows(name) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            title TEXT,
+            description TEXT,
+            motivation TEXT,
+            version TEXT NOT NULL CHECK (version ~ '^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z\\.-]+)?(\\+[0-9A-Za-z\\.-]+)?$'),
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT,
+            shell TEXT,
+            run TEXT,
+            PRIMARY KEY (workflow_id, name, version)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_tasks_workflow ON tasks(workflow_id)`,
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
