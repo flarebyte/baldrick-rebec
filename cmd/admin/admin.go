@@ -6,6 +6,7 @@ import (
     dbcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/db"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/message"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/workflow"
+    "github.com/flarebyte/baldrick-rebec/cmd/admin/task"
     srvcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/server"
     "github.com/spf13/cobra"
 )
@@ -21,5 +22,6 @@ func init() {
     AdminCmd.AddCommand(dbcmd.DBCmd)
     AdminCmd.AddCommand(message.MessageCmd)
     AdminCmd.AddCommand(workflow.WorkflowCmd)
+    AdminCmd.AddCommand(task.TaskCmd)
     AdminCmd.AddCommand(srvcmd.ServerCmd)
 }

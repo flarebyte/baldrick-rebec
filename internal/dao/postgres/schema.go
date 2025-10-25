@@ -44,7 +44,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             title TEXT,
             description TEXT,
             motivation TEXT,
-            version TEXT NOT NULL CHECK (version ~ '^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z\\.-]+)?(\\+[0-9A-Za-z\\.-]+)?$'),
+            version TEXT NOT NULL CHECK (version ~ '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z\.-]+)?(\+[0-9A-Za-z\.-]+)?$'),
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT,
             shell TEXT,
