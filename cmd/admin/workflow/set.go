@@ -5,6 +5,7 @@ import (
     "database/sql"
     "errors"
     "fmt"
+    "encoding/json"
     "os"
     "strings"
     "time"
@@ -45,7 +46,19 @@ var setCmd = &cobra.Command{
         if flagWFDesc != "" { w.Description = sql.NullString{String: flagWFDesc, Valid: true} }
         if flagWFNotes != "" { w.Notes = sql.NullString{String: flagWFNotes, Valid: true} }
         if err := pgdao.UpsertWorkflow(ctx, db, w); err != nil { return err }
+        // Human-friendly one-liner to stderr
         fmt.Fprintf(os.Stderr, "workflow upserted name=%q title=%q\n", w.Name, w.Title)
+        // AI/automation friendly JSON to stdout
+        out := map[string]any{
+            "status": "upserted",
+            "name":   w.Name,
+            "title":  w.Title,
+        }
+        if w.Created.Valid { out["created"] = w.Created.Time.Format(time.RFC3339Nano) }
+        if w.Updated.Valid { out["updated"] = w.Updated.Time.Format(time.RFC3339Nano) }
+        enc := json.NewEncoder(os.Stdout)
+        enc.SetIndent("", "  ")
+        if err := enc.Encode(out); err != nil { return err }
         return nil
     },
 }
