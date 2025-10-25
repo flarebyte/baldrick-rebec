@@ -60,3 +60,10 @@ func ListWorkflows(ctx context.Context, db *pgxpool.Pool, limit, offset int) ([]
     }
     return out, rows.Err()
 }
+
+// DeleteWorkflow removes a workflow by name. Returns number of rows affected.
+func DeleteWorkflow(ctx context.Context, db *pgxpool.Pool, name string) (int64, error) {
+    ct, err := db.Exec(ctx, `DELETE FROM workflows WHERE name=$1`, name)
+    if err != nil { return 0, err }
+    return ct.RowsAffected(), nil
+}
