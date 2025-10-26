@@ -103,7 +103,7 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow string, limit, of
     if stringsTrim(workflow) == "" {
         rows, err = db.Query(ctx, `SELECT id, workflow_id, command, variant, title, description, motivation, version,
                                         notes, shell, run, timeout::text, tags, level, created
-                                   FROM tasks ORDER BY workflow_id, name, version LIMIT $1 OFFSET $2`, limit, offset)
+                                   FROM tasks ORDER BY workflow_id, command, variant, version LIMIT $1 OFFSET $2`, limit, offset)
     } else {
         rows, err = db.Query(ctx, `SELECT id, workflow_id, command, variant, title, description, motivation, version,
                                         notes, shell, run, timeout::text, tags, level, created
