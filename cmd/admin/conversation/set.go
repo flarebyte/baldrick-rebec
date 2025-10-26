@@ -16,7 +16,7 @@ import (
 )
 
 var (
-    flagConvID    string
+    flagConvID    int64
     flagConvTitle string
     flagConvDesc  string
     flagConvNotes string
@@ -28,7 +28,6 @@ var setCmd = &cobra.Command{
     Use:   "set",
     Short: "Create or update a conversation (by id)",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if strings.TrimSpace(flagConvID) == "" { return errors.New("--id is required") }
         if strings.TrimSpace(flagConvTitle) == "" { return errors.New("--title is required") }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
@@ -44,7 +43,7 @@ var setCmd = &cobra.Command{
         if len(flagConvTags) > 0 { conv.Tags = flagConvTags }
         if err := pgdao.UpsertConversation(ctx, db, conv); err != nil { return err }
         // Human line
-        fmt.Fprintf(os.Stderr, "conversation upserted id=%q title=%q\n", conv.ID, conv.Title)
+        fmt.Fprintf(os.Stderr, "conversation upserted id=%d title=%q\n", conv.ID, conv.Title)
         // JSON
         out := map[string]any{
             "status": "upserted",
@@ -62,11 +61,10 @@ var setCmd = &cobra.Command{
 
 func init() {
     ConversationCmd.AddCommand(setCmd)
-    setCmd.Flags().StringVar(&flagConvID, "id", "", "Conversation id (required)")
+    setCmd.Flags().Int64Var(&flagConvID, "id", 0, "Conversation id (optional; when omitted, a new id is generated)")
     setCmd.Flags().StringVar(&flagConvTitle, "title", "", "Title (required)")
     setCmd.Flags().StringVar(&flagConvDesc, "description", "", "Plain text description")
     setCmd.Flags().StringVar(&flagConvNotes, "notes", "", "Markdown notes")
     setCmd.Flags().StringVar(&flagConvProj, "project", "", "Project name (e.g. GitHub repo)")
     setCmd.Flags().StringSliceVar(&flagConvTags, "tags", nil, "Tags")
 }
-

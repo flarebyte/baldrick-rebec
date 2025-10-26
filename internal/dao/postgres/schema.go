@@ -18,9 +18,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT
         )`,
-        // Conversations table (id as unique identifier) with created/updated timestamps, notes and tags
+        // Conversations table (id autoincrement) with created/updated timestamps, notes and tags
         `CREATE TABLE IF NOT EXISTS conversations (
-            id TEXT PRIMARY KEY,
+            id BIGSERIAL PRIMARY KEY,
             title TEXT NOT NULL,
             description TEXT,
             project TEXT,

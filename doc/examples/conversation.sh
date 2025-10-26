@@ -17,18 +17,16 @@ rbc admin db init >/dev/null
 
 echo "Creating example conversations..." >&2
 
-# Build system refresh initiative
+# Build system refresh initiative (id auto-generated)
 rbc admin conversation set \
-  --id build-refresh \
   --title "Build System Refresh" \
   --project "github.com/acme/build-system" \
   --tags pipeline,build,ci \
   --description "Consolidate and modernize build tooling across repos." \
   --notes "# Goals\n- Reduce CI times\n- Simplify developer onboarding\n- Standardize linters and test runners"
 
-# Onboarding improvements
+# Onboarding improvements (id auto-generated)
 rbc admin conversation set \
-  --id onboarding-initiative \
   --title "Onboarding Improvement Initiative" \
   --project "github.com/acme/product" \
   --tags onboarding,docs,dx \
