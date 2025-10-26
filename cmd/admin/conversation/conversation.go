@@ -10,5 +10,4 @@ var ConversationCmd = &cobra.Command{
 }
 
 func init() {
-	ConversationCmd.AddCommand(joinCmd)
 }
