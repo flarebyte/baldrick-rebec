@@ -3,7 +3,6 @@ package postgres
 import (
     "context"
     "database/sql"
-    "strings"
 
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -61,6 +60,3 @@ func DeleteExperiment(ctx context.Context, db *pgxpool.Pool, id int64) (int64, e
     if err != nil { return 0, err }
     return ct.RowsAffected(), nil
 }
-
-// helpers reused from other files
-type pgxRows interface{ Next() bool; Scan(...any) error; Close(); Err() error }
