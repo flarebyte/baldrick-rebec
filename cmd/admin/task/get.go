@@ -37,10 +37,12 @@ var getCmd = &cobra.Command{
         if flagTaskGetID > 0 {
             t, err = pgdao.GetTaskByID(ctx, db, flagTaskGetID)
         } else {
-            if strings.TrimSpace(flagTaskGetWF)=="" || strings.TrimSpace(flagTaskGetCmd)=="" || strings.TrimSpace(flagTaskGetVer)=="" {
-                return errors.New("provide --id or all of --workflow, --command, --version (and optionally --variant)")
+            if strings.TrimSpace(flagTaskGetWF)=="" || strings.TrimSpace(flagTaskGetVer)=="" || (strings.TrimSpace(flagTaskGetVar)=="" && strings.TrimSpace(flagTaskGetCmd)=="") {
+                return errors.New("provide --id or --workflow, --version and either --variant (full selector) or --command (used as selector if no variant provided)")
             }
-            t, err = pgdao.GetTaskByKey(ctx, db, flagTaskGetWF, flagTaskGetCmd, flagTaskGetVar, flagTaskGetVer)
+            selector := flagTaskGetVar
+            if selector == "" { selector = flagTaskGetCmd }
+            t, err = pgdao.GetTaskByKey(ctx, db, flagTaskGetWF, selector, flagTaskGetVer)
         }
         if err != nil { return err }
         // Human
