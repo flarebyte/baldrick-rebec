@@ -2,13 +2,13 @@ package message
 
 import (
     "bufio"
-    "errors"
     "fmt"
     "io"
     "os"
     "strings"
     "encoding/json"
     "context"
+    "database/sql"
     "time"
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
@@ -29,6 +29,7 @@ var (
     flagDescription string
     flagGoal        string
     flagTimeout     string
+    flagExperiment  int64
 )
 
 var sendCmd = &cobra.Command{
@@ -36,13 +37,6 @@ var sendCmd = &cobra.Command{
     Short: "Send a structured message (logs stdin, echoes to stdout)",
     RunE: func(cmd *cobra.Command, args []string) error {
         cfg, _ := cfgpkg.Load()
-        // Validate mandatory params
-        if strings.TrimSpace(flagConversation) == "" {
-            return errors.New("missing required flag: --conversation")
-        }
-        if strings.TrimSpace(flagAttempt) == "" {
-            return errors.New("missing required flag: --attempt")
-        }
 
         // Read stdin if piped; avoid blocking if attached to TTY
         var stdinData []byte
@@ -54,7 +48,7 @@ var sendCmd = &cobra.Command{
                 chunk, err := reader.ReadString('\n')
                 b.WriteString(chunk)
                 if err != nil {
-                    if errors.Is(err, io.EOF) {
+                    if err == io.EOF {
                         break
                     }
                     return fmt.Errorf("read stdin: %w", err)
@@ -64,8 +58,8 @@ var sendCmd = &cobra.Command{
         }
 
         // Log parsed parameters to stderr, to avoid polluting stdout pipeline
-        fmt.Fprintf(os.Stderr, "rbc admin message send: conversation=%q attempt=%q title=%q level=%q from=%q to=%q tags=%q timeout=%q\n",
-            flagConversation, flagAttempt, flagTitle, flagLevel, flagFrom,
+        fmt.Fprintf(os.Stderr, "rbc admin message send: title=%q level=%q from=%q to=%q tags=%q timeout=%q\n",
+            flagTitle, flagLevel, flagFrom,
             strings.Join(flagTo, ","), strings.Join(flagTags, ","), flagTimeout,
         )
         if flagDescription != "" || flagGoal != "" {
@@ -99,16 +93,10 @@ var sendCmd = &cobra.Command{
             id, err := pgdao.PutMessageContent(ctx, db, string(stdinData), "", "", metaJSON)
             if err != nil { return err }
             // Insert event referencing content
-            ev := &pgdao.MessageEvent{
-                ContentID: id,
-                ConversationID: flagConversation,
-                AttemptID: flagAttempt,
-                Source: "cli",
-                Status: "ingested",
-                Attempt: 1,
-                Recipients: flagTo,
-                Tags: flagTags,
-            }
+            ev := &pgdao.MessageEvent{ ContentID: id, Status: "ingested", Tags: flagTags }
+            // Map optional executor and experiment
+            if strings.TrimSpace(flagFrom) != "" { ev.Executor = sql.NullString{String: flagFrom, Valid: true} }
+            if flagExperiment > 0 { ev.ExperimentID = sql.NullInt64{Int64: flagExperiment, Valid: true} }
             if _, err := pgdao.InsertMessageEvent(ctx, db, ev); err != nil { return err }
             fmt.Fprintf(os.Stderr, "stored content id=%s and event\n", id)
         return nil
@@ -130,4 +118,5 @@ func init() {
     sendCmd.Flags().StringVar(&flagDescription, "description", "", "Longer explanation or context")
     sendCmd.Flags().StringVar(&flagGoal, "goal", "", "Intended outcome of the message")
     sendCmd.Flags().StringVar(&flagTimeout, "timeout", "", "Max allowed duration for execution or response")
+    sendCmd.Flags().Int64Var(&flagExperiment, "experiment", 0, "Experiment id to link this message to")
 }

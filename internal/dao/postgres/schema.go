@@ -84,24 +84,20 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             UNIQUE (workflow_id, name, version)
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_workflow ON tasks(workflow_id)`,
-        // Messages events: references tasks.id; lean schema (no legacy cols)
-        `CREATE TABLE IF NOT EXISTS messages_events (
+        // Messages table: references tasks.id (optional) and experiments.id (optional)
+        `CREATE TABLE IF NOT EXISTS messages (
             id BIGSERIAL PRIMARY KEY,
             content_id TEXT NOT NULL,
-            conversation_id TEXT NOT NULL,
-            attempt_id TEXT NOT NULL,
             task_id BIGINT REFERENCES tasks(id) ON DELETE SET NULL,
-            sender_id TEXT,
-            recipients TEXT[] DEFAULT '{}',
-            source TEXT NOT NULL,
+            experiment_id BIGINT REFERENCES experiments(id) ON DELETE SET NULL,
+            executor TEXT,
             received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             processed_at TIMESTAMPTZ,
             status TEXT NOT NULL DEFAULT 'ingested',
             error_message TEXT,
             tags TEXT[] DEFAULT '{}',
             meta JSONB DEFAULT '{}',
-            attempt INT DEFAULT 1,
-            UNIQUE (content_id, source, received_at)
+            UNIQUE (content_id, status, received_at)
         )`,
     }
     for _, s := range stmts {

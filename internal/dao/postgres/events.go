@@ -13,19 +13,15 @@ import (
 type MessageEvent struct {
     ID             int64
     ContentID      string
-    ConversationID string
-    AttemptID      string
     TaskID         sql.NullInt64
-    SenderID       sql.NullString
-    Recipients     []string
-    Source         string
+    ExperimentID   sql.NullInt64
+    Executor       sql.NullString
     ReceivedAt     time.Time
     ProcessedAt    sql.NullTime
     Status         string
     ErrorMessage   sql.NullString
     Tags           []string
     Meta           map[string]any
-    Attempt        int
 }
 
 func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent) (int64, error) {
@@ -33,14 +29,12 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
         return 0, errors.New("nil event")
     }
     metaJSON, _ := json.Marshal(ev.Meta)
-    q := `INSERT INTO messages_events (
-            content_id, conversation_id, attempt_id,
-            task_id, sender_id, recipients,
-            source, received_at, processed_at, status, error_message, tags, meta, attempt
+    q := `INSERT INTO messages (
+            content_id, task_id, experiment_id, executor,
+            received_at, processed_at, status, error_message, tags, meta
         ) VALUES (
-            $1,$2,$3,
-            $4,$5,$6::text[],
-            $7,COALESCE($8, now()),$9,$10,$11,$12::text[],$13,$14
+            $1,$2,$3,$4,
+            COALESCE($5, now()),$6,$7,$8,$9::text[],$10
         ) RETURNING id`
     var id int64
     var receivedAt any
@@ -50,9 +44,8 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
         receivedAt = ev.ReceivedAt
     }
     err := db.QueryRow(ctx, q,
-        ev.ContentID, ev.ConversationID, ev.AttemptID,
-        nullOrInt64(ev.TaskID), nullOrString(ev.SenderID), ev.Recipients,
-        ev.Source, receivedAt, nullOrTime(ev.ProcessedAt), ev.Status, nullOrString(ev.ErrorMessage), ev.Tags, metaJSON, ev.Attempt,
+        ev.ContentID, nullOrInt64(ev.TaskID), nullOrInt64(ev.ExperimentID), nullOrString(ev.Executor),
+        receivedAt, nullOrTime(ev.ProcessedAt), ev.Status, nullOrString(ev.ErrorMessage), ev.Tags, metaJSON,
     ).Scan(&id)
     if err != nil {
         return 0, err
@@ -62,25 +55,25 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
 }
 
 func GetMessageEventByID(ctx context.Context, db *pgxpool.Pool, id int64) (*MessageEvent, error) {
-    q := `SELECT id, content_id, conversation_id, attempt_id,
-                 task_id, sender_id, recipients,
-                 source, received_at, processed_at, status, error_message, tags, meta, attempt
-          FROM messages_events WHERE id=$1`
+    q := `SELECT id, content_id,
+                 task_id, experiment_id, executor,
+                 received_at, processed_at, status, error_message, tags, meta
+          FROM messages WHERE id=$1`
     row := db.QueryRow(ctx, q, id)
     var out MessageEvent
     var metaBytes []byte
-    var recipients, tags []string
-    var taskID sql.NullInt64
+    var tags []string
+    var taskID, expID sql.NullInt64
     err := row.Scan(
-        &out.ID, &out.ContentID, &out.ConversationID, &out.AttemptID,
-        &taskID, &out.SenderID, &recipients,
-        &out.Source, &out.ReceivedAt, &out.ProcessedAt, &out.Status, &out.ErrorMessage, &tags, &metaBytes, &out.Attempt,
+        &out.ID, &out.ContentID,
+        &taskID, &expID, &out.Executor,
+        &out.ReceivedAt, &out.ProcessedAt, &out.Status, &out.ErrorMessage, &tags, &metaBytes,
     )
     if err != nil {
         return nil, err
     }
     out.TaskID = taskID
-    out.Recipients = recipients
+    out.ExperimentID = expID
     out.Tags = tags
     if len(metaBytes) > 0 {
         _ = json.Unmarshal(metaBytes, &out.Meta)

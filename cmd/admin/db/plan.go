@@ -67,9 +67,9 @@ var planCmd = &cobra.Command{
 
             // Schema objects
             var cnt int
-            _ = admdb.QueryRow(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages_events')").Scan(&cnt)
+            _ = admdb.QueryRow(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages')").Scan(&cnt)
             if cnt < 1 {
-                fmt.Println("PLAN: CREATE TABLE messages_events (...);")
+                fmt.Println("PLAN: CREATE TABLE messages (...);")
             }
         }
 
