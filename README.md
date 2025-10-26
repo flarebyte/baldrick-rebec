@@ -1,6 +1,8 @@
 # baldrick-rebec
 Autonomous build automation tool and task runner
 
+![baldrick-rebec hero image](./baldrick-rebec-hero-image.jpg)
+
 ## First-Time Setup
 
 Use these steps to configure the CLI and initialize PostgreSQL for the first time.
