@@ -8,13 +8,13 @@ alias rbc='go run main.go'
 
 command -v rbc >/dev/null 2>&1 || { echo "error: rbc not found (go run main.go)" >&2; exit 1; }
 
-echo "[1/6] Resetting database (destructive)" >&2
+echo "[1/7] Resetting database (destructive)" >&2
 rbc admin db reset --force
 
-echo "[2/6] Scaffolding roles, database, privileges, schema, and content index" >&2
+echo "[2/7] Scaffolding roles, database, privileges, schema, and content index" >&2
 rbc admin db scaffold --all --yes
 
-echo "[3/6] Creating sample workflows and tasks" >&2
+echo "[3/7] Creating sample workflows and tasks" >&2
 rbc admin workflow set --name ci-test --title "Continuous Integration: Test Suite" --description "Runs unit and integration tests." --notes "CI test workflow"
 rbc admin workflow set --name ci-lint --title "Continuous Integration: Lint & Format" --description "Lints and vets the codebase." --notes "CI lint workflow"
 
@@ -25,7 +25,7 @@ rbc admin task set --workflow ci-test --command integration --variant "" --versi
 rbc admin task set --workflow ci-lint --command lint --variant go --version 1.0.0 \
   --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run "go vet ./... && golangci-lint run" --timeout "5 minutes" --tags lint,style --level h2
 
-echo "[4/6] Creating sample conversations and experiments" >&2
+echo "[4/7] Creating sample conversations and experiments" >&2
 cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX")
 cid=$(printf "%s" "$cjson" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/')
 
@@ -38,12 +38,17 @@ eid1=$(printf "%s" "$ejson1" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/
 ejson2=$(rbc admin experiment create --conversation "$cid2")
 eid2=$(printf "%s" "$ejson2" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/')
 
-echo "[5/6] Creating sample messages" >&2
+echo "[5/7] Starring tasks per mode" >&2
+rbc admin star set --mode dev --variant unit/go --version 1.0.0
+rbc admin star set --mode qa  --variant integration --version 1.0.0
+rbc admin star set --mode dev --variant lint/go --version 1.0.0
+
+echo "[6/7] Creating sample messages" >&2
 echo "Hello from user12" | rbc admin message set --executor user12 --experiment "$eid1" --title "Greeting" --tags hello
 echo "Build started" | rbc admin message set --executor build-bot --experiment "$eid1" --title "BuildStart" --tags build
 echo "Onboarding checklist updated" | rbc admin message set --executor docs-bot --experiment "$eid2" --title "DocsUpdate" --tags docs,update
 
-echo "[6/6] Listing all entities and counts" >&2
+echo "[7/7] Listing all entities and counts" >&2
 echo "-- Workflows --" >&2
 rbc admin workflow list --limit 50
 echo "-- Tasks --" >&2
@@ -58,4 +63,3 @@ echo "-- Table counts --" >&2
 rbc admin db count --json
 
 echo "Done." >&2
-

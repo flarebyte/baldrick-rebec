@@ -106,6 +106,30 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             meta JSONB DEFAULT '{}',
             UNIQUE (content_id, status, received_at)
         )`,
+        // Starred tasks per mode: binds a mode (e.g., dev, qa) to a specific
+        // variant and version, referencing the task row. Unique per (mode, variant).
+        `CREATE TABLE IF NOT EXISTS starred_tasks (
+            id BIGSERIAL PRIMARY KEY,
+            mode TEXT NOT NULL,
+            variant TEXT NOT NULL,
+            version TEXT NOT NULL,
+            task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            UNIQUE (mode, variant)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_starred_tasks_mode ON starred_tasks(mode)`,
+        `CREATE INDEX IF NOT EXISTS idx_starred_tasks_variant ON starred_tasks(variant)`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'starred_tasks_set_updated'
+            ) THEN
+                CREATE TRIGGER starred_tasks_set_updated
+                BEFORE UPDATE ON starred_tasks
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
