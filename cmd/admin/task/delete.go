@@ -63,7 +63,7 @@ var deleteCmd = &cobra.Command{
         } else {
             selector := flagTaskDelVar
             if strings.TrimSpace(selector) == "" { selector = flagTaskDelCmd }
-            affected, err = pgdao.DeleteTaskByKey(ctx, db, flagTaskDelWF, selector, flagTaskDelVer)
+            affected, err = pgdao.DeleteTaskByKey(ctx, db, selector, flagTaskDelVer)
         }
         if err != nil { return err }
         if affected == 0 {

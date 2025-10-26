@@ -65,12 +65,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             created TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
         `CREATE INDEX IF NOT EXISTS idx_experiments_conversation ON experiments(conversation_id)`,
-        // Tasks table: versioned execution units under a workflow
+        // Task variants registry: one workflow per selector (variant)
+        `CREATE TABLE IF NOT EXISTS task_variants (
+            variant TEXT PRIMARY KEY,
+            workflow_id TEXT NOT NULL REFERENCES workflows(name) ON DELETE CASCADE
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_task_variants_workflow ON task_variants(workflow_id)`,
+        // Tasks table: versioned execution units identified by (variant, version)
         `CREATE TABLE IF NOT EXISTS tasks (
             id BIGSERIAL PRIMARY KEY,
-            workflow_id TEXT NOT NULL REFERENCES workflows(name) ON DELETE CASCADE,
             command TEXT NOT NULL,
-            variant TEXT NOT NULL DEFAULT '',
+            variant TEXT NOT NULL,
             title TEXT,
             description TEXT,
             motivation TEXT,
@@ -82,9 +87,10 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             timeout INTERVAL,
             tags TEXT[] DEFAULT '{}',
             level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
-            UNIQUE (workflow_id, variant, version)
+            UNIQUE (variant, version),
+            FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
         )`,
-        `CREATE INDEX IF NOT EXISTS idx_tasks_workflow ON tasks(workflow_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_tasks_variant ON tasks(variant)`,
         // Messages table: references tasks.id (optional) and experiments.id (optional)
         `CREATE TABLE IF NOT EXISTS messages (
             id BIGSERIAL PRIMARY KEY,
