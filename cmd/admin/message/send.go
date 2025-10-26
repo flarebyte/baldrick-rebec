@@ -72,8 +72,7 @@ var setCmd = &cobra.Command{
             db, err := pgdao.OpenApp(ctx, cfg)
             if err != nil { return err }
             defer db.Close()
-            if err := pgdao.EnsureContentSchema(ctx, db); err != nil { return err }
-            // Prepare metadata as JSON
+            // Prepare metadata as JSON (schema should already be created via 'rbc admin db init')
             meta := map[string]interface{}{
                 "title": flagTitle,
                 "level": flagLevel,
