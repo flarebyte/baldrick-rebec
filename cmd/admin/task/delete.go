@@ -61,7 +61,9 @@ var deleteCmd = &cobra.Command{
         if byID {
             affected, err = pgdao.DeleteTaskByID(ctx, db, flagTaskDelID)
         } else {
-            affected, err = pgdao.DeleteTaskByKey(ctx, db, flagTaskDelWF, flagTaskDelCmd, flagTaskDelVar, flagTaskDelVer)
+            selector := flagTaskDelVar
+            if strings.TrimSpace(selector) == "" { selector = flagTaskDelCmd }
+            affected, err = pgdao.DeleteTaskByKey(ctx, db, flagTaskDelWF, selector, flagTaskDelVer)
         }
         if err != nil { return err }
         if affected == 0 {
