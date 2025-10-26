@@ -1,0 +1,62 @@
+package message
+
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "os"
+    "time"
+
+    cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
+    pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
+    "github.com/spf13/cobra"
+)
+
+var (
+    flagMsgListExperiment int64
+    flagMsgListTask       int64
+    flagMsgListStatus     string
+    flagMsgListLimit      int
+    flagMsgListOffset     int
+)
+
+var listCmd = &cobra.Command{
+    Use:   "list",
+    Short: "List messages (filter by experiment, task, or status)",
+    RunE: func(cmd *cobra.Command, args []string) error {
+        cfg, err := cfgpkg.Load()
+        if err != nil { return err }
+        ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+        defer cancel()
+        db, err := pgdao.OpenApp(ctx, cfg)
+        if err != nil { return err }
+        defer db.Close()
+        ms, err := pgdao.ListMessages(ctx, db, flagMsgListExperiment, flagMsgListTask, flagMsgListStatus, flagMsgListLimit, flagMsgListOffset)
+        if err != nil { return err }
+        fmt.Fprintf(os.Stderr, "messages: %d\n", len(ms))
+        arr := make([]map[string]any, 0, len(ms))
+        for _, m := range ms {
+            item := map[string]any{
+                "id": m.ID,
+                "content_id": m.ContentID,
+                "status": m.Status,
+                "received_at": m.ReceivedAt.Format(time.RFC3339Nano),
+            }
+            if m.TaskID.Valid { item["task_id"] = m.TaskID.Int64 }
+            if m.ExperimentID.Valid { item["experiment_id"] = m.ExperimentID.Int64 }
+            if m.Executor.Valid { item["executor"] = m.Executor.String }
+            arr = append(arr, item)
+        }
+        enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
+    },
+}
+
+func init() {
+    MessageCmd.AddCommand(listCmd)
+    listCmd.Flags().Int64Var(&flagMsgListExperiment, "experiment", 0, "Filter by experiment id")
+    listCmd.Flags().Int64Var(&flagMsgListTask, "task", 0, "Filter by task id")
+    listCmd.Flags().StringVar(&flagMsgListStatus, "status", "", "Filter by status")
+    listCmd.Flags().IntVar(&flagMsgListLimit, "limit", 100, "Max rows")
+    listCmd.Flags().IntVar(&flagMsgListOffset, "offset", 0, "Offset for pagination")
+}
+
