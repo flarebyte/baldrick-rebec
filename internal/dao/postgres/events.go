@@ -54,6 +54,35 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
     return id, nil
 }
 
+// UpdateMessageEvent updates mutable fields of a message event: status, processed_at,
+// error_message, content_id, executor, tags and meta. Any zero-value/empty inputs are ignored
+// unless explicitly provided via sql.Null* with Valid=true.
+func UpdateMessageEvent(ctx context.Context, db *pgxpool.Pool, id int64, update MessageEvent) error {
+    // Build a compact UPDATE with COALESCE on provided fields while staying parameterized.
+    // We purposely keep a fixed-shape query to avoid dynamic SQL per DB guidelines.
+    metaJSON, _ := json.Marshal(update.Meta)
+    q := `UPDATE messages SET
+            status = COALESCE(NULLIF($1,''), status),
+            processed_at = COALESCE($2, processed_at),
+            error_message = COALESCE($3, error_message),
+            content_id = COALESCE(NULLIF($4,''), content_id),
+            executor = COALESCE($5, executor),
+            tags = COALESCE($6::text[], tags),
+            meta = COALESCE($7, meta)
+          WHERE id=$8`
+    _, err := db.Exec(ctx, q,
+        update.Status,
+        nullOrTime(update.ProcessedAt),
+        nullOrString(update.ErrorMessage),
+        update.ContentID,
+        nullOrString(update.Executor),
+        pgTextArrayOrNil(update.Tags),
+        jsonOrNil(metaJSON),
+        id,
+    )
+    return err
+}
+
 func GetMessageEventByID(ctx context.Context, db *pgxpool.Pool, id int64) (*MessageEvent, error) {
     q := `SELECT id, content_id,
                  task_id, experiment_id, executor,
@@ -162,3 +191,17 @@ func nullOrTime(nt sql.NullTime) any {
 
 func stringOrEmpty(ns sql.NullString) string { if ns.Valid { return ns.String }; return "" }
 func nullOrInt64(ni sql.NullInt64) any { if ni.Valid { return ni.Int64 }; return nil }
+
+// pgTextArrayOrNil returns nil when empty to avoid overriding with an empty array
+// when the caller intended to leave the field unchanged.
+func pgTextArrayOrNil(arr []string) any {
+    if len(arr) == 0 { return nil }
+    return arr
+}
+
+// jsonOrNil returns nil when the JSON payload is empty so the UPDATE can COALESCE.
+func jsonOrNil(b []byte) any {
+    if len(b) == 0 { return nil }
+    // Accept "{}" or other content as-is.
+    return b
+}
