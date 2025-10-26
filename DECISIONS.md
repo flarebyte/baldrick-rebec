@@ -295,3 +295,188 @@ CREATE INDEX messages_events_meta_gin ON messages_events USING GIN (meta);
 
 - **OpenSearch ILM**: rollover by size/age, retain 180 days (content rarely changes).
 - **PostgreSQL partitioning**: monthly partitions on `received_at`, drop/archive old partitions as needed.
+
+## Agent task definition
+
+**Problem Definition:**
+
+A system must define and register _task agents_ in a PostgreSQL database. Each task agent represents a defined executable unit of work that can be uniquely identified, versioned, and described through structured metadata. The system should ensure that agents can be uniquely referenced, queried, and updated in a consistent manner.
+
+**Core Requirements:**
+
+- Each task agent must have a _unique name_ and a _version_. Together, they act as the unique identifier (similar to a package registry like npm).
+- The name may follow a convention such as `company/name/language`, where:
+
+  - `company` identifies the organization or namespace.
+  - `name` identifies the agent itself.
+  - `language` identifies the primary implementation or runtime environment.
+
+- The version follows semantic or incremental versioning rules to distinguish agent revisions.
+
+**Stored Definition (fields to persist):**
+
+- name (string)
+- version (string)
+- title (string)
+- description (text)
+- goal (text)
+- prompt (text)
+- shell_command (text)
+- tags (array or text)
+- timeout (integer, representing seconds)
+- metrics (structured data; includes cost per token, quality score, etc.)
+- created_at and updated_at timestamps (auto-generated)
+
+**Behavior and Use Cases:**
+
+1. Register a new task agent with full metadata into the database.
+2. Retrieve an existing agent by name and version.
+3. List all versions for a given agent name.
+4. Update an existing agent’s definition when a new version is released.
+5. Validate that names and versions are unique and comply with naming conventions.
+6. Allow filtering by tags or language when querying agents.
+
+**Edge Cases:**
+
+- Attempting to register an agent with an existing (name, version) pair should be rejected.
+- Missing required fields (name, version, or title) should cause validation failure.
+- Invalid name format (not following convention or containing disallowed characters).
+- Version rollback attempts (registering an older version number after a newer one).
+- Excessively large descriptions or prompts should be rejected to prevent data overflow.
+
+**Example Contexts:**
+
+- A company registers `acme/text-summarizer/python` v1.0.0 describing a summarization task.
+- Another registers `openai/code-reviewer/js` v2.1.1 for code analysis.
+- Updating `acme/text-summarizer/python` to v1.1.0 with improved prompt and new metrics.
+
+## Workflow configuration
+
+**Problem Definition:**
+
+A system must manage _documentation metadata_ for individual tasks and for _workflows_ composed of tasks. Both types of documentation must be stored and retrievable from a PostgreSQL database. Locally, workflow definitions should be manageable through YAML configuration files, supporting version tracking, environment profiles, and update checks similar to a package manager (e.g., npm).
+
+---
+
+**Documentation Metadata Requirements:**
+
+Each **task documentation** must include:
+
+- title (string)
+- description (text)
+- goal (text)
+- links (list of objects containing `title` and `url`)
+
+Each **workflow documentation** must include:
+
+- title (string)
+- description (text)
+- tasks (list of task references: name and version)
+
+Both documentation types should be persistable in PostgreSQL and retrievable by ID, name, or related entity.
+
+---
+
+**Workflow Management Requirements:**
+
+A **workflow** represents a sequence or collection of registered tasks.
+Each workflow definition (in database or local YAML) must specify:
+
+- name (string)
+- profile (string, e.g., dev-ai, dev-basic, qa, ci)
+- tasks (key-value mapping of `task_name`: `version`)
+- optional metadata (title, description)
+
+Local YAML format example:
+
+```
+workflow:
+  name: example-workflow
+  profile: dev-ai
+  tasks:
+    summarizer: "1.2.1"
+    translator: "1.3.0"
+```
+
+---
+
+**Capabilities and Use Cases:**
+
+1. Store documentation metadata for tasks and workflows in PostgreSQL.
+2. Retrieve, update, or delete documentation records by name or workflow reference.
+3. Load a local YAML workflow file and validate its structure and task version references.
+4. Check for outdated task versions based on stored registry data (compare YAML vs DB).
+5. Upgrade tasks within a workflow definition to the latest available versions.
+6. Support multiple workflow profiles, each maintaining its own task versions and configurations.
+7. Allow exporting or syncing local YAML workflow definitions with database-stored documentation.
+
+---
+
+**Edge Cases:**
+
+- Missing or invalid links (no title or malformed URL).
+- Inconsistent task versions (referencing a task that does not exist or is unregistered).
+- Conflicting task definitions between profiles.
+- YAML parsing errors due to indentation or type mismatch.
+- Workflow referencing tasks without associated documentation.
+- Attempt to upgrade tasks beyond available versions.
+
+---
+
+**Example Contexts:**
+
+- A YAML workflow for `qa` uses task versions optimized for testing (`summarizer: 1.2.0`), while `dev-ai` uses newer experimental ones (`summarizer: 1.3.0`).
+- The system checks the registry and flags that `summarizer 1.2.0` is outdated.
+- The database stores the full documentation for each task and workflow, allowing browsing or linking to related docs via stored URLs.
+
+This section defines the storage, retrieval, and version-checking context for documentation metadata and workflow definitions, without specifying implementation logic or schema.
+
+## Spec: Workflow and Task Tables in PostgreSQL (Go with pgx)
+
+**Problem Overview**
+Define two PostgreSQL tables to represent workflows and their associated tasks. Workflows group related tasks. Tasks belong to workflows and contain structured metadata including semantic versioning and command execution definitions. The system must support uniquely versioned tasks per workflow, markdown content, and future execution interfaces like `workflow task`.
+
+**Workflow Table**
+Represents a named collection of tasks, including metadata.
+
+- Fields:
+
+  - `name`: string, unique identifier
+  - `title`: string, human-readable label
+  - `description`: string, plain text
+  - `created`: timestamp with timezone
+  - `updated`: timestamp with timezone
+  - `notes`: string, markdown-formatted
+
+**Task Table**
+Represents a versioned execution unit under a workflow.
+
+- Fields:
+
+  - `name`: string, required
+  - `title`: string, human-readable label
+  - `description`: string, plain text
+  - `motivation`: string, purpose or context
+  - `version`: string, must follow semantic versioning (e.g. 1.0.0)
+  - `created`: timestamp with timezone
+  - `notes`: string, markdown-formatted
+  - `shell`: string, shell environment (e.g. "bash", "python")
+  - `run`: string, command to execute
+  - `workflow_id`: foreign key to Workflow (`name`)
+
+**Use Cases**
+
+- Insert a new workflow with metadata.
+- Insert a new task tied to a specific workflow and version.
+- Retrieve all tasks under a workflow by name (e.g. list tasks in `test`).
+- Retrieve a task by workflow and name (e.g. run `test unit`).
+- Display markdown notes for a task or workflow.
+- Store command metadata per task for automated runners.
+
+**Edge Cases**
+
+- Attempting to insert a task with the same name and version under a workflow must fail.
+- A task with the same name but a different version is valid within the same workflow.
+- Workflow names are globally unique; task names are only unique within workflow+version.
+- Markdown notes may contain special characters or very large text blocks.
+- Tasks may use non-standard shells (e.g. `zsh`, `sh`, `powershell`).

@@ -8,7 +8,6 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    osdao "github.com/flarebyte/baldrick-rebec/internal/dao/opensearch"
     "github.com/spf13/cobra"
 )
 
@@ -41,12 +40,15 @@ var initCmd = &cobra.Command{
             return err
         }
 
-        // OpenSearch: ensure index (use admin if available)
-        fmt.Fprintln(os.Stderr, "db:init - connecting to OpenSearch (admin/app)...")
-        osc := osdao.NewClientFromConfigAdmin(cfg)
-        fmt.Fprintln(os.Stderr, "db:init - ensuring OpenSearch index 'messages_content'...")
-        if err := osc.EnsureMessagesContentIndex(ctx); err != nil {
+        // Ensure content table and FTS readiness
+        fmt.Fprintln(os.Stderr, "db:init - ensuring PostgreSQL content table...")
+        if err := pgdao.EnsureContentSchema(ctx, db); err != nil {
             return err
+        }
+        if err := pgdao.EnsureFTSIndex(ctx, db); err != nil {
+            fmt.Fprintf(os.Stderr, "db:init - warn: ensure FTS index: %v\n", err)
+        } else {
+            fmt.Fprintln(os.Stderr, "db:init - FTS index: ok")
         }
 
         fmt.Fprintln(os.Stderr, "db:init - done")

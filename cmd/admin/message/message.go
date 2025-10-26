@@ -10,6 +10,5 @@ var MessageCmd = &cobra.Command{
 }
 
 func init() {
-    MessageCmd.AddCommand(sendCmd)
+    MessageCmd.AddCommand(setCmd)
 }
-

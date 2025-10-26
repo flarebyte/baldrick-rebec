@@ -2,74 +2,139 @@ package postgres
 
 import (
     "context"
-    "database/sql"
+
+    "github.com/jackc/pgx/v5/pgxpool"
 )
 
 // EnsureSchema creates the required tables if they do not exist.
-func EnsureSchema(ctx context.Context, db *sql.DB) error {
+func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
     stmts := []string{
-        `CREATE TABLE IF NOT EXISTS messages_events (
+        // Workflows table (name as unique identifier) with created/updated timestamps and notes (markdown)
+        `CREATE TABLE IF NOT EXISTS workflows (
+            name TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT
+        )`,
+        // Conversations table (id autoincrement) with created/updated timestamps, notes and tags
+        `CREATE TABLE IF NOT EXISTS conversations (
+            id BIGSERIAL PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            project TEXT,
+            tags TEXT[] DEFAULT '{}',
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT
+        )`,
+        // Trigger function to maintain 'updated' column on workflows
+        `CREATE OR REPLACE FUNCTION set_updated()
+         RETURNS TRIGGER AS $$
+         BEGIN
+            NEW.updated = now();
+            RETURN NEW;
+         END;
+         $$ LANGUAGE plpgsql;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'workflows_set_updated'
+            ) THEN
+                CREATE TRIGGER workflows_set_updated
+                BEFORE UPDATE ON workflows
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'conversations_set_updated'
+            ) THEN
+                CREATE TRIGGER conversations_set_updated
+                BEFORE UPDATE ON conversations
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_conversations_project ON conversations(project)`,
+        // Experiments table (auto id) linked to conversations
+        `CREATE TABLE IF NOT EXISTS experiments (
+            id BIGSERIAL PRIMARY KEY,
+            conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            created TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_experiments_conversation ON experiments(conversation_id)`,
+        // Task variants registry: one workflow per selector (variant)
+        `CREATE TABLE IF NOT EXISTS task_variants (
+            variant TEXT PRIMARY KEY,
+            workflow_id TEXT NOT NULL REFERENCES workflows(name) ON DELETE CASCADE
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_task_variants_workflow ON task_variants(workflow_id)`,
+        // Tasks table: versioned execution units identified by (variant, version)
+        `CREATE TABLE IF NOT EXISTS tasks (
+            id BIGSERIAL PRIMARY KEY,
+            command TEXT NOT NULL,
+            variant TEXT NOT NULL,
+            title TEXT,
+            description TEXT,
+            motivation TEXT,
+            version TEXT NOT NULL CHECK (version ~ '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z\.-]+)?(\+[0-9A-Za-z\.-]+)?$'),
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT,
+            shell TEXT,
+            run TEXT,
+            timeout INTERVAL,
+            tags TEXT[] DEFAULT '{}',
+            level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
+            UNIQUE (variant, version),
+            FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_tasks_variant ON tasks(variant)`,
+        // Messages table: references tasks.id (optional) and experiments.id (optional)
+        `CREATE TABLE IF NOT EXISTS messages (
             id BIGSERIAL PRIMARY KEY,
             content_id TEXT NOT NULL,
-            conversation_id TEXT NOT NULL,
-            attempt_id TEXT NOT NULL,
-            profile_name TEXT NOT NULL,
-            title TEXT,
-            level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
-            sender_id TEXT,
-            recipients TEXT[] DEFAULT '{}',
-            description TEXT,
-            goal TEXT,
-            timeout INTERVAL,
-            source TEXT NOT NULL,
+            task_id BIGINT REFERENCES tasks(id) ON DELETE SET NULL,
+            experiment_id BIGINT REFERENCES experiments(id) ON DELETE SET NULL,
+            executor TEXT,
             received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             processed_at TIMESTAMPTZ,
             status TEXT NOT NULL DEFAULT 'ingested',
             error_message TEXT,
             tags TEXT[] DEFAULT '{}',
             meta JSONB DEFAULT '{}',
-            attempt INT DEFAULT 1,
-            UNIQUE (content_id, source, received_at)
+            UNIQUE (content_id, status, received_at)
         )`,
-        `CREATE TABLE IF NOT EXISTS message_profiles (
+        // Starred tasks per mode: binds a mode (e.g., dev, qa) to a specific
+        // variant and version, referencing the task row. Unique per (mode, variant).
+        `CREATE TABLE IF NOT EXISTS starred_tasks (
             id BIGSERIAL PRIMARY KEY,
-            name TEXT UNIQUE NOT NULL,
-            description TEXT,
-            goal TEXT,
-            tags TEXT[] DEFAULT '{}',
-            is_vector BOOLEAN DEFAULT FALSE,
-            timeout INTERVAL,
-            sensitive BOOLEAN DEFAULT FALSE,
-            title TEXT,
-            level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
-            sender_id TEXT,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            mode TEXT NOT NULL,
+            variant TEXT NOT NULL,
+            version TEXT NOT NULL,
+            task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            UNIQUE (mode, variant)
         )`,
-        // Optional trigger to maintain updated_at; simple for now
-        `CREATE OR REPLACE FUNCTION set_updated_at()
-         RETURNS TRIGGER AS $$
-         BEGIN
-            NEW.updated_at = now();
-            RETURN NEW;
-         END;
-         $$ LANGUAGE plpgsql;`,
+        `CREATE INDEX IF NOT EXISTS idx_starred_tasks_mode ON starred_tasks(mode)`,
+        `CREATE INDEX IF NOT EXISTS idx_starred_tasks_variant ON starred_tasks(variant)`,
         `DO $$ BEGIN
             IF NOT EXISTS (
-                SELECT 1 FROM pg_trigger WHERE tgname = 'message_profiles_set_updated_at'
+                SELECT 1 FROM pg_trigger WHERE tgname = 'starred_tasks_set_updated'
             ) THEN
-                CREATE TRIGGER message_profiles_set_updated_at
-                BEFORE UPDATE ON message_profiles
+                CREATE TRIGGER starred_tasks_set_updated
+                BEFORE UPDATE ON starred_tasks
                 FOR EACH ROW
-                EXECUTE PROCEDURE set_updated_at();
+                EXECUTE PROCEDURE set_updated();
             END IF;
         END $$;`,
     }
     for _, s := range stmts {
-        if _, err := db.ExecContext(ctx, s); err != nil {
+        if _, err := db.Exec(ctx, s); err != nil {
             return err
         }
     }
     return nil
 }
-

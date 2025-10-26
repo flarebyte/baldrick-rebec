@@ -12,36 +12,20 @@ import (
 
 const (
     DefaultServerPort    = 53051
-    DefaultOpenSearchPort = 9200
 )
 
 type ServerConfig struct {
     Port int `yaml:"port"`
 }
 
-type OpenSearchConfig struct {
-    Host               string `yaml:"host"`
-    Scheme             string `yaml:"scheme"` // http or https
-    Port               int    `yaml:"port"`
-    InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
-    Admin              OSRole `yaml:"admin"`
-    App                OSRole `yaml:"app"`
-    // Legacy fields (deprecated)
-    Username           string `yaml:"username,omitempty"`
-    Password           string `yaml:"password,omitempty"`
-}
-
 type Config struct {
     Server     ServerConfig     `yaml:"server"`
-    OpenSearch OpenSearchConfig `yaml:"opensearch"`
     Postgres   PostgresConfig   `yaml:"postgres"`
 }
 
 func defaults() Config {
     return Config{
         Server:     ServerConfig{Port: DefaultServerPort},
-        OpenSearch: OpenSearchConfig{Host: "127.0.0.1", Scheme: "http", Port: DefaultOpenSearchPort,
-            Admin: OSRole{Username: "admin"}, App: OSRole{Username: "rbc_app"}},
         Postgres:   PostgresConfig{Host: "127.0.0.1", Port: 5432, DBName: "rbc", SSLMode: "disable",
             Admin: PGRole{User: "rbc_admin"}, App: PGRole{User: "rbc_app"}},
     }
@@ -72,31 +56,6 @@ func Load() (Config, error) {
     if fileCfg.Server.Port != 0 {
         cfg.Server.Port = fileCfg.Server.Port
     }
-    if fileCfg.OpenSearch.Host != "" {
-        cfg.OpenSearch.Host = fileCfg.OpenSearch.Host
-    }
-    if fileCfg.OpenSearch.Scheme != "" {
-        cfg.OpenSearch.Scheme = fileCfg.OpenSearch.Scheme
-    }
-    if fileCfg.OpenSearch.Port != 0 {
-        cfg.OpenSearch.Port = fileCfg.OpenSearch.Port
-    }
-    if fileCfg.OpenSearch.InsecureSkipVerify {
-        cfg.OpenSearch.InsecureSkipVerify = true
-    }
-    if fileCfg.OpenSearch.Admin.Username != "" {
-        cfg.OpenSearch.Admin.Username = fileCfg.OpenSearch.Admin.Username
-    }
-    if fileCfg.OpenSearch.Admin.Password != "" || fileCfg.OpenSearch.Admin.PasswordTemp != "" {
-        cfg.OpenSearch.Admin.Password = fileCfg.OpenSearch.Admin.Password
-        cfg.OpenSearch.Admin.PasswordTemp = fileCfg.OpenSearch.Admin.PasswordTemp
-    }
-    if fileCfg.OpenSearch.App.Username != "" {
-        cfg.OpenSearch.App.Username = fileCfg.OpenSearch.App.Username
-    }
-    if fileCfg.OpenSearch.App.Password != "" {
-        cfg.OpenSearch.App.Password = fileCfg.OpenSearch.App.Password
-    }
     // Postgres overrides
     if fileCfg.Postgres.Host != "" {
         cfg.Postgres.Host = fileCfg.Postgres.Host
@@ -113,9 +72,8 @@ func Load() (Config, error) {
     if fileCfg.Postgres.Admin.User != "" {
         cfg.Postgres.Admin.User = fileCfg.Postgres.Admin.User
     }
-    if fileCfg.Postgres.Admin.Password != "" || fileCfg.Postgres.Admin.PasswordTemp != "" {
+    if fileCfg.Postgres.Admin.Password != "" {
         cfg.Postgres.Admin.Password = fileCfg.Postgres.Admin.Password
-        cfg.Postgres.Admin.PasswordTemp = fileCfg.Postgres.Admin.PasswordTemp
     }
     if fileCfg.Postgres.App.User != "" {
         cfg.Postgres.App.User = fileCfg.Postgres.App.User
@@ -133,21 +91,9 @@ type PostgresConfig struct {
     SSLMode string `yaml:"sslmode"` // disable, require, verify-ca, verify-full
     Admin   PGRole `yaml:"admin"`
     App     PGRole `yaml:"app"`
-    // Legacy fields (deprecated)
-    User    string `yaml:"user,omitempty"`
-    Password string `yaml:"password,omitempty"`
 }
 
 type PGRole struct {
     User         string `yaml:"user"`
     Password     string `yaml:"password,omitempty"`
-    // For admin role, prefer using password_temp and remove it after use.
-    PasswordTemp string `yaml:"password_temp,omitempty"`
-}
-
-type OSRole struct {
-    Username     string `yaml:"username"`
-    Password     string `yaml:"password,omitempty"`
-    // For admin role, prefer using password_temp and remove it after use.
-    PasswordTemp string `yaml:"password_temp,omitempty"`
 }

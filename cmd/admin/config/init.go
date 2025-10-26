@@ -23,22 +23,10 @@ var (
     // Postgres app creds
     flagPGAppUser     string
     flagPGAppPassword string
-    // Postgres admin creds (temporary)
+    // Postgres admin creds
     flagPGAdminUser        string
     flagPGAdminPassword    string
-    flagPGAdminPasswordTmp string
-    // OpenSearch base
-    flagOSScheme   string
-    flagOSHost     string
-    flagOSPort     int
-    flagOSInsecure bool
-    // OpenSearch app creds
-    flagOSAppUsername string
-    flagOSAppPassword string
-    // OpenSearch admin creds (temporary)
-    flagOSAdminUsername    string
-    flagOSAdminPassword    string
-    flagOSAdminPasswordTmp string
+    // (OpenSearch flags removed)
 )
 
 var initCmd = &cobra.Command{
@@ -73,19 +61,9 @@ var initCmd = &cobra.Command{
         if cmd.Flags().Changed("pg-app-password") { cfg.Postgres.App.Password = flagPGAppPassword }
         if cmd.Flags().Changed("pg-admin-user") { cfg.Postgres.Admin.User = flagPGAdminUser }
         if cmd.Flags().Changed("pg-admin-password") { cfg.Postgres.Admin.Password = flagPGAdminPassword }
-        if cmd.Flags().Changed("pg-admin-password-temp") { cfg.Postgres.Admin.PasswordTemp = flagPGAdminPasswordTmp }
+        // no temp password; single admin password
 
-        // OpenSearch base
-        if cmd.Flags().Changed("os-scheme") { cfg.OpenSearch.Scheme = flagOSScheme }
-        if cmd.Flags().Changed("os-host") { cfg.OpenSearch.Host = flagOSHost }
-        if cmd.Flags().Changed("os-port") { cfg.OpenSearch.Port = flagOSPort }
-        if cmd.Flags().Changed("os-insecure") { cfg.OpenSearch.InsecureSkipVerify = flagOSInsecure }
-        // OpenSearch roles
-        if cmd.Flags().Changed("os-app-username") { cfg.OpenSearch.App.Username = flagOSAppUsername }
-        if cmd.Flags().Changed("os-app-password") { cfg.OpenSearch.App.Password = flagOSAppPassword }
-        if cmd.Flags().Changed("os-admin-username") { cfg.OpenSearch.Admin.Username = flagOSAdminUsername }
-        if cmd.Flags().Changed("os-admin-password") { cfg.OpenSearch.Admin.Password = flagOSAdminPassword }
-        if cmd.Flags().Changed("os-admin-password-temp") { cfg.OpenSearch.Admin.PasswordTemp = flagOSAdminPasswordTmp }
+        // No feature flags
 
         b, err := yaml.Marshal(cfg)
         if err != nil { return err }
@@ -117,18 +95,7 @@ func init() {
     initCmd.Flags().StringVar(&flagPGAppUser, "pg-app-user", "rbc_app", "Postgres app user (runtime)")
     initCmd.Flags().StringVar(&flagPGAppPassword, "pg-app-password", "", "Postgres app password")
     initCmd.Flags().StringVar(&flagPGAdminUser, "pg-admin-user", "rbc_admin", "Postgres admin user (migrations)")
-    initCmd.Flags().StringVar(&flagPGAdminPassword, "pg-admin-password", "", "Postgres admin password (avoid; prefer --pg-admin-password-temp)")
-    initCmd.Flags().StringVar(&flagPGAdminPasswordTmp, "pg-admin-password-temp", "", "Postgres admin temporary password (preferred; remove after use)")
+    initCmd.Flags().StringVar(&flagPGAdminPassword, "pg-admin-password", "", "Postgres admin password")
 
-    initCmd.Flags().StringVar(&flagOSScheme, "os-scheme", "http", "OpenSearch scheme (http/https)")
-    initCmd.Flags().StringVar(&flagOSHost, "os-host", "127.0.0.1", "OpenSearch host")
-    initCmd.Flags().IntVar(&flagOSPort, "os-port", cfgpkg.DefaultOpenSearchPort, "OpenSearch port")
-    initCmd.Flags().BoolVar(&flagOSInsecure, "os-insecure", false, "OpenSearch: skip TLS verification (dev)")
-
-    initCmd.Flags().StringVar(&flagOSAppUsername, "os-app-username", "rbc_app", "OpenSearch app username (runtime)")
-    initCmd.Flags().StringVar(&flagOSAppPassword, "os-app-password", "", "OpenSearch app password")
-    initCmd.Flags().StringVar(&flagOSAdminUsername, "os-admin-username", "admin", "OpenSearch admin username (operator)")
-    initCmd.Flags().StringVar(&flagOSAdminPassword, "os-admin-password", "", "OpenSearch admin password (avoid; prefer --os-admin-password-temp)")
-    initCmd.Flags().StringVar(&flagOSAdminPasswordTmp, "os-admin-password-temp", "", "OpenSearch admin temporary password (preferred; remove after use)")
+    // No feature flags
 }
-

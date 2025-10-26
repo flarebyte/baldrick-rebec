@@ -9,7 +9,6 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    osdao "github.com/flarebyte/baldrick-rebec/internal/dao/opensearch"
     "github.com/spf13/cobra"
 )
 
@@ -38,20 +37,8 @@ var statusCmd = &cobra.Command{
                 OK bool `json:"ok"`
             } `json:"privileges"`
         }
-        type osIndex struct{
-            Exists bool `json:"exists"`
-            ILMPolicy string `json:"ilm_policy,omitempty"`
-            ILMPolicyExists *bool `json:"ilm_policy_exists,omitempty"`
-            DocCount int64 `json:"doc_count,omitempty"`
-        }
-        type osStatus struct{
-            Health string `json:"health,omitempty"`
-            Index osIndex `json:"messages_content"`
-            Error string `json:"error,omitempty"`
-        }
         type statusOut struct{
             Postgres pgStatus `json:"postgres"`
-            OpenSearch osStatus `json:"opensearch"`
         }
         st := statusOut{}
         cfg, err := cfgpkg.Load()
@@ -70,9 +57,36 @@ var statusCmd = &cobra.Command{
         } else {
             defer pgres.Close()
             var dbname, user, version string
-            _ = pgres.QueryRowContext(ctx, "select current_database(), current_user, version()").Scan(&dbname, &user, &version)
+            _ = pgres.QueryRow(ctx, "select current_database(), current_user, version()").Scan(&dbname, &user, &version)
             fmt.Fprintf(os.Stderr, "postgres: ok db=%s user=%s\n", dbname, user)
             st.Postgres.AppConnection = pgAppConn{OK:true, DB:dbname, User:user}
+        }
+
+        // From app connection, sanity-check configured admin role existence/superuser
+        var adminExists, adminSuper, adminCanLogin bool
+        var superCandidates []string
+        if st.Postgres.AppConnection.OK {
+            // Check configured admin role info
+            _ = pgres.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)`, cfg.Postgres.Admin.User).Scan(&adminExists)
+            if adminExists {
+                _ = pgres.QueryRow(ctx, `SELECT rolsuper, rolcanlogin FROM pg_roles WHERE rolname=$1`, cfg.Postgres.Admin.User).Scan(&adminSuper, &adminCanLogin)
+                fmt.Fprintf(os.Stderr, "postgres: admin role %q: exists=%v superuser=%v can_login=%v (via app view)\n", cfg.Postgres.Admin.User, adminExists, adminSuper, adminCanLogin)
+            } else {
+                fmt.Fprintf(os.Stderr, "postgres: admin role %q: not found (via app view)\n", cfg.Postgres.Admin.User)
+            }
+            // Gather candidate superusers for hints
+            rows, err := pgres.Query(ctx, `SELECT rolname FROM pg_roles WHERE rolsuper AND rolcanlogin ORDER BY rolname LIMIT 5`)
+            if err == nil {
+                for rows.Next() {
+                    var rn string
+                    _ = rows.Scan(&rn)
+                    superCandidates = append(superCandidates, rn)
+                }
+                rows.Close()
+                if len(superCandidates) > 0 {
+                    fmt.Fprintf(os.Stderr, "postgres: superuser candidates: %v\n", superCandidates)
+                }
+            }
         }
         // Admin/system DB for role/db checks
         var sysdbOK bool
@@ -101,18 +115,33 @@ var statusCmd = &cobra.Command{
             }
             // Grant connect
             // We cannot directly test CONNECT privilege easily cross-db here; implied by ability to connect as app.
+        } else {
+            fmt.Fprintf(os.Stderr, "postgres: admin connect to system DB failed: %v\n", err)
+            if !adminExists && len(superCandidates) > 0 {
+                fmt.Fprintf(os.Stderr, "hint: configured admin user %q not found; try one of: %v\n", cfg.Postgres.Admin.User, superCandidates)
+            } else if adminExists && (!adminSuper || !adminCanLogin) {
+                fmt.Fprintf(os.Stderr, "hint: admin role %q exists but superuser=%v can_login=%v; use a superuser with login\n", cfg.Postgres.Admin.User, adminSuper, adminCanLogin)
+            }
         }
         // In target DB: tables and privileges
         if db, err := pgdao.OpenAdmin(ctx, cfg); err == nil {
             defer db.Close()
             var cnt int
-            _ = db.QueryRowContext(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages_events','message_profiles')").Scan(&cnt)
-            if cnt == 2 {
+            _ = db.QueryRow(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name in ('messages')").Scan(&cnt)
+            if cnt == 1 {
                 fmt.Fprintln(os.Stderr, "postgres: schema tables: ok")
                 st.Postgres.Schema.TablesOK = true
             } else {
                 fmt.Fprintln(os.Stderr, "postgres: schema tables: missing/incomplete (run db scaffold or db init)")
             }
+            // Additional tables presence (conversations, experiments, tasks)
+            var conv, exp, tasks bool
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='conversations')`).Scan(&conv)
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='experiments')`).Scan(&exp)
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='tasks')`).Scan(&tasks)
+            if conv { fmt.Fprintln(os.Stderr, "postgres: conversations table: ok") } else { fmt.Fprintln(os.Stderr, "postgres: conversations table: missing (run 'rbc admin db init')") }
+            if exp  { fmt.Fprintln(os.Stderr, "postgres: experiments table: ok") } else { fmt.Fprintln(os.Stderr, "postgres: experiments table: missing (run 'rbc admin db init')") }
+            if tasks{ fmt.Fprintln(os.Stderr, "postgres: tasks table: ok") } else { fmt.Fprintln(os.Stderr, "postgres: tasks table: missing (run 'rbc admin db init')") }
             if sysdbOK {
                 usage, _ := pgdao.HasSchemaUsage(ctx, db, cfg.Postgres.App.User, "public")
                 missingDML, _ := pgdao.MissingTableDML(ctx, db, cfg.Postgres.App.User, "public")
@@ -125,63 +154,32 @@ var statusCmd = &cobra.Command{
                     fmt.Fprintf(os.Stderr, "postgres: privileges for %q: missing (scaffold --grant-privileges)\n", cfg.Postgres.App.User)
                 }
             }
-        }
-
-        // OpenSearch (app role)
-        fmt.Fprintln(os.Stderr, "db:status - checking OpenSearch (app)...")
-        osc := osdao.NewClientFromConfigApp(cfg)
-        health, err := osc.ClusterHealth(ctx)
-        if err != nil {
-            fmt.Fprintf(os.Stderr, "opensearch: error: %v\n", err)
-            st.OpenSearch.Error = err.Error()
-        } else {
-            fmt.Fprintf(os.Stderr, "opensearch: cluster health=%s\n", health)
-            st.OpenSearch.Health = health
-        }
-        if exists, err := osc.IndexExists(ctx, "messages_content"); err == nil {
+            // Content table
+            var exists bool
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='messages_content_pg')`).Scan(&exists)
             if exists {
-                fmt.Fprintln(os.Stderr, "opensearch: index 'messages_content': present")
-                st.OpenSearch.Index.Exists = true
-                if name, err := osc.IndexLifecycleName(ctx, "messages_content"); err == nil && name != "" {
-                    fmt.Fprintf(os.Stderr, "opensearch: index ILM policy=%q\n", name)
-                    st.OpenSearch.Index.ILMPolicy = name
-                    // Check ILM policy existence via admin
-                    adminOSC := osdao.NewClientFromConfigAdmin(cfg)
-                    if _, err := adminOSC.GetILMPolicy(ctx, name); err == nil {
-                        fmt.Fprintln(os.Stderr, "opensearch: ILM policy exists: ok")
-                        v := true
-                        st.OpenSearch.Index.ILMPolicyExists = &v
-                    } else {
-                        fmt.Fprintf(os.Stderr, "opensearch: ILM policy missing or inaccessible: %v\n", err)
-                        v := false
-                        st.OpenSearch.Index.ILMPolicyExists = &v
-                    }
-                } else if pid, err := osc.IndexISMPolicyID(ctx, "messages_content"); err == nil && pid != "" {
-                    fmt.Fprintf(os.Stderr, "opensearch: index ISM policy=%q\n", pid)
-                    st.OpenSearch.Index.ILMPolicy = pid
-                    adminOSC := osdao.NewClientFromConfigAdmin(cfg)
-                    if _, err := adminOSC.GetISMPolicy(ctx, pid); err == nil {
-                        fmt.Fprintln(os.Stderr, "opensearch: ISM policy exists: ok")
-                        v := true
-                        st.OpenSearch.Index.ILMPolicyExists = &v
-                    } else {
-                        fmt.Fprintf(os.Stderr, "opensearch: ISM policy missing or inaccessible: %v\n", err)
-                        v := false
-                        st.OpenSearch.Index.ILMPolicyExists = &v
-                    }
-                } else {
-                    fmt.Fprintln(os.Stderr, "opensearch: index lifecycle policy: not set (use 'rbc admin os ilm ensure --attach-to-index messages_content' or ISM policy)")
-                }
-                if cnt, err := osc.IndexDocCount(ctx, "messages_content"); err == nil {
-                    fmt.Fprintf(os.Stderr, "opensearch: index doc count=%d\n", cnt)
-                    st.OpenSearch.Index.DocCount = cnt
-                }
+                fmt.Fprintln(os.Stderr, "postgres: content table: ok")
             } else {
-                fmt.Fprintln(os.Stderr, "opensearch: index 'messages_content': missing (run 'rbc admin db init')")
+                fmt.Fprintln(os.Stderr, "postgres: content table: missing (run 'rbc admin db init')")
+            }
+            // FTS index readiness: rely on index name we create
+            var fts bool
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_messages_content_pg_fts')`).Scan(&fts)
+            if fts {
+                fmt.Fprintln(os.Stderr, "postgres: FTS index: ok")
+            } else {
+                fmt.Fprintln(os.Stderr, "postgres: FTS index: missing (run 'rbc admin db init')")
             }
         } else {
-            fmt.Fprintf(os.Stderr, "opensearch: index check error: %v\n", err)
+            fmt.Fprintf(os.Stderr, "postgres: admin connect to target DB failed: %v\n", err)
+            if !adminExists && len(superCandidates) > 0 {
+                fmt.Fprintf(os.Stderr, "hint: configured admin user %q not found; try one of: %v\n", cfg.Postgres.Admin.User, superCandidates)
+            } else if adminExists && (!adminSuper || !adminCanLogin) {
+                fmt.Fprintf(os.Stderr, "hint: admin role %q exists but superuser=%v can_login=%v; use a superuser with login\n", cfg.Postgres.Admin.User, adminSuper, adminCanLogin)
+            }
         }
+
+        // OpenSearch removed in PG-only path
 
         if flagStatusJSON {
             enc := json.NewEncoder(os.Stdout)
