@@ -104,13 +104,13 @@ func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id int64) (*Task, error)
 }
 
 // GetTaskByKey fetches a task by (workflow_id, name, version).
-func GetTaskByKey(ctx context.Context, db *pgxpool.Pool, wf, variant, ver string) (*Task, error) {
+func GetTaskByKey(ctx context.Context, db *pgxpool.Pool, variant, ver string) (*Task, error) {
     q := `SELECT id, workflow_id, command, variant, title, description, motivation, version,
                  notes, shell, run, timeout::text, tags, level, created
-          FROM tasks WHERE workflow_id=$1 AND variant=$2 AND version=$3`
+          FROM tasks WHERE variant=$1 AND version=$2`
     var t Task
     var tags []string
-    if err := db.QueryRow(ctx, q, wf, variant, ver).Scan(
+    if err := db.QueryRow(ctx, q, variant, ver).Scan(
         &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
         &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tags, &t.Level, &t.Created,
     ); err != nil {
