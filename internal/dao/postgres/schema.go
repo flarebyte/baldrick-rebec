@@ -18,6 +18,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT
         )`,
+        // Conversations table (id as unique identifier) with created/updated timestamps, notes and tags
+        `CREATE TABLE IF NOT EXISTS conversations (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            project TEXT,
+            tags TEXT[] DEFAULT '{}',
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT
+        )`,
         // Trigger function to maintain 'updated' column on workflows
         `CREATE OR REPLACE FUNCTION set_updated()
          RETURNS TRIGGER AS $$
@@ -36,6 +47,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
                 EXECUTE PROCEDURE set_updated();
             END IF;
         END $$;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'conversations_set_updated'
+            ) THEN
+                CREATE TRIGGER conversations_set_updated
+                BEFORE UPDATE ON conversations
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_conversations_project ON conversations(project)`,
         // Tasks table: versioned execution units under a workflow
         `CREATE TABLE IF NOT EXISTS tasks (
             id BIGSERIAL PRIMARY KEY,
