@@ -58,6 +58,13 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_conversations_project ON conversations(project)`,
+        // Experiments table (auto id) linked to conversations
+        `CREATE TABLE IF NOT EXISTS experiments (
+            id BIGSERIAL PRIMARY KEY,
+            conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            created TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_experiments_conversation ON experiments(conversation_id)`,
         // Tasks table: versioned execution units under a workflow
         `CREATE TABLE IF NOT EXISTS tasks (
             id BIGSERIAL PRIMARY KEY,
