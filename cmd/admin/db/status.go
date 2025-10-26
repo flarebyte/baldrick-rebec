@@ -134,6 +134,14 @@ var statusCmd = &cobra.Command{
             } else {
                 fmt.Fprintln(os.Stderr, "postgres: schema tables: missing/incomplete (run db scaffold or db init)")
             }
+            // Additional tables presence (conversations, experiments, tasks)
+            var conv, exp, tasks bool
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='conversations')`).Scan(&conv)
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='experiments')`).Scan(&exp)
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='tasks')`).Scan(&tasks)
+            if conv { fmt.Fprintln(os.Stderr, "postgres: conversations table: ok") } else { fmt.Fprintln(os.Stderr, "postgres: conversations table: missing (run 'rbc admin db init')") }
+            if exp  { fmt.Fprintln(os.Stderr, "postgres: experiments table: ok") } else { fmt.Fprintln(os.Stderr, "postgres: experiments table: missing (run 'rbc admin db init')") }
+            if tasks{ fmt.Fprintln(os.Stderr, "postgres: tasks table: ok") } else { fmt.Fprintln(os.Stderr, "postgres: tasks table: missing (run 'rbc admin db init')") }
             if sysdbOK {
                 usage, _ := pgdao.HasSchemaUsage(ctx, db, cfg.Postgres.App.User, "public")
                 missingDML, _ := pgdao.MissingTableDML(ctx, db, cfg.Postgres.App.User, "public")
