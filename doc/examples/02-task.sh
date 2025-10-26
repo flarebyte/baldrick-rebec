@@ -16,7 +16,8 @@ echo "Creating sample tasks under ci-test and ci-lint..." >&2
 # ci-test: unit tests task
 rbc admin task set \
   --workflow ci-test \
-  --name unit \
+  --command unit \
+  --variant go \
   --version 1.0.0 \
   --title "Run Unit Tests" \
   --description "Executes unit tests across all packages." \
@@ -29,7 +30,8 @@ rbc admin task set \
 # ci-test: integration tests task
 rbc admin task set \
   --workflow ci-test \
-  --name integration \
+  --command integration \
+  --variant "" \
   --version 1.0.0 \
   --title "Run Integration Tests" \
   --description "Brings up services and runs integration tests." \
@@ -42,7 +44,8 @@ rbc admin task set \
 # ci-lint: formatting / linting
 rbc admin task set \
   --workflow ci-lint \
-  --name lint \
+  --command lint \
+  --variant go \
   --version 1.0.0 \
   --title "Lint & Vet" \
   --description "Runs vet and lints the codebase." \
@@ -53,4 +56,3 @@ rbc admin task set \
   --level h2
 
 echo "Done." >&2
-

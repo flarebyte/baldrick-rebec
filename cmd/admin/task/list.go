@@ -37,7 +37,8 @@ var listCmd = &cobra.Command{
             item := map[string]any{
                 "id": t.ID,
                 "workflow": t.WorkflowID,
-                "name": t.Name,
+                "command": t.Command,
+                "variant": t.Variant,
                 "version": t.Version,
             }
             if t.Created.Valid { item["created"] = t.Created.Time.Format(time.RFC3339Nano) }
@@ -57,4 +58,3 @@ func init() {
     listCmd.Flags().IntVar(&flagTaskListLimit, "limit", 100, "Max rows")
     listCmd.Flags().IntVar(&flagTaskListOffset, "offset", 0, "Offset for pagination")
 }
-

@@ -17,8 +17,9 @@ import (
 var (
     flagTaskGetID  int64
     flagTaskGetWF  string
-    flagTaskGetName string
-    flagTaskGetVer  string
+    flagTaskGetCmd string
+    flagTaskGetVar string
+    flagTaskGetVer string
 )
 
 var getCmd = &cobra.Command{
@@ -36,19 +37,20 @@ var getCmd = &cobra.Command{
         if flagTaskGetID > 0 {
             t, err = pgdao.GetTaskByID(ctx, db, flagTaskGetID)
         } else {
-            if strings.TrimSpace(flagTaskGetWF)=="" || strings.TrimSpace(flagTaskGetName)=="" || strings.TrimSpace(flagTaskGetVer)=="" {
-                return errors.New("provide --id or all of --workflow, --name, --version")
+            if strings.TrimSpace(flagTaskGetWF)=="" || strings.TrimSpace(flagTaskGetCmd)=="" || strings.TrimSpace(flagTaskGetVer)=="" {
+                return errors.New("provide --id or all of --workflow, --command, --version (and optionally --variant)")
             }
-            t, err = pgdao.GetTaskByKey(ctx, db, flagTaskGetWF, flagTaskGetName, flagTaskGetVer)
+            t, err = pgdao.GetTaskByKey(ctx, db, flagTaskGetWF, flagTaskGetCmd, flagTaskGetVar, flagTaskGetVer)
         }
         if err != nil { return err }
         // Human
-        fmt.Fprintf(os.Stderr, "task id=%d workflow=%q name=%q version=%q\n", t.ID, t.WorkflowID, t.Name, t.Version)
+        fmt.Fprintf(os.Stderr, "task id=%d workflow=%q command=%q variant=%q version=%q\n", t.ID, t.WorkflowID, t.Command, t.Variant, t.Version)
         // JSON
         out := map[string]any{
             "id": t.ID,
             "workflow": t.WorkflowID,
-            "name": t.Name,
+            "command": t.Command,
+            "variant": t.Variant,
             "version": t.Version,
         }
         if t.Created.Valid { out["created"] = t.Created.Time.Format(time.RFC3339Nano) }
@@ -70,7 +72,8 @@ var getCmd = &cobra.Command{
 func init() {
     TaskCmd.AddCommand(getCmd)
     getCmd.Flags().Int64Var(&flagTaskGetID, "id", 0, "Task numeric id")
-    getCmd.Flags().StringVar(&flagTaskGetWF, "workflow", "", "Workflow name (with --name and --version)")
-    getCmd.Flags().StringVar(&flagTaskGetName, "name", "", "Task name (with --workflow and --version)")
-    getCmd.Flags().StringVar(&flagTaskGetVer, "version", "", "Task version (with --workflow and --name)")
+    getCmd.Flags().StringVar(&flagTaskGetWF, "workflow", "", "Workflow name (with --command and --version)")
+    getCmd.Flags().StringVar(&flagTaskGetCmd, "command", "", "Task command (with --workflow and --version)")
+    getCmd.Flags().StringVar(&flagTaskGetVar, "variant", "", "Task variant (optional; default empty)")
+    getCmd.Flags().StringVar(&flagTaskGetVer, "version", "", "Task version (with --workflow and --command)")
 }

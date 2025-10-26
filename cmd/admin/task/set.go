@@ -17,7 +17,8 @@ import (
 
 var (
     flagTaskWF   string
-    flagTaskName string
+    flagTaskCmd  string
+    flagTaskVar  string
     flagTaskVer  string
 
     flagTaskTitle string
@@ -35,8 +36,8 @@ var setCmd = &cobra.Command{
     Use:   "set",
     Short: "Create or update a task (by workflow,name,version)",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if strings.TrimSpace(flagTaskWF) == "" || strings.TrimSpace(flagTaskName) == "" || strings.TrimSpace(flagTaskVer) == "" {
-            return errors.New("--workflow, --name and --version are required")
+        if strings.TrimSpace(flagTaskWF) == "" || strings.TrimSpace(flagTaskCmd) == "" || strings.TrimSpace(flagTaskVer) == "" {
+            return errors.New("--workflow, --command and --version are required")
         }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
@@ -45,7 +46,7 @@ var setCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg)
         if err != nil { return err }
         defer db.Close()
-        t := &pgdao.Task{WorkflowID: flagTaskWF, Name: flagTaskName, Version: flagTaskVer}
+        t := &pgdao.Task{WorkflowID: flagTaskWF, Command: flagTaskCmd, Variant: flagTaskVar, Version: flagTaskVer}
         if flagTaskTitle != "" { t.Title = sql.NullString{String: flagTaskTitle, Valid: true} }
         if flagTaskDesc  != "" { t.Description = sql.NullString{String: flagTaskDesc, Valid: true} }
         if flagTaskMotiv != "" { t.Motivation = sql.NullString{String: flagTaskMotiv, Valid: true} }
@@ -57,13 +58,14 @@ var setCmd = &cobra.Command{
         if flagTaskLevel != "" { t.Level = sql.NullString{String: flagTaskLevel, Valid: true} }
         if err := pgdao.UpsertTask(ctx, db, t); err != nil { return err }
         // Human
-        fmt.Fprintf(os.Stderr, "task upserted workflow=%q name=%q version=%q id=%d\n", t.WorkflowID, t.Name, t.Version, t.ID)
+        fmt.Fprintf(os.Stderr, "task upserted workflow=%q command=%q variant=%q version=%q id=%d\n", t.WorkflowID, t.Command, t.Variant, t.Version, t.ID)
         // JSON
         out := map[string]any{
             "status":"upserted",
             "id": t.ID,
             "workflow": t.WorkflowID,
-            "name": t.Name,
+            "command": t.Command,
+            "variant": t.Variant,
             "version": t.Version,
         }
         if t.Created.Valid { out["created"] = t.Created.Time.Format(time.RFC3339Nano) }
@@ -76,7 +78,8 @@ var setCmd = &cobra.Command{
 func init() {
     TaskCmd.AddCommand(setCmd)
     setCmd.Flags().StringVar(&flagTaskWF, "workflow", "", "Workflow name (required)")
-    setCmd.Flags().StringVar(&flagTaskName, "name", "", "Task name (required)")
+    setCmd.Flags().StringVar(&flagTaskCmd, "command", "", "Task command (e.g., unit, lint) (required)")
+    setCmd.Flags().StringVar(&flagTaskVar, "variant", "", "Task variant (e.g., go, typescript/v5)")
     setCmd.Flags().StringVar(&flagTaskVer, "version", "", "Semver version (required)")
     setCmd.Flags().StringVar(&flagTaskTitle, "title", "", "Human-readable title")
     setCmd.Flags().StringVar(&flagTaskDesc, "description", "", "Plain text description")
@@ -88,4 +91,3 @@ func init() {
     setCmd.Flags().StringSliceVar(&flagTaskTags, "tags", nil, "Tags")
     setCmd.Flags().StringVar(&flagTaskLevel, "level", "", "Level: h1..h6")
 }
-

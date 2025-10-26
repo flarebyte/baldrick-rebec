@@ -69,7 +69,8 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         `CREATE TABLE IF NOT EXISTS tasks (
             id BIGSERIAL PRIMARY KEY,
             workflow_id TEXT NOT NULL REFERENCES workflows(name) ON DELETE CASCADE,
-            name TEXT NOT NULL,
+            command TEXT NOT NULL,
+            variant TEXT NOT NULL DEFAULT '',
             title TEXT,
             description TEXT,
             motivation TEXT,
@@ -81,7 +82,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             timeout INTERVAL,
             tags TEXT[] DEFAULT '{}',
             level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
-            UNIQUE (workflow_id, name, version)
+            UNIQUE (workflow_id, command, variant, version)
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_workflow ON tasks(workflow_id)`,
         // Messages table: references tasks.id (optional) and experiments.id (optional)

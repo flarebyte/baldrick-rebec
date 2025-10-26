@@ -18,7 +18,8 @@ import (
 var (
     flagTaskDelID   int64
     flagTaskDelWF   string
-    flagTaskDelName string
+    flagTaskDelCmd  string
+    flagTaskDelVar  string
     flagTaskDelVer  string
     flagTaskDelForce bool
     flagTaskDelIgnoreMissing bool
@@ -35,10 +36,10 @@ var deleteCmd = &cobra.Command{
             ident = fmt.Sprintf("id=%d", flagTaskDelID)
             byID = true
         } else {
-            if strings.TrimSpace(flagTaskDelWF)=="" || strings.TrimSpace(flagTaskDelName)=="" || strings.TrimSpace(flagTaskDelVer)=="" {
-                return errors.New("provide --id or all of --workflow, --name, --version")
+            if strings.TrimSpace(flagTaskDelWF)=="" || strings.TrimSpace(flagTaskDelCmd)=="" || strings.TrimSpace(flagTaskDelVer)=="" {
+                return errors.New("provide --id or all of --workflow, --command, --version (and optionally --variant)")
             }
-            ident = fmt.Sprintf("workflow=%s name=%s version=%s", flagTaskDelWF, flagTaskDelName, flagTaskDelVer)
+            ident = fmt.Sprintf("workflow=%s command=%s variant=%s version=%s", flagTaskDelWF, flagTaskDelCmd, flagTaskDelVar, flagTaskDelVer)
         }
         if !flagTaskDelForce {
             fmt.Fprintf(os.Stderr, "About to delete task (%s).\n", ident)
@@ -60,13 +61,13 @@ var deleteCmd = &cobra.Command{
         if byID {
             affected, err = pgdao.DeleteTaskByID(ctx, db, flagTaskDelID)
         } else {
-            affected, err = pgdao.DeleteTaskByKey(ctx, db, flagTaskDelWF, flagTaskDelName, flagTaskDelVer)
+            affected, err = pgdao.DeleteTaskByKey(ctx, db, flagTaskDelWF, flagTaskDelCmd, flagTaskDelVar, flagTaskDelVer)
         }
         if err != nil { return err }
         if affected == 0 {
             if flagTaskDelIgnoreMissing {
                 fmt.Fprintf(os.Stderr, "task (%s) not found; ignoring\n", ident)
-                out := map[string]any{"status":"not_found_ignored","id": flagTaskDelID, "workflow": flagTaskDelWF, "name": flagTaskDelName, "version": flagTaskDelVer}
+                out := map[string]any{"status":"not_found_ignored","id": flagTaskDelID, "workflow": flagTaskDelWF, "command": flagTaskDelCmd, "variant": flagTaskDelVar, "version": flagTaskDelVer}
                 enc := json.NewEncoder(os.Stdout)
                 enc.SetIndent("", "  ")
                 return enc.Encode(out)
@@ -75,7 +76,7 @@ var deleteCmd = &cobra.Command{
         }
         fmt.Fprintf(os.Stderr, "task deleted (%s)\n", ident)
         out := map[string]any{"status":"deleted","deleted":true}
-        if byID { out["id"] = flagTaskDelID } else { out["workflow"]=flagTaskDelWF; out["name"]=flagTaskDelName; out["version"]=flagTaskDelVer }
+        if byID { out["id"] = flagTaskDelID } else { out["workflow"]=flagTaskDelWF; out["command"]=flagTaskDelCmd; out["variant"]=flagTaskDelVar; out["version"]=flagTaskDelVer }
         enc := json.NewEncoder(os.Stdout)
         enc.SetIndent("", "  ")
         return enc.Encode(out)
@@ -85,9 +86,10 @@ var deleteCmd = &cobra.Command{
 func init() {
     TaskCmd.AddCommand(deleteCmd)
     deleteCmd.Flags().Int64Var(&flagTaskDelID, "id", 0, "Task numeric id")
-    deleteCmd.Flags().StringVar(&flagTaskDelWF, "workflow", "", "Workflow name (with --name and --version)")
-    deleteCmd.Flags().StringVar(&flagTaskDelName, "name", "", "Task name (with --workflow and --version)")
-    deleteCmd.Flags().StringVar(&flagTaskDelVer, "version", "", "Task version (with --workflow and --name)")
+    deleteCmd.Flags().StringVar(&flagTaskDelWF, "workflow", "", "Workflow name (with --command and --version)")
+    deleteCmd.Flags().StringVar(&flagTaskDelCmd, "command", "", "Task command (with --workflow and --version)")
+    deleteCmd.Flags().StringVar(&flagTaskDelVar, "variant", "", "Task variant (optional)")
+    deleteCmd.Flags().StringVar(&flagTaskDelVer, "version", "", "Task version (with --workflow and --command)")
     deleteCmd.Flags().BoolVar(&flagTaskDelForce, "force", false, "Do not prompt for confirmation")
     deleteCmd.Flags().BoolVar(&flagTaskDelIgnoreMissing, "ignore-missing", false, "Do not error if task does not exist")
 }

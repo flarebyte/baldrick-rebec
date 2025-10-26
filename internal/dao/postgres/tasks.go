@@ -11,7 +11,8 @@ import (
 type Task struct {
     ID         int64
     WorkflowID string
-    Name       string
+    Command    string
+    Variant    string
     Title      sql.NullString
     Description sql.NullString
     Motivation sql.NullString
@@ -27,14 +28,15 @@ type Task struct {
 
 // UpsertTask inserts or updates a task identified by (workflow_id, name, version).
 func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
+    if strings.TrimSpace(t.Variant) == "" { t.Variant = "" }
     q := `INSERT INTO tasks (
-            workflow_id, name, title, description, motivation, version,
+            workflow_id, command, variant, title, description, motivation, version,
             notes, shell, run, timeout, tags, level
           ) VALUES (
-            $1, $2, NULLIF($3,''), NULLIF($4,''), NULLIF($5,''), $6,
-            NULLIF($7,''), NULLIF($8,''), NULLIF($9,''), CASE WHEN $10='' THEN NULL ELSE $10::interval END, $11::text[], NULLIF($12,'')
+            $1, $2, $3, NULLIF($4,''), NULLIF($5,''), NULLIF($6,''), $7,
+            NULLIF($8,''), NULLIF($9,''), NULLIF($10,''), CASE WHEN $11='' THEN NULL ELSE $11::interval END, $12::text[], NULLIF($13,'')
           )
-          ON CONFLICT (workflow_id, name, version) DO UPDATE SET
+          ON CONFLICT (workflow_id, command, variant, version) DO UPDATE SET
             title = EXCLUDED.title,
             description = EXCLUDED.description,
             motivation = EXCLUDED.motivation,
@@ -48,7 +50,7 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
     var id int64
     var created sql.NullTime
     if err := db.QueryRow(ctx, q,
-        t.WorkflowID, t.Name, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation), t.Version,
+        t.WorkflowID, t.Command, t.Variant, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation), t.Version,
         stringOrEmpty(t.Notes), stringOrEmpty(t.Shell), stringOrEmpty(t.Run), stringOrEmpty(t.Timeout), t.Tags, stringOrEmpty(t.Level),
     ).Scan(&id, &created); err != nil {
         return err
@@ -60,13 +62,13 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
 
 // GetTaskByID fetches a task by numeric id.
 func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id int64) (*Task, error) {
-    q := `SELECT id, workflow_id, name, title, description, motivation, version,
+    q := `SELECT id, workflow_id, command, variant, title, description, motivation, version,
                  notes, shell, run, timeout::text, tags, level, created
           FROM tasks WHERE id=$1`
     var t Task
     var tags []string
     if err := db.QueryRow(ctx, q, id).Scan(
-        &t.ID, &t.WorkflowID, &t.Name, &t.Title, &t.Description, &t.Motivation, &t.Version,
+        &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
         &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tags, &t.Level, &t.Created,
     ); err != nil {
         return nil, err
@@ -76,14 +78,14 @@ func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id int64) (*Task, error)
 }
 
 // GetTaskByKey fetches a task by (workflow_id, name, version).
-func GetTaskByKey(ctx context.Context, db *pgxpool.Pool, wf, name, ver string) (*Task, error) {
-    q := `SELECT id, workflow_id, name, title, description, motivation, version,
+func GetTaskByKey(ctx context.Context, db *pgxpool.Pool, wf, command, variant, ver string) (*Task, error) {
+    q := `SELECT id, workflow_id, command, variant, title, description, motivation, version,
                  notes, shell, run, timeout::text, tags, level, created
-          FROM tasks WHERE workflow_id=$1 AND name=$2 AND version=$3`
+          FROM tasks WHERE workflow_id=$1 AND command=$2 AND variant=$3 AND version=$4`
     var t Task
     var tags []string
-    if err := db.QueryRow(ctx, q, wf, name, ver).Scan(
-        &t.ID, &t.WorkflowID, &t.Name, &t.Title, &t.Description, &t.Motivation, &t.Version,
+    if err := db.QueryRow(ctx, q, wf, command, variant, ver).Scan(
+        &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
         &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tags, &t.Level, &t.Created,
     ); err != nil {
         return nil, err
@@ -99,13 +101,13 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow string, limit, of
     var rows pgxRows
     var err error
     if stringsTrim(workflow) == "" {
-        rows, err = db.Query(ctx, `SELECT id, workflow_id, name, title, description, motivation, version,
+        rows, err = db.Query(ctx, `SELECT id, workflow_id, command, variant, title, description, motivation, version,
                                         notes, shell, run, timeout::text, tags, level, created
                                    FROM tasks ORDER BY workflow_id, name, version LIMIT $1 OFFSET $2`, limit, offset)
     } else {
-        rows, err = db.Query(ctx, `SELECT id, workflow_id, name, title, description, motivation, version,
+        rows, err = db.Query(ctx, `SELECT id, workflow_id, command, variant, title, description, motivation, version,
                                         notes, shell, run, timeout::text, tags, level, created
-                                   FROM tasks WHERE workflow_id=$1 ORDER BY name, version LIMIT $2 OFFSET $3`, workflow, limit, offset)
+                                   FROM tasks WHERE workflow_id=$1 ORDER BY command, variant, version LIMIT $2 OFFSET $3`, workflow, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()
@@ -113,7 +115,7 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow string, limit, of
     for rows.Next() {
         var t Task
         var tags []string
-        if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Name, &t.Title, &t.Description, &t.Motivation, &t.Version,
+        if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
             &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tags, &t.Level, &t.Created); err != nil {
             return nil, err
         }
@@ -131,8 +133,8 @@ func DeleteTaskByID(ctx context.Context, db *pgxpool.Pool, id int64) (int64, err
 }
 
 // DeleteTaskByKey deletes a task by (workflow_id, name, version).
-func DeleteTaskByKey(ctx context.Context, db *pgxpool.Pool, wf, name, ver string) (int64, error) {
-    ct, err := db.Exec(ctx, `DELETE FROM tasks WHERE workflow_id=$1 AND name=$2 AND version=$3`, wf, name, ver)
+func DeleteTaskByKey(ctx context.Context, db *pgxpool.Pool, wf, command, variant, ver string) (int64, error) {
+    ct, err := db.Exec(ctx, `DELETE FROM tasks WHERE workflow_id=$1 AND command=$2 AND variant=$3 AND version=$4`, wf, command, variant, ver)
     if err != nil { return 0, err }
     return ct.RowsAffected(), nil
 }
