@@ -130,7 +130,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         // variant and version, referencing the task row. Unique per (role, variant).
         `CREATE TABLE IF NOT EXISTS starred_tasks (
             id BIGSERIAL PRIMARY KEY,
-            role TEXT NOT NULL,
+            role TEXT NOT NULL REFERENCES roles(name) ON DELETE CASCADE,
             variant TEXT NOT NULL,
             version TEXT NOT NULL,
             task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -140,6 +140,16 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_starred_tasks_role ON starred_tasks(role)`,
         `CREATE INDEX IF NOT EXISTS idx_starred_tasks_variant ON starred_tasks(variant)`,
+        // Ensure FK exists if table predated the FK addition
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname='starred_tasks_role_fkey'
+            ) THEN
+                ALTER TABLE starred_tasks
+                    ADD CONSTRAINT starred_tasks_role_fkey
+                    FOREIGN KEY (role) REFERENCES roles(name) ON DELETE CASCADE;
+            END IF;
+        END $$;`,
         `DO $$ BEGIN
             IF NOT EXISTS (
                 SELECT 1 FROM pg_trigger WHERE tgname = 'starred_tasks_set_updated'

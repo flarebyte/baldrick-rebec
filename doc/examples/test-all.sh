@@ -38,17 +38,21 @@ eid1=$(printf "%s" "$ejson1" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/
 ejson2=$(rbc admin experiment create --conversation "$cid2")
 eid2=$(printf "%s" "$ejson2" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/')
 
-echo "[5/7] Starring tasks per role" >&2
+echo "[5/8] Creating roles" >&2
+rbc admin role set --name user --title "User" --description "Regular end-user role" --tags default
+rbc admin role set --name qa   --title "QA"   --description "Quality assurance role" --tags testing
+
+echo "[6/8] Starring tasks per role" >&2
 rbc admin star set --role user --variant unit/go --version 1.0.0
 rbc admin star set --role qa   --variant integration --version 1.0.0
 rbc admin star set --role user --variant lint/go --version 1.0.0
 
-echo "[6/7] Creating sample messages" >&2
+echo "[7/8] Creating sample messages" >&2
 echo "Hello from user12" | rbc admin message set --executor user12 --experiment "$eid1" --title "Greeting" --tags hello
 echo "Build started" | rbc admin message set --executor build-bot --experiment "$eid1" --title "BuildStart" --tags build
 echo "Onboarding checklist updated" | rbc admin message set --executor docs-bot --experiment "$eid2" --title "DocsUpdate" --tags docs,update
 
-echo "[7/7] Listing all entities and counts" >&2
+echo "[8/8] Listing all entities and counts" >&2
 echo "-- Workflows --" >&2
 rbc admin workflow list --limit 50
 echo "-- Tasks --" >&2
