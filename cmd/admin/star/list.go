@@ -13,7 +13,7 @@ import (
 )
 
 var (
-    flagStarListMode    string
+    flagStarListRole    string
     flagStarListVariant string
     flagStarListLimit   int
     flagStarListOffset  int
@@ -21,7 +21,7 @@ var (
 
 var listCmd = &cobra.Command{
     Use:   "list",
-    Short: "List starred tasks (optionally filter by mode or variant)",
+    Short: "List starred tasks (optionally filter by role or variant)",
     RunE: func(cmd *cobra.Command, args []string) error {
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
@@ -30,14 +30,14 @@ var listCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg)
         if err != nil { return err }
         defer db.Close()
-        items, err := pgdao.ListStarredTasks(ctx, db, flagStarListMode, flagStarListVariant, flagStarListLimit, flagStarListOffset)
+        items, err := pgdao.ListStarredTasks(ctx, db, flagStarListRole, flagStarListVariant, flagStarListLimit, flagStarListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "starred tasks: %d\n", len(items))
         arr := make([]map[string]any, 0, len(items))
         for _, st := range items {
             m := map[string]any{
                 "id": st.ID,
-                "mode": st.Mode,
+                "role": st.Role,
                 "variant": st.Variant,
                 "version": st.Version,
                 "task_id": st.TaskID,
@@ -54,9 +54,8 @@ var listCmd = &cobra.Command{
 
 func init() {
     StarCmd.AddCommand(listCmd)
-    listCmd.Flags().StringVar(&flagStarListMode, "mode", "", "Filter by mode")
+    listCmd.Flags().StringVar(&flagStarListRole, "role", "", "Filter by role")
     listCmd.Flags().StringVar(&flagStarListVariant, "variant", "", "Filter by variant")
     listCmd.Flags().IntVar(&flagStarListLimit, "limit", 100, "Max rows")
     listCmd.Flags().IntVar(&flagStarListOffset, "offset", 0, "Offset for pagination")
 }
-

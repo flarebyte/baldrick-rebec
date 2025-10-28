@@ -16,13 +16,13 @@ import (
 
 var (
     flagStarGetID      int64
-    flagStarGetMode    string
+    flagStarGetRole    string
     flagStarGetVariant string
 )
 
 var getCmd = &cobra.Command{
     Use:   "get",
-    Short: "Get a starred task by id or by (mode, variant)",
+    Short: "Get a starred task by id or by (role, variant)",
     RunE: func(cmd *cobra.Command, args []string) error {
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
@@ -35,16 +35,16 @@ var getCmd = &cobra.Command{
         if flagStarGetID > 0 {
             st, err = pgdao.GetStarredTaskByID(ctx, db, flagStarGetID)
         } else {
-            if strings.TrimSpace(flagStarGetMode) == "" || strings.TrimSpace(flagStarGetVariant) == "" {
-                return errors.New("provide --id or both --mode and --variant")
+            if strings.TrimSpace(flagStarGetRole) == "" || strings.TrimSpace(flagStarGetVariant) == "" {
+                return errors.New("provide --id or both --role and --variant")
             }
-            st, err = pgdao.GetStarredTaskByKey(ctx, db, flagStarGetMode, flagStarGetVariant)
+            st, err = pgdao.GetStarredTaskByKey(ctx, db, flagStarGetRole, flagStarGetVariant)
         }
         if err != nil { return err }
         // Human
-        fmt.Fprintf(os.Stderr, "star id=%d mode=%q variant=%q version=%q task_id=%d\n", st.ID, st.Mode, st.Variant, st.Version, st.TaskID)
+        fmt.Fprintf(os.Stderr, "star id=%d role=%q variant=%q version=%q task_id=%d\n", st.ID, st.Role, st.Variant, st.Version, st.TaskID)
         // JSON
-        out := map[string]any{ "id": st.ID, "mode": st.Mode, "variant": st.Variant, "version": st.Version, "task_id": st.TaskID }
+        out := map[string]any{ "id": st.ID, "role": st.Role, "variant": st.Variant, "version": st.Version, "task_id": st.TaskID }
         if st.Created.Valid { out["created"] = st.Created.Time.Format(time.RFC3339Nano) }
         if st.Updated.Valid { out["updated"] = st.Updated.Time.Format(time.RFC3339Nano) }
         enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
@@ -54,7 +54,6 @@ var getCmd = &cobra.Command{
 func init() {
     StarCmd.AddCommand(getCmd)
     getCmd.Flags().Int64Var(&flagStarGetID, "id", 0, "Starred task id")
-    getCmd.Flags().StringVar(&flagStarGetMode, "mode", "", "Mode (with --variant)")
-    getCmd.Flags().StringVar(&flagStarGetVariant, "variant", "", "Variant (with --mode)")
+    getCmd.Flags().StringVar(&flagStarGetRole, "role", "", "Role (with --variant)")
+    getCmd.Flags().StringVar(&flagStarGetVariant, "variant", "", "Variant (with --role)")
 }
-

@@ -17,7 +17,7 @@ import (
 
 var (
     flagStarDelID      int64
-    flagStarDelMode    string
+    flagStarDelRole    string
     flagStarDelVariant string
     flagStarDelForce   bool
     flagStarDelIgnore  bool
@@ -25,7 +25,7 @@ var (
 
 var deleteCmd = &cobra.Command{
     Use:   "delete",
-    Short: "Delete a starred task by id or by (mode, variant)",
+    Short: "Delete a starred task by id or by (role, variant)",
     RunE: func(cmd *cobra.Command, args []string) error {
         var ident string
         byID := false
@@ -33,10 +33,10 @@ var deleteCmd = &cobra.Command{
             ident = fmt.Sprintf("id=%d", flagStarDelID)
             byID = true
         } else {
-            if strings.TrimSpace(flagStarDelMode) == "" || strings.TrimSpace(flagStarDelVariant) == "" {
-                return errors.New("provide --id or both --mode and --variant")
+            if strings.TrimSpace(flagStarDelRole) == "" || strings.TrimSpace(flagStarDelVariant) == "" {
+                return errors.New("provide --id or both --role and --variant")
             }
-            ident = fmt.Sprintf("mode=%s variant=%s", flagStarDelMode, flagStarDelVariant)
+            ident = fmt.Sprintf("role=%s variant=%s", flagStarDelRole, flagStarDelVariant)
         }
         if !flagStarDelForce {
             fmt.Fprintf(os.Stderr, "About to delete starred task (%s).\n", ident)
@@ -58,7 +58,7 @@ var deleteCmd = &cobra.Command{
         if byID {
             affected, err = pgdao.DeleteStarredTaskByID(ctx, db, flagStarDelID)
         } else {
-            affected, err = pgdao.DeleteStarredTaskByKey(ctx, db, flagStarDelMode, flagStarDelVariant)
+            affected, err = pgdao.DeleteStarredTaskByKey(ctx, db, flagStarDelRole, flagStarDelVariant)
         }
         if err != nil { return err }
         if affected == 0 {
@@ -78,9 +78,8 @@ var deleteCmd = &cobra.Command{
 func init() {
     StarCmd.AddCommand(deleteCmd)
     deleteCmd.Flags().Int64Var(&flagStarDelID, "id", 0, "Starred task id")
-    deleteCmd.Flags().StringVar(&flagStarDelMode, "mode", "", "Mode (with --variant)")
-    deleteCmd.Flags().StringVar(&flagStarDelVariant, "variant", "", "Variant (with --mode)")
+    deleteCmd.Flags().StringVar(&flagStarDelRole, "role", "", "Role (with --variant)")
+    deleteCmd.Flags().StringVar(&flagStarDelVariant, "variant", "", "Variant (with --role)")
     deleteCmd.Flags().BoolVar(&flagStarDelForce, "force", false, "Do not prompt for confirmation")
     deleteCmd.Flags().BoolVar(&flagStarDelIgnore, "ignore-missing", false, "Do not error if not found")
 }
-

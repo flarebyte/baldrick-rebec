@@ -15,17 +15,17 @@ import (
 )
 
 var (
-    flagStarMode    string
+    flagStarRole    string
     flagStarVariant string
     flagStarVersion string
 )
 
 var setCmd = &cobra.Command{
     Use:   "set",
-    Short: "Set (or update) a starred task for a mode by variant and version",
+    Short: "Set (or update) a starred task for a role by variant and version",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if strings.TrimSpace(flagStarMode) == "" || strings.TrimSpace(flagStarVariant) == "" || strings.TrimSpace(flagStarVersion) == "" {
-            return errors.New("--mode, --variant, and --version are required")
+        if strings.TrimSpace(flagStarRole) == "" || strings.TrimSpace(flagStarVariant) == "" || strings.TrimSpace(flagStarVersion) == "" {
+            return errors.New("--role, --variant, and --version are required")
         }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
@@ -34,15 +34,15 @@ var setCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg)
         if err != nil { return err }
         defer db.Close()
-        st, err := pgdao.UpsertStarredTask(ctx, db, flagStarMode, flagStarVariant, flagStarVersion)
+        st, err := pgdao.UpsertStarredTask(ctx, db, flagStarRole, flagStarVariant, flagStarVersion)
         if err != nil { return err }
         // Human-readable
-        fmt.Fprintf(os.Stderr, "star set mode=%q variant=%q version=%q task_id=%d id=%d\n", flagStarMode, flagStarVariant, flagStarVersion, st.TaskID, st.ID)
+        fmt.Fprintf(os.Stderr, "star set role=%q variant=%q version=%q task_id=%d id=%d\n", flagStarRole, flagStarVariant, flagStarVersion, st.TaskID, st.ID)
         // JSON output
         out := map[string]any{
             "status":  "upserted",
             "id":      st.ID,
-            "mode":    st.Mode,
+            "role":    st.Role,
             "variant": st.Variant,
             "version": st.Version,
             "task_id": st.TaskID,
@@ -57,8 +57,7 @@ var setCmd = &cobra.Command{
 
 func init() {
     StarCmd.AddCommand(setCmd)
-    setCmd.Flags().StringVar(&flagStarMode, "mode", "", "Mode name (e.g., dev, qa) (required)")
+    setCmd.Flags().StringVar(&flagStarRole, "role", "", "Role name (e.g., user, admin) (required)")
     setCmd.Flags().StringVar(&flagStarVariant, "variant", "", "Task selector variant (e.g., unit/go) (required)")
     setCmd.Flags().StringVar(&flagStarVersion, "version", "", "Task semver version (required)")
 }
-

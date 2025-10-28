@@ -38,10 +38,10 @@ eid1=$(printf "%s" "$ejson1" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/
 ejson2=$(rbc admin experiment create --conversation "$cid2")
 eid2=$(printf "%s" "$ejson2" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/')
 
-echo "[5/7] Starring tasks per mode" >&2
-rbc admin star set --mode dev --variant unit/go --version 1.0.0
-rbc admin star set --mode qa  --variant integration --version 1.0.0
-rbc admin star set --mode dev --variant lint/go --version 1.0.0
+echo "[5/7] Starring tasks per role" >&2
+rbc admin star set --role user --variant unit/go --version 1.0.0
+rbc admin star set --role qa   --variant integration --version 1.0.0
+rbc admin star set --role user --variant lint/go --version 1.0.0
 
 echo "[6/7] Creating sample messages" >&2
 echo "Hello from user12" | rbc admin message set --executor user12 --experiment "$eid1" --title "Greeting" --tags hello
