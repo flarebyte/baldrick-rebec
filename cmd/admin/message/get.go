@@ -55,4 +55,3 @@ func init() {
     MessageCmd.AddCommand(getCmd)
     getCmd.Flags().Int64Var(&flagMsgGetID, "id", 0, "Message id (required)")
 }
-

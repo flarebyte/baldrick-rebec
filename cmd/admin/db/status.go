@@ -156,7 +156,7 @@ var statusCmd = &cobra.Command{
             }
             // Content table
             var exists bool
-            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='messages_content_pg')`).Scan(&exists)
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='messages_content')`).Scan(&exists)
             if exists {
                 fmt.Fprintln(os.Stderr, "postgres: content table: ok")
             } else {
@@ -164,7 +164,7 @@ var statusCmd = &cobra.Command{
             }
             // FTS index readiness: rely on index name we create
             var fts bool
-            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_messages_content_pg_fts')`).Scan(&fts)
+            _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_messages_content_fts')`).Scan(&fts)
             if fts {
                 fmt.Fprintln(os.Stderr, "postgres: FTS index: ok")
             } else {

@@ -59,4 +59,3 @@ func init() {
     listCmd.Flags().IntVar(&flagMsgListLimit, "limit", 100, "Max rows")
     listCmd.Flags().IntVar(&flagMsgListOffset, "offset", 0, "Offset for pagination")
 }
-

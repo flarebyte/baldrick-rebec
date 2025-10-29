@@ -62,7 +62,7 @@ var runCmd = &cobra.Command{
             "shell":   valueOr(task.Shell.String, "bash"),
         }
         metaStartJSON, _ := json.Marshal(metaStart)
-        contentID, err := pgdao.PutMessageContent(ctx, db, startText, "text/plain", "", metaStartJSON)
+        contentID, err := pgdao.InsertContent(ctx, db, startText, metaStartJSON)
         if err != nil { return err }
         ev := &pgdao.MessageEvent{
             ContentID: contentID,
@@ -125,7 +125,7 @@ var runCmd = &cobra.Command{
         }
         compMetaJSON, _ := json.Marshal(compMeta)
         content := buildCompletionContent(task, interpreter, dur, exitCode, &outBuf, &errBuf, errMsg)
-        compCID, err := pgdao.PutMessageContent(context.Background(), db, content, "text/plain", "", compMetaJSON)
+        compCID, err := pgdao.InsertContent(context.Background(), db, content, compMetaJSON)
         if err != nil { return err }
         // Update message row
         upd := pgdao.MessageEvent{
@@ -244,4 +244,3 @@ func buildCompletionContent(task *pgdao.Task, interpreter string, dur time.Durat
     }
     return b.String()
 }
-

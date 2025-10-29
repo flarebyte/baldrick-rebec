@@ -16,6 +16,14 @@ import (
     "github.com/spf13/cobra"
 )
 
+// yamlUnmarshal is a thin wrapper around yaml.v3 if available.
+// We provide it via a buildable shim in this file.
+func yamlUnmarshal(b []byte, v any) error {
+    // Use a light dependency via gopkg.in/yaml.v3
+    type Y = any
+    return yamlUnmarshalImpl(b, v)
+}
+
 // Flags
 var (
     flagTitle       string
@@ -25,6 +33,7 @@ var (
     flagDescription string
     flagGoal        string
     flagExperiment  int64
+    flagFormat      string
 )
 
 var setCmd = &cobra.Command{
@@ -72,7 +81,7 @@ var setCmd = &cobra.Command{
             db, err := pgdao.OpenApp(ctx, cfg)
             if err != nil { return err }
             defer db.Close()
-            // Prepare metadata as JSON (schema should already be created via 'rbc admin db init')
+            // Meta stored on message event (not content)
             meta := map[string]interface{}{
                 "title": flagTitle,
                 "level": flagLevel,
@@ -81,16 +90,43 @@ var setCmd = &cobra.Command{
                 "description": flagDescription,
                 "goal":  flagGoal,
             }
-            metaJSON, _ := json.Marshal(meta)
-            id, err := pgdao.PutMessageContent(ctx, db, string(stdinData), "", "", metaJSON)
-            if err != nil { return err }
+            // Handle optional structured content
+            var parsed []byte
+            var parseErr error
+            switch strings.ToLower(strings.TrimSpace(flagFormat)) {
+            case "json":
+                var v any
+                if err := json.Unmarshal(stdinData, &v); err != nil {
+                    parseErr = fmt.Errorf("invalid json: %w", err)
+                } else {
+                    parsed, _ = json.Marshal(v)
+                }
+            case "yaml":
+                // Lazy import to avoid hard dependency if not used
+                type yamlAny = any
+                var ya yamlAny
+                if err := yamlUnmarshal(stdinData, &ya); err != nil {
+                    parseErr = fmt.Errorf("invalid yaml: %w", err)
+                } else {
+                    parsed, _ = json.Marshal(ya)
+                }
+            case "":
+                // no parsing
+            default:
+                return fmt.Errorf("unsupported --format value: %s", flagFormat)
+            }
+            cid, insErr := pgdao.InsertContent(ctx, db, string(stdinData), parsed)
+            if insErr != nil { return insErr }
             // Insert event referencing content
-            ev := &pgdao.MessageEvent{ ContentID: id, Status: "ingested", Tags: flagTags }
+            ev := &pgdao.MessageEvent{ ContentID: cid, Status: "ingested", Tags: flagTags }
             // Map optional executor and experiment
             if strings.TrimSpace(flagFrom) != "" { ev.Executor = sql.NullString{String: flagFrom, Valid: true} }
             if flagExperiment > 0 { ev.ExperimentID = sql.NullInt64{Int64: flagExperiment, Valid: true} }
+            ev.Meta = meta
             if _, err := pgdao.InsertMessageEvent(ctx, db, ev); err != nil { return err }
-            fmt.Fprintf(os.Stderr, "stored content id=%s and message row\n", id)
+            fmt.Fprintf(os.Stderr, "stored content id=%d and message row\n", cid)
+            // Return parse error if any (after storing content and message)
+            if parseErr != nil { return parseErr }
         return nil
     },
 }
@@ -104,4 +140,5 @@ func init() {
     setCmd.Flags().StringVar(&flagDescription, "description", "", "Longer explanation or context")
     setCmd.Flags().StringVar(&flagGoal, "goal", "", "Intended outcome of the message")
     setCmd.Flags().Int64Var(&flagExperiment, "experiment", 0, "Experiment id to link this message to")
+    setCmd.Flags().StringVar(&flagFormat, "format", "", "Optional: interpret stdin as json or yaml and save parsed JSON alongside text")
 }

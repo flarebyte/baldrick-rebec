@@ -111,10 +111,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_variant ON tasks(variant)`,
-        // Messages table: references tasks.id (optional) and experiments.id (optional)
+        // Content table for message bodies (text + optional parsed JSON)
+        `CREATE TABLE IF NOT EXISTS messages_content (
+            id BIGSERIAL PRIMARY KEY,
+            text_content TEXT NOT NULL,
+            json_content JSONB,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+        // Messages table: references tasks.id (optional), experiments.id (optional), content id
         `CREATE TABLE IF NOT EXISTS messages (
             id BIGSERIAL PRIMARY KEY,
-            content_id TEXT NOT NULL,
+            content_id BIGINT NOT NULL REFERENCES messages_content(id) ON DELETE CASCADE,
             task_id BIGINT REFERENCES tasks(id) ON DELETE SET NULL,
             experiment_id BIGINT REFERENCES experiments(id) ON DELETE SET NULL,
             executor TEXT,

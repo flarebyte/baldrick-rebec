@@ -21,7 +21,7 @@ var (
 )
 
 type searchResult struct {
-    ID      string `json:"id"`
+    ID      int64 `json:"id"`
     Preview string `json:"preview"`
 }
 
@@ -40,9 +40,9 @@ var searchCmd = &cobra.Command{
         if err != nil { return err }
         defer db.Close()
         // Simple FTS using plainto_tsquery on 'simple' config
-        q := `SELECT id, substr(content,1,160) AS preview
-              FROM messages_content_pg
-              WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', $1)
+        q := `SELECT id, substr(text_content,1,160) AS preview
+              FROM messages_content
+              WHERE to_tsvector('simple', text_content) @@ plainto_tsquery('simple', $1)
               LIMIT $2`
         rows, err := db.Query(ctx, q, flagSearchText, flagSearchTopK)
         if err != nil { return err }

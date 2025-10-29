@@ -12,7 +12,7 @@ import (
 
 type MessageEvent struct {
     ID             int64
-    ContentID      string
+    ContentID      int64
     TaskID         sql.NullInt64
     ExperimentID   sql.NullInt64
     Executor       sql.NullString
@@ -65,7 +65,7 @@ func UpdateMessageEvent(ctx context.Context, db *pgxpool.Pool, id int64, update 
             status = COALESCE(NULLIF($1,''), status),
             processed_at = COALESCE($2, processed_at),
             error_message = COALESCE($3, error_message),
-            content_id = COALESCE(NULLIF($4,''), content_id),
+            content_id = COALESCE(NULLIF($4,0), content_id),
             executor = COALESCE($5, executor),
             tags = COALESCE($6::text[], tags),
             meta = COALESCE($7, meta)
