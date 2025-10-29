@@ -54,7 +54,7 @@ var setCmd = &cobra.Command{
         if flagTaskShell != "" { t.Shell = sql.NullString{String: flagTaskShell, Valid: true} }
         if flagTaskRun   != "" { t.Run   = sql.NullString{String: flagTaskRun, Valid: true} }
         if flagTaskTimeout != "" { t.Timeout = sql.NullString{String: flagTaskTimeout, Valid: true} }
-        if len(flagTaskTags) > 0 { t.Tags = flagTaskTags }
+        if len(flagTaskTags) > 0 { t.Tags = parseTags(flagTaskTags) }
         if flagTaskLevel != "" { t.Level = sql.NullString{String: flagTaskLevel, Valid: true} }
         if err := pgdao.UpsertTask(ctx, db, t); err != nil { return err }
         // Human
@@ -88,6 +88,28 @@ func init() {
     setCmd.Flags().StringVar(&flagTaskShell, "shell", "", "Shell environment (bash, python)")
     setCmd.Flags().StringVar(&flagTaskRun, "run", "", "Command to execute")
     setCmd.Flags().StringVar(&flagTaskTimeout, "timeout", "", "Text interval, e.g., '5 minutes'")
-    setCmd.Flags().StringSliceVar(&flagTaskTags, "tags", nil, "Tags")
+    setCmd.Flags().StringSliceVar(&flagTaskTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
     setCmd.Flags().StringVar(&flagTaskLevel, "level", "", "Level: h1..h6")
+}
+
+// parseTags converts k=v pairs (or bare keys) into a map.
+func parseTags(items []string) map[string]any {
+    if len(items) == 0 { return nil }
+    out := map[string]any{}
+    for _, raw := range items {
+        if raw == "" { continue }
+        parts := strings.Split(raw, ",")
+        for _, p := range parts {
+            p = strings.TrimSpace(p)
+            if p == "" { continue }
+            if eq := strings.IndexByte(p, '='); eq > 0 {
+                k := strings.TrimSpace(p[:eq])
+                v := strings.TrimSpace(p[eq+1:])
+                if k != "" { out[k] = v }
+            } else {
+                out[p] = true
+            }
+        }
+    }
+    return out
 }

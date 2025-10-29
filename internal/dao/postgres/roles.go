@@ -3,6 +3,7 @@ package postgres
 import (
     "context"
     "database/sql"
+    "encoding/json"
 
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -12,7 +13,7 @@ type Role struct {
     Title       string
     Description sql.NullString
     Notes       sql.NullString
-    Tags        []string
+    Tags        map[string]any
     Created     sql.NullTime
     Updated     sql.NullTime
 }
@@ -20,7 +21,7 @@ type Role struct {
 // UpsertRole creates or updates a role by name.
 func UpsertRole(ctx context.Context, db *pgxpool.Pool, r *Role) error {
     q := `INSERT INTO roles (name, title, description, notes, tags)
-          VALUES ($1, $2, NULLIF($3,''), NULLIF($4,''), $5::text[])
+          VALUES ($1, $2, NULLIF($3,''), NULLIF($4,''), COALESCE($5,'{}'::jsonb))
           ON CONFLICT (name) DO UPDATE SET
             title = EXCLUDED.title,
             description = EXCLUDED.description,
@@ -28,10 +29,10 @@ func UpsertRole(ctx context.Context, db *pgxpool.Pool, r *Role) error {
             tags = EXCLUDED.tags,
             updated = now()
           RETURNING created, updated`
-    var tags []string
-    if len(r.Tags) > 0 { tags = r.Tags }
+    var tagsJSON []byte
+    if r.Tags != nil { tagsJSON, _ = json.Marshal(r.Tags) }
     return db.QueryRow(ctx, q,
-        r.Name, r.Title, stringOrEmpty(r.Description), stringOrEmpty(r.Notes), tags,
+        r.Name, r.Title, stringOrEmpty(r.Description), stringOrEmpty(r.Notes), tagsJSON,
     ).Scan(&r.Created, &r.Updated)
 }
 
@@ -39,11 +40,11 @@ func UpsertRole(ctx context.Context, db *pgxpool.Pool, r *Role) error {
 func GetRoleByName(ctx context.Context, db *pgxpool.Pool, name string) (*Role, error) {
     q := `SELECT name, title, description, notes, tags, created, updated FROM roles WHERE name=$1`
     var r Role
-    var tags []string
-    if err := db.QueryRow(ctx, q, name).Scan(&r.Name, &r.Title, &r.Description, &r.Notes, &tags, &r.Created, &r.Updated); err != nil {
+    var tagsJSON []byte
+    if err := db.QueryRow(ctx, q, name).Scan(&r.Name, &r.Title, &r.Description, &r.Notes, &tagsJSON, &r.Created, &r.Updated); err != nil {
         return nil, err
     }
-    r.Tags = tags
+    if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &r.Tags) }
     return &r, nil
 }
 
@@ -58,11 +59,11 @@ func ListRoles(ctx context.Context, db *pgxpool.Pool, limit, offset int) ([]Role
     var out []Role
     for rows.Next() {
         var r Role
-        var tags []string
-        if err := rows.Scan(&r.Name, &r.Title, &r.Description, &r.Notes, &tags, &r.Created, &r.Updated); err != nil {
+        var tagsJSON []byte
+        if err := rows.Scan(&r.Name, &r.Title, &r.Description, &r.Notes, &tagsJSON, &r.Created, &r.Updated); err != nil {
             return nil, err
         }
-        r.Tags = tags
+        if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &r.Tags) }
         out = append(out, r)
     }
     return out, rows.Err()

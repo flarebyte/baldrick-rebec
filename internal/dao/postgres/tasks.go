@@ -3,6 +3,7 @@ package postgres
 import (
     "context"
     "database/sql"
+    "encoding/json"
     "fmt"
     "strings"
 
@@ -23,7 +24,7 @@ type Task struct {
     Shell      sql.NullString
     Run        sql.NullString
     Timeout    sql.NullString // textual interval
-    Tags       []string
+    Tags       map[string]any
     Level      sql.NullString // h1..h6
 }
 
@@ -74,7 +75,7 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
             notes, shell, run, timeout, tags, level
           ) VALUES (
             $1, $2, NULLIF($3,''), NULLIF($4,''), NULLIF($5,''), $6,
-            NULLIF($7,''), NULLIF($8,''), NULLIF($9,''), CASE WHEN $10='' THEN NULL ELSE $10::interval END, $11::text[], NULLIF($12,'')
+            NULLIF($7,''), NULLIF($8,''), NULLIF($9,''), CASE WHEN $10='' THEN NULL ELSE $10::interval END, COALESCE($11,'{}'::jsonb), NULLIF($12,'')
           )
           ON CONFLICT (variant, version) DO UPDATE SET
             title = EXCLUDED.title,
@@ -89,9 +90,11 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
           RETURNING id, created`
     var id string
     var created sql.NullTime
+    var tagsJSON []byte
+    if t.Tags != nil { tagsJSON, _ = json.Marshal(t.Tags) }
     if err := db.QueryRow(ctx, q,
         t.Command, t.Variant, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation), t.Version,
-        stringOrEmpty(t.Notes), stringOrEmpty(t.Shell), stringOrEmpty(t.Run), stringOrEmpty(t.Timeout), t.Tags, stringOrEmpty(t.Level),
+        stringOrEmpty(t.Notes), stringOrEmpty(t.Shell), stringOrEmpty(t.Run), stringOrEmpty(t.Timeout), tagsJSON, stringOrEmpty(t.Level),
     ).Scan(&id, &created); err != nil {
         return err
     }
@@ -108,14 +111,14 @@ func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*Task, error
           LEFT JOIN task_variants tv ON tv.variant = t.variant
           WHERE t.id=$1::uuid`
     var t Task
-    var tags []string
+    var tagsJSON []byte
     if err := db.QueryRow(ctx, q, id).Scan(
         &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
-        &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tags, &t.Level, &t.Created,
+        &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tagsJSON, &t.Level, &t.Created,
     ); err != nil {
         return nil, err
     }
-    t.Tags = tags
+    if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }
     return &t, nil
 }
 
@@ -127,14 +130,14 @@ func GetTaskByKey(ctx context.Context, db *pgxpool.Pool, variant, ver string) (*
           LEFT JOIN task_variants tv ON tv.variant = t.variant
           WHERE t.variant=$1 AND t.version=$2`
     var t Task
-    var tags []string
+    var tagsJSON []byte
     if err := db.QueryRow(ctx, q, variant, ver).Scan(
         &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
-        &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tags, &t.Level, &t.Created,
+        &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tagsJSON, &t.Level, &t.Created,
     ); err != nil {
         return nil, err
     }
-    t.Tags = tags
+    if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }
     return &t, nil
 }
 
@@ -163,12 +166,12 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow string, limit, of
     var out []Task
     for rows.Next() {
         var t Task
-        var tags []string
+        var tagsJSON []byte
         if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
-            &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tags, &t.Level, &t.Created); err != nil {
+            &t.Notes, &t.Shell, &t.Run, &t.Timeout, &tagsJSON, &t.Level, &t.Created); err != nil {
             return nil, err
         }
-        t.Tags = tags
+        if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }
         out = append(out, t)
     }
     return out, rows.Err()

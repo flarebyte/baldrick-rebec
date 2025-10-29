@@ -19,7 +19,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT,
-            tags TEXT[] DEFAULT '{}'
+            tags JSONB DEFAULT '{}'::jsonb
         )`,
         // Workflows table (name as unique identifier) with created/updated timestamps and notes (markdown)
         `CREATE TABLE IF NOT EXISTS workflows (
@@ -38,7 +38,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             description TEXT,
             project TEXT,
             role_name TEXT NOT NULL DEFAULT 'user',
-            tags TEXT[] DEFAULT '{}',
+            tags JSONB DEFAULT '{}'::jsonb,
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT
@@ -110,7 +110,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             shell TEXT,
             run TEXT,
             timeout INTERVAL,
-            tags TEXT[] DEFAULT '{}',
+            tags JSONB DEFAULT '{}'::jsonb,
             level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
             UNIQUE (variant, version),
             FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
@@ -135,10 +135,25 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             processed_at TIMESTAMPTZ,
             status TEXT NOT NULL DEFAULT 'ingested',
             error_message TEXT,
-            tags TEXT[] DEFAULT '{}',
+            tags JSONB DEFAULT '{}'::jsonb,
             meta JSONB DEFAULT '{}',
             UNIQUE (content_id, status, received_at)
         )`,
+        // Attempt to migrate existing tags columns to JSONB if they exist as arrays
+        `DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='roles' AND column_name='tags' AND data_type<>'jsonb') THEN
+                ALTER TABLE roles ALTER COLUMN tags TYPE jsonb USING COALESCE(tags::jsonb,'{}'::jsonb);
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='conversations' AND column_name='tags' AND data_type<>'jsonb') THEN
+                ALTER TABLE conversations ALTER COLUMN tags TYPE jsonb USING COALESCE(tags::jsonb,'{}'::jsonb);
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='tags' AND data_type<>'jsonb') THEN
+                ALTER TABLE tasks ALTER COLUMN tags TYPE jsonb USING COALESCE(tags::jsonb,'{}'::jsonb);
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='tags' AND data_type<>'jsonb') THEN
+                ALTER TABLE messages ALTER COLUMN tags TYPE jsonb USING COALESCE(tags::jsonb,'{}'::jsonb);
+            END IF;
+        END $$;`,
         // Packages per role_name: bind a role (e.g., user, admin) to a specific
         // variant and version, referencing the task row. Unique per (role_name, variant).
         `CREATE TABLE IF NOT EXISTS packages (

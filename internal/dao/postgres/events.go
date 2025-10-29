@@ -20,7 +20,7 @@ type MessageEvent struct {
     ProcessedAt    sql.NullTime
     Status         string
     ErrorMessage   sql.NullString
-    Tags           []string
+    Tags           map[string]any
     Meta           map[string]any
 }
 
@@ -34,7 +34,7 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
             received_at, processed_at, status, error_message, tags, meta
         ) VALUES (
             $1::uuid,$2,$3,$4,
-            COALESCE($5, now()),$6,$7,$8,$9::text[],$10
+            COALESCE($5, now()),$6,$7,$8,COALESCE($9,'{}'::jsonb),$10
         ) RETURNING id::text`
     var id string
     var receivedAt any
@@ -43,9 +43,11 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
     } else {
         receivedAt = ev.ReceivedAt
     }
+    var tagsJSON []byte
+    if ev.Tags != nil { tagsJSON, _ = json.Marshal(ev.Tags) }
     err := db.QueryRow(ctx, q,
         ev.ContentID, nullOrUUID(ev.TaskID), nullOrUUID(ev.ExperimentID), nullOrString(ev.Executor),
-        receivedAt, nullOrTime(ev.ProcessedAt), ev.Status, nullOrString(ev.ErrorMessage), ev.Tags, metaJSON,
+        receivedAt, nullOrTime(ev.ProcessedAt), ev.Status, nullOrString(ev.ErrorMessage), tagsJSON, metaJSON,
     ).Scan(&id)
     if err != nil {
         return "", err
@@ -67,16 +69,18 @@ func UpdateMessageEvent(ctx context.Context, db *pgxpool.Pool, id string, update
             error_message = COALESCE($3, error_message),
             content_id = COALESCE(NULLIF($4::uuid,'00000000-0000-0000-0000-000000000000'::uuid), content_id),
             executor = COALESCE($5, executor),
-            tags = COALESCE($6::text[], tags),
+            tags = COALESCE($6, tags),
             meta = COALESCE($7, meta)
           WHERE id=$8::uuid`
+    var tagsJSON []byte
+    if update.Tags != nil { tagsJSON, _ = json.Marshal(update.Tags) }
     _, err := db.Exec(ctx, q,
         update.Status,
         nullOrTime(update.ProcessedAt),
         nullOrString(update.ErrorMessage),
         update.ContentID,
         nullOrString(update.Executor),
-        pgTextArrayOrNil(update.Tags),
+        jsonOrNil(tagsJSON),
         jsonOrNil(metaJSON),
         id,
     )
@@ -91,19 +95,19 @@ func GetMessageEventByID(ctx context.Context, db *pgxpool.Pool, id string) (*Mes
     row := db.QueryRow(ctx, q, id)
     var out MessageEvent
     var metaBytes []byte
-    var tags []string
+    var tagsJSON []byte
     var taskID, expID sql.NullString
     err := row.Scan(
         &out.ID, &out.ContentID,
         &taskID, &expID, &out.Executor,
-        &out.ReceivedAt, &out.ProcessedAt, &out.Status, &out.ErrorMessage, &tags, &metaBytes,
+        &out.ReceivedAt, &out.ProcessedAt, &out.Status, &out.ErrorMessage, &tagsJSON, &metaBytes,
     )
     if err != nil {
         return nil, err
     }
     out.TaskID = taskID
     out.ExperimentID = expID
-    out.Tags = tags
+    if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &out.Tags) }
     if len(metaBytes) > 0 {
         _ = json.Unmarshal(metaBytes, &out.Meta)
     }
@@ -155,12 +159,12 @@ func ListMessages(ctx context.Context, db *pgxpool.Pool, experimentID, taskID st
     var out []MessageEvent
     for rows.Next() {
         var r MessageEvent
-        var tags []string
+        var tagsJSON []byte
         var metaBytes []byte
-        if err := rows.Scan(&r.ID, &r.ContentID, &r.TaskID, &r.ExperimentID, &r.Executor, &r.ReceivedAt, &r.ProcessedAt, &r.Status, &r.ErrorMessage, &tags, &metaBytes); err != nil {
+        if err := rows.Scan(&r.ID, &r.ContentID, &r.TaskID, &r.ExperimentID, &r.Executor, &r.ReceivedAt, &r.ProcessedAt, &r.Status, &r.ErrorMessage, &tagsJSON, &metaBytes); err != nil {
             return nil, err
         }
-        r.Tags = tags
+        if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &r.Tags) }
         if len(metaBytes) > 0 { _ = json.Unmarshal(metaBytes, &r.Meta) }
         out = append(out, r)
     }

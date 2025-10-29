@@ -40,7 +40,7 @@ var setCmd = &cobra.Command{
         if flagConvDesc != "" { conv.Description = sql.NullString{String: flagConvDesc, Valid: true} }
         if flagConvNotes != "" { conv.Notes = sql.NullString{String: flagConvNotes, Valid: true} }
         if flagConvProj != "" { conv.Project = sql.NullString{String: flagConvProj, Valid: true} }
-        if len(flagConvTags) > 0 { conv.Tags = flagConvTags }
+        if len(flagConvTags) > 0 { conv.Tags = parseTags(flagConvTags) }
         if err := pgdao.UpsertConversation(ctx, db, conv); err != nil { return err }
         // Human line
         fmt.Fprintf(os.Stderr, "conversation upserted id=%s title=%q\n", conv.ID, conv.Title)
@@ -66,5 +66,27 @@ func init() {
     setCmd.Flags().StringVar(&flagConvDesc, "description", "", "Plain text description")
     setCmd.Flags().StringVar(&flagConvNotes, "notes", "", "Markdown notes")
     setCmd.Flags().StringVar(&flagConvProj, "project", "", "Project name (e.g. GitHub repo)")
-    setCmd.Flags().StringSliceVar(&flagConvTags, "tags", nil, "Tags")
+    setCmd.Flags().StringSliceVar(&flagConvTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
+}
+
+// parseTags converts k=v pairs (or bare keys) into a map.
+func parseTags(items []string) map[string]any {
+    if len(items) == 0 { return nil }
+    out := map[string]any{}
+    for _, raw := range items {
+        if raw == "" { continue }
+        parts := strings.Split(raw, ",")
+        for _, p := range parts {
+            p = strings.TrimSpace(p)
+            if p == "" { continue }
+            if eq := strings.IndexByte(p, '='); eq > 0 {
+                k := strings.TrimSpace(p[:eq])
+                v := strings.TrimSpace(p[eq+1:])
+                if k != "" { out[k] = v }
+            } else {
+                out[p] = true
+            }
+        }
+    }
+    return out
 }

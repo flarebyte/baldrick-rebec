@@ -86,7 +86,7 @@ var setCmd = &cobra.Command{
                 "title": flagTitle,
                 "level": flagLevel,
                 "executor":  flagFrom,
-                "tags":  flagTags,
+                "tags":  parseTags(flagTags),
                 "description": flagDescription,
                 "goal":  flagGoal,
             }
@@ -118,7 +118,7 @@ var setCmd = &cobra.Command{
             cid, insErr := pgdao.InsertContent(ctx, db, string(stdinData), parsed)
             if insErr != nil { return insErr }
             // Insert event referencing content
-            ev := &pgdao.MessageEvent{ ContentID: cid, Status: "ingested", Tags: flagTags }
+            ev := &pgdao.MessageEvent{ ContentID: cid, Status: "ingested", Tags: parseTags(flagTags) }
             // Map optional executor and experiment
             if strings.TrimSpace(flagFrom) != "" { ev.Executor = sql.NullString{String: flagFrom, Valid: true} }
             if strings.TrimSpace(flagExperiment) != "" { ev.ExperimentID = sql.NullString{String: flagExperiment, Valid: true} }
@@ -136,9 +136,31 @@ func init() {
     setCmd.Flags().StringVar(&flagTitle, "title", "", "Short label for the message")
     setCmd.Flags().StringVar(&flagLevel, "level", "", "Hierarchical depth (e.g., h1, h2, h3)")
     setCmd.Flags().StringVar(&flagFrom, "executor", "", "Executor identifier (actor id)")
-    setCmd.Flags().StringSliceVar(&flagTags, "tags", nil, "Tags (comma-separated or repeated)")
+    setCmd.Flags().StringSliceVar(&flagTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
     setCmd.Flags().StringVar(&flagDescription, "description", "", "Longer explanation or context")
     setCmd.Flags().StringVar(&flagGoal, "goal", "", "Intended outcome of the message")
     setCmd.Flags().StringVar(&flagExperiment, "experiment", "", "Experiment UUID to link this message to")
     setCmd.Flags().StringVar(&flagFormat, "format", "", "Optional: interpret stdin as json or yaml and save parsed JSON alongside text")
+}
+
+// parseTags converts k=v pairs (or bare keys) into a map.
+func parseTags(items []string) map[string]any {
+    if len(items) == 0 { return nil }
+    out := map[string]any{}
+    for _, raw := range items {
+        if raw == "" { continue }
+        parts := strings.Split(raw, ",")
+        for _, p := range parts {
+            p = strings.TrimSpace(p)
+            if p == "" { continue }
+            if eq := strings.IndexByte(p, '='); eq > 0 {
+                k := strings.TrimSpace(p[:eq])
+                v := strings.TrimSpace(p[eq+1:])
+                if k != "" { out[k] = v }
+            } else {
+                out[p] = true
+            }
+        }
+    }
+    return out
 }

@@ -3,6 +3,7 @@ package postgres
 import (
     "context"
     "database/sql"
+    "encoding/json"
     "strings"
 
     "github.com/jackc/pgx/v5/pgxpool"
@@ -14,7 +15,7 @@ type Conversation struct {
     Description sql.NullString
     Notes       sql.NullString
     Project     sql.NullString
-    Tags        []string
+    Tags        map[string]any
     Created     sql.NullTime
     Updated     sql.NullTime
 }
@@ -28,20 +29,22 @@ func UpsertConversation(ctx context.Context, db *pgxpool.Pool, c *Conversation) 
         return db.QueryRow(ctx, q, c.ID, c.Title, stringOrEmpty(c.Description), stringOrEmpty(c.Project), c.Tags, stringOrEmpty(c.Notes)).Scan(&c.Created, &c.Updated)
     }
     q := `INSERT INTO conversations (title, description, project, tags, notes)
-          VALUES ($1, NULLIF($2,''), NULLIF($3,''), $4::text[], NULLIF($5,''))
+          VALUES ($1, NULLIF($2,''), NULLIF($3,''), COALESCE($4,'{}'::jsonb), NULLIF($5,''))
           RETURNING id::text, created, updated`
-    return db.QueryRow(ctx, q, c.Title, stringOrEmpty(c.Description), stringOrEmpty(c.Project), c.Tags, stringOrEmpty(c.Notes)).Scan(&c.ID, &c.Created, &c.Updated)
+    var tagsJSON []byte
+    if c.Tags != nil { tagsJSON, _ = json.Marshal(c.Tags) }
+    return db.QueryRow(ctx, q, c.Title, stringOrEmpty(c.Description), stringOrEmpty(c.Project), tagsJSON, stringOrEmpty(c.Notes)).Scan(&c.ID, &c.Created, &c.Updated)
 }
 
 // GetConversationByID returns a conversation by its id.
 func GetConversationByID(ctx context.Context, db *pgxpool.Pool, id string) (*Conversation, error) {
     q := `SELECT id::text, title, description, project, tags, notes, created, updated FROM conversations WHERE id=$1::uuid`
     var c Conversation
-    var tags []string
-    if err := db.QueryRow(ctx, q, id).Scan(&c.ID, &c.Title, &c.Description, &c.Project, &tags, &c.Notes, &c.Created, &c.Updated); err != nil {
+    var tagsJSON []byte
+    if err := db.QueryRow(ctx, q, id).Scan(&c.ID, &c.Title, &c.Description, &c.Project, &tagsJSON, &c.Notes, &c.Created, &c.Updated); err != nil {
         return nil, err
     }
-    c.Tags = tags
+    if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &c.Tags) }
     return &c, nil
 }
 
@@ -61,11 +64,11 @@ func ListConversations(ctx context.Context, db *pgxpool.Pool, project string, li
     var out []Conversation
     for rows.Next() {
         var c Conversation
-        var tags []string
-        if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Project, &tags, &c.Notes, &c.Created, &c.Updated); err != nil {
+        var tagsJSON []byte
+        if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Project, &tagsJSON, &c.Notes, &c.Created, &c.Updated); err != nil {
             return nil, err
         }
-        c.Tags = tags
+        if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &c.Tags) }
         out = append(out, c)
     }
     return out, rows.Err()

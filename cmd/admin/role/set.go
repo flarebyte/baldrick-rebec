@@ -40,7 +40,7 @@ var setCmd = &cobra.Command{
         r := &pgdao.Role{Name: flagRoleName, Title: flagRoleTitle}
         if flagRoleDesc != "" { r.Description = sql.NullString{String: flagRoleDesc, Valid: true} }
         if flagRoleNotes != "" { r.Notes = sql.NullString{String: flagRoleNotes, Valid: true} }
-        if len(flagRoleTags) > 0 { r.Tags = flagRoleTags }
+        if len(flagRoleTags) > 0 { r.Tags = parseTags(flagRoleTags) }
         if err := pgdao.UpsertRole(ctx, db, r); err != nil { return err }
         // Human
         fmt.Fprintf(os.Stderr, "role upserted name=%q title=%q\n", r.Name, r.Title)
@@ -67,6 +67,27 @@ func init() {
     setCmd.Flags().StringVar(&flagRoleTitle, "title", "", "Role title (required)")
     setCmd.Flags().StringVar(&flagRoleDesc, "description", "", "Role description")
     setCmd.Flags().StringVar(&flagRoleNotes, "notes", "", "Notes (markdown)")
-    setCmd.Flags().StringSliceVar(&flagRoleTags, "tags", nil, "Tags")
+    setCmd.Flags().StringSliceVar(&flagRoleTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
 }
 
+// parseTags converts k=v pairs (or bare keys) into a map.
+func parseTags(items []string) map[string]any {
+    if len(items) == 0 { return nil }
+    out := map[string]any{}
+    for _, raw := range items {
+        if raw == "" { continue }
+        parts := strings.Split(raw, ",")
+        for _, p := range parts {
+            p = strings.TrimSpace(p)
+            if p == "" { continue }
+            if eq := strings.IndexByte(p, '='); eq > 0 {
+                k := strings.TrimSpace(p[:eq])
+                v := strings.TrimSpace(p[eq+1:])
+                if k != "" { out[k] = v }
+            } else {
+                out[p] = true
+            }
+        }
+    }
+    return out
+}

@@ -44,6 +44,7 @@ var listCmd = &cobra.Command{
             }
             if m.TaskID.Valid { item["task_id"] = m.TaskID.String }
             if m.ExperimentID.Valid { item["experiment_id"] = m.ExperimentID.String }
+            if len(m.Tags) > 0 { item["tags"] = m.Tags }
             if m.Executor.Valid { item["executor"] = m.Executor.String }
             arr = append(arr, item)
         }

@@ -64,11 +64,7 @@ var runCmd = &cobra.Command{
         metaStartJSON, _ := json.Marshal(metaStart)
         contentID, err := pgdao.InsertContent(ctx, db, startText, metaStartJSON)
         if err != nil { return err }
-        ev := &pgdao.MessageEvent{
-            ContentID: contentID,
-            Status:    "starting",
-            Tags:      []string{"task", "run"},
-        }
+        ev := &pgdao.MessageEvent{ ContentID: contentID, Status: "starting", Tags: map[string]any{"task": true, "run": true} }
         if strings.TrimSpace(task.ID) != "" { ev.TaskID = sql.NullString{String: task.ID, Valid: true} }
         if strings.TrimSpace(flagRunExperiment) != "" { ev.ExperimentID = sql.NullString{String: flagRunExperiment, Valid: true} }
         if strings.TrimSpace(flagRunExecutor) != "" { ev.Executor = sql.NullString{String: flagRunExecutor, Valid: true} }
