@@ -16,6 +16,7 @@ var (
     flagConvListProject string
     flagConvListLimit   int
     flagConvListOffset  int
+    flagConvListMax     int
 )
 
 var listCmd = &cobra.Command{
@@ -29,7 +30,9 @@ var listCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg)
         if err != nil { return err }
         defer db.Close()
-        rows, err := pgdao.ListConversations(ctx, db, flagConvListProject, flagConvListLimit, flagConvListOffset)
+        effLimit := flagConvListMax
+        if effLimit <= 0 { effLimit = flagConvListLimit }
+        rows, err := pgdao.ListConversations(ctx, db, flagConvListProject, effLimit, flagConvListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "conversations: %d\n", len(rows))
         arr := make([]map[string]any, 0, len(rows))
@@ -47,7 +50,7 @@ var listCmd = &cobra.Command{
 func init() {
     ConversationCmd.AddCommand(listCmd)
     listCmd.Flags().StringVar(&flagConvListProject, "project", "", "Filter by project")
-    listCmd.Flags().IntVar(&flagConvListLimit, "limit", 100, "Max rows")
+    listCmd.Flags().IntVar(&flagConvListLimit, "limit", 100, "Max rows (deprecated; prefer --max-results)")
     listCmd.Flags().IntVar(&flagConvListOffset, "offset", 0, "Offset for pagination")
+    listCmd.Flags().IntVar(&flagConvListMax, "max-results", 20, "Max results to return (default 20)")
 }
-

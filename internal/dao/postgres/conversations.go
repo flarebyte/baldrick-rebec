@@ -55,9 +55,9 @@ func ListConversations(ctx context.Context, db *pgxpool.Pool, project string, li
     var rows pgxRows
     var err error
     if strings.TrimSpace(project) == "" {
-        rows, err = db.Query(ctx, `SELECT id::text, title, description, project, tags, notes, created, updated FROM conversations ORDER BY created DESC LIMIT $1 OFFSET $2`, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, title, description, project, tags, notes, created, updated FROM conversations ORDER BY updated DESC, created DESC LIMIT $1 OFFSET $2`, limit, offset)
     } else {
-        rows, err = db.Query(ctx, `SELECT id::text, title, description, project, tags, notes, created, updated FROM conversations WHERE project=$1 ORDER BY created DESC LIMIT $2 OFFSET $3`, project, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, title, description, project, tags, notes, created, updated FROM conversations WHERE project=$1 ORDER BY updated DESC, created DESC LIMIT $2 OFFSET $3`, project, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()

@@ -152,14 +152,14 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow string, limit, of
                                         t.notes, t.shell, t.run, t.timeout::text, t.tags, t.level, t.created
                                    FROM tasks t
                                    LEFT JOIN task_variants tv ON tv.variant = t.variant
-                                   ORDER BY tv.workflow_id, t.command, t.variant, t.version LIMIT $1 OFFSET $2`, limit, offset)
+                                   ORDER BY t.variant ASC, t.version ASC LIMIT $1 OFFSET $2`, limit, offset)
     } else {
         rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation, t.version,
                                         t.notes, t.shell, t.run, t.timeout::text, t.tags, t.level, t.created
                                    FROM tasks t
                                    LEFT JOIN task_variants tv ON tv.variant = t.variant
                                    WHERE tv.workflow_id=$1
-                                   ORDER BY t.command, t.variant, t.version LIMIT $2 OFFSET $3`, workflow, limit, offset)
+                                   ORDER BY t.variant ASC, t.version ASC LIMIT $2 OFFSET $3`, workflow, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()

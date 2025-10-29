@@ -18,6 +18,7 @@ var (
     flagMsgListStatus     string
     flagMsgListLimit      int
     flagMsgListOffset     int
+    flagMsgListMax        int
 )
 
 var listCmd = &cobra.Command{
@@ -31,7 +32,9 @@ var listCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg)
         if err != nil { return err }
         defer db.Close()
-        ms, err := pgdao.ListMessages(ctx, db, flagMsgListExperiment, flagMsgListTask, flagMsgListStatus, flagMsgListLimit, flagMsgListOffset)
+        effLimit := flagMsgListMax
+        if effLimit <= 0 { effLimit = flagMsgListLimit }
+        ms, err := pgdao.ListMessages(ctx, db, flagMsgListExperiment, flagMsgListTask, flagMsgListStatus, effLimit, flagMsgListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "messages: %d\n", len(ms))
         arr := make([]map[string]any, 0, len(ms))
@@ -57,6 +60,7 @@ func init() {
     listCmd.Flags().StringVar(&flagMsgListExperiment, "experiment", "", "Filter by experiment UUID")
     listCmd.Flags().StringVar(&flagMsgListTask, "task", "", "Filter by task UUID")
     listCmd.Flags().StringVar(&flagMsgListStatus, "status", "", "Filter by status")
-    listCmd.Flags().IntVar(&flagMsgListLimit, "limit", 100, "Max rows")
+    listCmd.Flags().IntVar(&flagMsgListLimit, "limit", 100, "Max rows (deprecated; prefer --max-results)")
     listCmd.Flags().IntVar(&flagMsgListOffset, "offset", 0, "Offset for pagination")
+    listCmd.Flags().IntVar(&flagMsgListMax, "max-results", 20, "Max results to return (default 20)")
 }

@@ -16,6 +16,7 @@ var (
     flagTaskListWF     string
     flagTaskListLimit  int
     flagTaskListOffset int
+    flagTaskListMax    int
 )
 
 var listCmd = &cobra.Command{
@@ -29,7 +30,9 @@ var listCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg)
         if err != nil { return err }
         defer db.Close()
-        tasks, err := pgdao.ListTasks(ctx, db, flagTaskListWF, flagTaskListLimit, flagTaskListOffset)
+        effLimit := flagTaskListMax
+        if effLimit <= 0 { effLimit = flagTaskListLimit }
+        tasks, err := pgdao.ListTasks(ctx, db, flagTaskListWF, effLimit, flagTaskListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "tasks: %d\n", len(tasks))
         arr := make([]map[string]any, 0, len(tasks))
@@ -55,6 +58,7 @@ var listCmd = &cobra.Command{
 func init() {
     TaskCmd.AddCommand(listCmd)
     listCmd.Flags().StringVar(&flagTaskListWF, "workflow", "", "Filter by workflow name")
-    listCmd.Flags().IntVar(&flagTaskListLimit, "limit", 100, "Max rows")
+    listCmd.Flags().IntVar(&flagTaskListLimit, "limit", 100, "Max rows (deprecated; prefer --max-results)")
     listCmd.Flags().IntVar(&flagTaskListOffset, "offset", 0, "Offset for pagination")
+    listCmd.Flags().IntVar(&flagTaskListMax, "max-results", 20, "Max results to return (default 20)")
 }
