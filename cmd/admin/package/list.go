@@ -3,8 +3,10 @@ package pkg
 import (
     "context"
     "encoding/json"
+    "errors"
     "fmt"
     "os"
+    "strings"
     "time"
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
@@ -21,8 +23,11 @@ var (
 
 var listCmd = &cobra.Command{
     Use:   "list",
-    Short: "List packages (optionally filter by role or variant)",
+    Short: "List packages for a role (required)",
     RunE: func(cmd *cobra.Command, args []string) error {
+        if strings.TrimSpace(flagPkgListRoleName) == "" {
+            return errors.New("--role is required")
+        }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -54,9 +59,8 @@ var listCmd = &cobra.Command{
 
 func init() {
     PackageCmd.AddCommand(listCmd)
-    listCmd.Flags().StringVar(&flagPkgListRoleName, "role", "", "Filter by role name")
+    listCmd.Flags().StringVar(&flagPkgListRoleName, "role", "", "Role name (required)")
     listCmd.Flags().StringVar(&flagPkgListVariant, "variant", "", "Filter by variant")
     listCmd.Flags().IntVar(&flagPkgListLimit, "limit", 100, "Max rows")
     listCmd.Flags().IntVar(&flagPkgListOffset, "offset", 0, "Offset for pagination")
 }
-

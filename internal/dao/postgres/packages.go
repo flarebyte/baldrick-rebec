@@ -66,13 +66,13 @@ func ListPackages(ctx context.Context, db *pgxpool.Pool, roleName, variant strin
     var err error
     switch {
     case stringsTrim(roleName) != "" && stringsTrim(variant) != "":
-        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE role_name=$1 AND variant=$2 ORDER BY role_name, variant LIMIT $3 OFFSET $4`, roleName, variant, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE role_name=$1 AND variant=$2 ORDER BY variant ASC, version ASC LIMIT $3 OFFSET $4`, roleName, variant, limit, offset)
     case stringsTrim(roleName) != "":
-        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE role_name=$1 ORDER BY variant LIMIT $2 OFFSET $3`, roleName, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE role_name=$1 ORDER BY variant ASC, version ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
     case stringsTrim(variant) != "":
-        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE variant=$1 ORDER BY role_name LIMIT $2 OFFSET $3`, variant, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE variant=$1 ORDER BY variant ASC, version ASC LIMIT $2 OFFSET $3`, variant, limit, offset)
     default:
-        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages ORDER BY role_name, variant LIMIT $1 OFFSET $2`, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages ORDER BY variant ASC, version ASC LIMIT $1 OFFSET $2`, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()
