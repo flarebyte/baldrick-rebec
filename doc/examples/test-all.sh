@@ -8,6 +8,16 @@ alias rbc='go run main.go'
 
 command -v rbc >/dev/null 2>&1 || { echo "error: rbc not found (go run main.go)" >&2; exit 1; }
 
+# Helper to extract UUID id from JSON output without relying on jq
+json_get_id() {
+  if command -v jq >/dev/null 2>&1; then
+    printf "%s" "$1" | jq -r '.id'
+  else
+    # Fallback: grep a UUID-looking value from the id field
+    printf "%s" "$1" | grep -oE '"id"\s*:\s*"[0-9a-fA-F-]{36}"' | sed -E 's/.*"([0-9a-fA-F-]{36})".*/\1/'
+  fi
+}
+
 echo "[1/7] Resetting database (destructive)" >&2
 rbc admin db reset --force
 
@@ -27,16 +37,16 @@ rbc admin task set --workflow ci-lint --command lint --variant go --version 1.0.
 
 echo "[4/7] Creating sample conversations and experiments" >&2
 cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX")
-cid=$(printf "%s" "$cjson" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/')
+cid=$(json_get_id "$cjson")
 
 cjson2=$(rbc admin conversation set --title "Onboarding Improvement" --project "github.com/acme/product" --tags onboarding,docs,dx --description "Improve onboarding artifacts." --notes "Scope: docs, templates, scripts")
-cid2=$(printf "%s" "$cjson2" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/')
+cid2=$(json_get_id "$cjson2")
 
 ejson1=$(rbc admin experiment create --conversation "$cid")
-eid1=$(printf "%s" "$ejson1" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/')
+eid1=$(json_get_id "$ejson1")
 
 ejson2=$(rbc admin experiment create --conversation "$cid2")
-eid2=$(printf "%s" "$ejson2" | grep -m1 '"id"' | sed -E 's/[^0-9]*([0-9]+).*/\1/')
+eid2=$(json_get_id "$ejson2")
 
 echo "[5/8] Creating roles" >&2
 rbc admin role set --name user --title "User" --description "Regular end-user role" --tags default
