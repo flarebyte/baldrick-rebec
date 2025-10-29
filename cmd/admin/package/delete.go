@@ -1,4 +1,4 @@
-package star
+package pkg
 
 import (
     "bufio"
@@ -16,30 +16,30 @@ import (
 )
 
 var (
-    flagStarDelID      string
-    flagStarDelRole    string
-    flagStarDelVariant string
-    flagStarDelForce   bool
-    flagStarDelIgnore  bool
+    flagPkgDelID      string
+    flagPkgDelRole    string
+    flagPkgDelVariant string
+    flagPkgDelForce   bool
+    flagPkgDelIgnore  bool
 )
 
 var deleteCmd = &cobra.Command{
     Use:   "delete",
-    Short: "Delete a starred task by id or by (role, variant)",
+    Short: "Delete a package by id or by (role, variant)",
     RunE: func(cmd *cobra.Command, args []string) error {
         var ident string
         byID := false
-        if strings.TrimSpace(flagStarDelID) != "" {
-            ident = fmt.Sprintf("id=%s", flagStarDelID)
+        if strings.TrimSpace(flagPkgDelID) != "" {
+            ident = fmt.Sprintf("id=%s", flagPkgDelID)
             byID = true
         } else {
-            if strings.TrimSpace(flagStarDelRole) == "" || strings.TrimSpace(flagStarDelVariant) == "" {
+            if strings.TrimSpace(flagPkgDelRole) == "" || strings.TrimSpace(flagPkgDelVariant) == "" {
                 return errors.New("provide --id or both --role and --variant")
             }
-            ident = fmt.Sprintf("role=%s variant=%s", flagStarDelRole, flagStarDelVariant)
+            ident = fmt.Sprintf("role=%s variant=%s", flagPkgDelRole, flagPkgDelVariant)
         }
-        if !flagStarDelForce {
-            fmt.Fprintf(os.Stderr, "About to delete starred task (%s).\n", ident)
+        if !flagPkgDelForce {
+            fmt.Fprintf(os.Stderr, "About to delete package (%s).\n", ident)
             fmt.Fprint(os.Stderr, "Type 'yes' to confirm: ")
             reader := bufio.NewReader(os.Stdin)
             line, _ := reader.ReadString('\n')
@@ -56,30 +56,31 @@ var deleteCmd = &cobra.Command{
         defer db.Close()
         var affected int64
         if byID {
-            affected, err = pgdao.DeleteStarredTaskByID(ctx, db, flagStarDelID)
+            affected, err = pgdao.DeletePackageByID(ctx, db, flagPkgDelID)
         } else {
-            affected, err = pgdao.DeleteStarredTaskByKey(ctx, db, flagStarDelRole, flagStarDelVariant)
+            affected, err = pgdao.DeletePackageByKey(ctx, db, flagPkgDelRole, flagPkgDelVariant)
         }
         if err != nil { return err }
         if affected == 0 {
-            if flagStarDelIgnore {
-                fmt.Fprintf(os.Stderr, "starred task (%s) not found; ignoring\n", ident)
+            if flagPkgDelIgnore {
+                fmt.Fprintf(os.Stderr, "package (%s) not found; ignoring\n", ident)
                 out := map[string]any{"status":"not_found_ignored"}
                 enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
             }
-            return fmt.Errorf("starred task (%s) not found", ident)
+            return fmt.Errorf("package (%s) not found", ident)
         }
-        fmt.Fprintf(os.Stderr, "starred task deleted (%s)\n", ident)
+        fmt.Fprintf(os.Stderr, "package deleted (%s)\n", ident)
         out := map[string]any{"status":"deleted","deleted":true}
         enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
     },
 }
 
 func init() {
-    StarCmd.AddCommand(deleteCmd)
-    deleteCmd.Flags().StringVar(&flagStarDelID, "id", "", "Starred task UUID")
-    deleteCmd.Flags().StringVar(&flagStarDelRole, "role", "", "Role (with --variant)")
-    deleteCmd.Flags().StringVar(&flagStarDelVariant, "variant", "", "Variant (with --role)")
-    deleteCmd.Flags().BoolVar(&flagStarDelForce, "force", false, "Do not prompt for confirmation")
-    deleteCmd.Flags().BoolVar(&flagStarDelIgnore, "ignore-missing", false, "Do not error if not found")
+    PackageCmd.AddCommand(deleteCmd)
+    deleteCmd.Flags().StringVar(&flagPkgDelID, "id", "", "Package UUID")
+    deleteCmd.Flags().StringVar(&flagPkgDelRole, "role", "", "Role name (with --variant)")
+    deleteCmd.Flags().StringVar(&flagPkgDelVariant, "variant", "", "Variant (with --role)")
+    deleteCmd.Flags().BoolVar(&flagPkgDelForce, "force", false, "Do not prompt for confirmation")
+    deleteCmd.Flags().BoolVar(&flagPkgDelIgnore, "ignore-missing", false, "Do not error if not found")
 }
+

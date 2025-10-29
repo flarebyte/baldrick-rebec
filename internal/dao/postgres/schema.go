@@ -135,36 +135,37 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             meta JSONB DEFAULT '{}',
             UNIQUE (content_id, status, received_at)
         )`,
-        // Starred tasks per role: binds a role (e.g., user, admin) to a specific
-        // variant and version, referencing the task row. Unique per (role, variant).
-        `CREATE TABLE IF NOT EXISTS starred_tasks (
+        // Packages per role_name: bind a role (e.g., user, admin) to a specific
+        // variant and version, referencing the task row. Unique per (role_name, variant).
+        `CREATE TABLE IF NOT EXISTS packages (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            role TEXT NOT NULL REFERENCES roles(name) ON DELETE CASCADE,
+            role_name TEXT NOT NULL REFERENCES roles(name) ON DELETE CASCADE,
             variant TEXT NOT NULL,
             version TEXT NOT NULL,
             task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
-            UNIQUE (role, variant)
+            UNIQUE (role_name, variant)
         )`,
-        `CREATE INDEX IF NOT EXISTS idx_starred_tasks_role ON starred_tasks(role)`,
-        `CREATE INDEX IF NOT EXISTS idx_starred_tasks_variant ON starred_tasks(variant)`,
-        // Ensure FK exists if table predated the FK addition
+        `CREATE INDEX IF NOT EXISTS idx_packages_role_name ON packages(role_name)`,
+        `CREATE INDEX IF NOT EXISTS idx_packages_variant ON packages(variant)`,
+        // Optional migration: rename old starred_tasks table/column if present.
         `DO $$ BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_constraint WHERE conname='starred_tasks_role_fkey'
-            ) THEN
-                ALTER TABLE starred_tasks
-                    ADD CONSTRAINT starred_tasks_role_fkey
-                    FOREIGN KEY (role) REFERENCES roles(name) ON DELETE CASCADE;
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='starred_tasks')
+               AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='packages') THEN
+                ALTER TABLE starred_tasks RENAME TO packages;
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='packages' AND column_name='role')
+               AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='packages' AND column_name='role_name') THEN
+                ALTER TABLE packages RENAME COLUMN role TO role_name;
             END IF;
         END $$;`,
         `DO $$ BEGIN
             IF NOT EXISTS (
-                SELECT 1 FROM pg_trigger WHERE tgname = 'starred_tasks_set_updated'
+                SELECT 1 FROM pg_trigger WHERE tgname = 'packages_set_updated'
             ) THEN
-                CREATE TRIGGER starred_tasks_set_updated
-                BEFORE UPDATE ON starred_tasks
+                CREATE TRIGGER packages_set_updated
+                BEFORE UPDATE ON packages
                 FOR EACH ROW
                 EXECUTE PROCEDURE set_updated();
             END IF;

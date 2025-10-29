@@ -52,10 +52,10 @@ echo "[5/8] Creating roles" >&2
 rbc admin role set --name user --title "User" --description "Regular end-user role" --tags default
 rbc admin role set --name qa   --title "QA"   --description "Quality assurance role" --tags testing
 
-echo "[6/8] Starring tasks per role" >&2
-rbc admin star set --role user --variant unit/go --version 1.0.0
-rbc admin star set --role qa   --variant integration --version 1.0.0
-rbc admin star set --role user --variant lint/go --version 1.0.0
+echo "[6/8] Creating packages (role-bound tasks)" >&2
+rbc admin package set --role user --variant unit/go --version 1.0.0
+rbc admin package set --role qa   --variant integration --version 1.0.0
+rbc admin package set --role user --variant lint/go --version 1.0.0
 
 echo "[7/8] Creating sample messages" >&2
 echo "Hello from user12" | rbc admin message set --executor user12 --experiment "$eid1" --title "Greeting" --tags hello
