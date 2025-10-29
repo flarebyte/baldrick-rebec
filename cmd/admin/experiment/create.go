@@ -6,6 +6,7 @@ import (
     "errors"
     "fmt"
     "os"
+    "strings"
     "time"
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
@@ -14,16 +15,14 @@ import (
 )
 
 var (
-    flagExpConversation int64
+    flagExpConversation string
 )
 
 var createCmd = &cobra.Command{
     Use:   "create",
     Short: "Create a new experiment linked to a conversation",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if flagExpConversation <= 0 {
-            return errors.New("--conversation is required and must be > 0")
-        }
+        if strings.TrimSpace(flagExpConversation) == "" { return errors.New("--conversation is required") }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -34,10 +33,9 @@ var createCmd = &cobra.Command{
         e, err := pgdao.CreateExperiment(ctx, db, flagExpConversation)
         if err != nil { return err }
         // Human
-        fmt.Fprintf(os.Stderr, "experiment created id=%d conversation_id=%d\n", e.ID, e.ConversationID)
+        fmt.Fprintf(os.Stderr, "experiment created id=%s conversation_id=%s\n", e.ID, e.ConversationID)
         // JSON
         out := map[string]any{"status":"created","id":e.ID,"conversation_id":e.ConversationID}
-        if e.Created.Valid { out["created"] = e.Created.Time.Format(time.RFC3339Nano) }
         enc := json.NewEncoder(os.Stdout)
         enc.SetIndent("", "  ")
         return enc.Encode(out)
@@ -46,6 +44,5 @@ var createCmd = &cobra.Command{
 
 func init() {
     ExperimentCmd.AddCommand(createCmd)
-    createCmd.Flags().Int64Var(&flagExpConversation, "conversation", 0, "Conversation id (required)")
+    createCmd.Flags().StringVar(&flagExpConversation, "conversation", "", "Conversation UUID (required)")
 }
-

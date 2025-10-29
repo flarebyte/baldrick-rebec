@@ -15,7 +15,7 @@ import (
 )
 
 var (
-    flagTaskGetID  int64
+    flagTaskGetID  string
     flagTaskGetWF  string
     flagTaskGetCmd string
     flagTaskGetVar string
@@ -34,7 +34,7 @@ var getCmd = &cobra.Command{
         if err != nil { return err }
         defer db.Close()
         var t *pgdao.Task
-        if flagTaskGetID > 0 {
+        if strings.TrimSpace(flagTaskGetID) != "" {
             t, err = pgdao.GetTaskByID(ctx, db, flagTaskGetID)
         } else {
             if strings.TrimSpace(flagTaskGetVer)=="" || (strings.TrimSpace(flagTaskGetVar)=="" && strings.TrimSpace(flagTaskGetCmd)=="") {
@@ -73,7 +73,7 @@ var getCmd = &cobra.Command{
 
 func init() {
     TaskCmd.AddCommand(getCmd)
-    getCmd.Flags().Int64Var(&flagTaskGetID, "id", 0, "Task numeric id")
+    getCmd.Flags().StringVar(&flagTaskGetID, "id", "", "Task UUID")
     getCmd.Flags().StringVar(&flagTaskGetWF, "workflow", "", "Workflow name (with --command and --version)")
     getCmd.Flags().StringVar(&flagTaskGetCmd, "command", "", "Task command (with --workflow and --version)")
     getCmd.Flags().StringVar(&flagTaskGetVar, "variant", "", "Task variant (optional; default empty)")

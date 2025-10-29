@@ -16,7 +16,7 @@ import (
 )
 
 var (
-    flagConvDelID           int64
+    flagConvDelID           string
     flagConvDelForce        bool
     flagConvDelIgnoreMissing bool
 )
@@ -25,7 +25,7 @@ var deleteCmd = &cobra.Command{
     Use:   "delete",
     Short: "Delete a conversation by id (asks for confirmation unless --force)",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if flagConvDelID <= 0 { return errors.New("--id is required and must be > 0") }
+        if strings.TrimSpace(flagConvDelID) == "" { return errors.New("--id is required") }
         if !flagConvDelForce {
             fmt.Fprintf(os.Stderr, "About to delete conversation id=%d.\n", flagConvDelID)
             fmt.Fprint(os.Stderr, "Type 'yes' to confirm: ")
@@ -60,8 +60,7 @@ var deleteCmd = &cobra.Command{
 
 func init() {
     ConversationCmd.AddCommand(deleteCmd)
-    deleteCmd.Flags().Int64Var(&flagConvDelID, "id", 0, "Conversation id (required)")
+    deleteCmd.Flags().StringVar(&flagConvDelID, "id", "", "Conversation UUID (required)")
     deleteCmd.Flags().BoolVar(&flagConvDelForce, "force", false, "Do not prompt for confirmation")
     deleteCmd.Flags().BoolVar(&flagConvDelIgnoreMissing, "ignore-missing", false, "Do not error if conversation does not exist")
 }
-

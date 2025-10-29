@@ -16,7 +16,7 @@ import (
 )
 
 var (
-    flagConvID    int64
+    flagConvID    string
     flagConvTitle string
     flagConvDesc  string
     flagConvNotes string
@@ -43,7 +43,7 @@ var setCmd = &cobra.Command{
         if len(flagConvTags) > 0 { conv.Tags = flagConvTags }
         if err := pgdao.UpsertConversation(ctx, db, conv); err != nil { return err }
         // Human line
-        fmt.Fprintf(os.Stderr, "conversation upserted id=%d title=%q\n", conv.ID, conv.Title)
+        fmt.Fprintf(os.Stderr, "conversation upserted id=%s title=%q\n", conv.ID, conv.Title)
         // JSON
         out := map[string]any{
             "status": "upserted",
@@ -61,7 +61,7 @@ var setCmd = &cobra.Command{
 
 func init() {
     ConversationCmd.AddCommand(setCmd)
-    setCmd.Flags().Int64Var(&flagConvID, "id", 0, "Conversation id (optional; when omitted, a new id is generated)")
+    setCmd.Flags().StringVar(&flagConvID, "id", "", "Conversation UUID (optional; when omitted, a new id is generated)")
     setCmd.Flags().StringVar(&flagConvTitle, "title", "", "Title (required)")
     setCmd.Flags().StringVar(&flagConvDesc, "description", "", "Plain text description")
     setCmd.Flags().StringVar(&flagConvNotes, "notes", "", "Markdown notes")

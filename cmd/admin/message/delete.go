@@ -16,7 +16,7 @@ import (
 )
 
 var (
-    flagMsgDelID           int64
+    flagMsgDelID           string
     flagMsgDelForce        bool
     flagMsgDelIgnoreMissing bool
 )
@@ -25,7 +25,7 @@ var deleteCmd = &cobra.Command{
     Use:   "delete",
     Short: "Delete a message by id (asks for confirmation unless --force)",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if flagMsgDelID <= 0 { return errors.New("--id is required and must be > 0") }
+        if strings.TrimSpace(flagMsgDelID) == "" { return errors.New("--id is required") }
         if !flagMsgDelForce {
             fmt.Fprintf(os.Stderr, "About to delete message id=%d.\n", flagMsgDelID)
             fmt.Fprint(os.Stderr, "Type 'yes' to confirm: ")
@@ -58,8 +58,7 @@ var deleteCmd = &cobra.Command{
 
 func init() {
     MessageCmd.AddCommand(deleteCmd)
-    deleteCmd.Flags().Int64Var(&flagMsgDelID, "id", 0, "Message id (required)")
+    deleteCmd.Flags().StringVar(&flagMsgDelID, "id", "", "Message UUID (required)")
     deleteCmd.Flags().BoolVar(&flagMsgDelForce, "force", false, "Do not prompt for confirmation")
     deleteCmd.Flags().BoolVar(&flagMsgDelIgnoreMissing, "ignore-missing", false, "Do not error if message does not exist")
 }
-

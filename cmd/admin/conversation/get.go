@@ -6,6 +6,7 @@ import (
     "errors"
     "fmt"
     "os"
+    "strings"
     "time"
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
@@ -14,14 +15,14 @@ import (
 )
 
 var (
-    flagConvGetID int64
+    flagConvGetID string
 )
 
 var getCmd = &cobra.Command{
     Use:   "get",
     Short: "Get a conversation by id",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if flagConvGetID <= 0 { return errors.New("--id is required and must be > 0") }
+        if strings.TrimSpace(flagConvGetID) == "" { return errors.New("--id is required") }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -47,6 +48,5 @@ var getCmd = &cobra.Command{
 
 func init() {
     ConversationCmd.AddCommand(getCmd)
-    getCmd.Flags().Int64Var(&flagConvGetID, "id", 0, "Conversation id (required)")
+    getCmd.Flags().StringVar(&flagConvGetID, "id", "", "Conversation UUID (required)")
 }
-

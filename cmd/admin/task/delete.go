@@ -16,7 +16,7 @@ import (
 )
 
 var (
-    flagTaskDelID   int64
+    flagTaskDelID   string
     flagTaskDelWF   string
     flagTaskDelCmd  string
     flagTaskDelVar  string
@@ -32,8 +32,8 @@ var deleteCmd = &cobra.Command{
         // Identify target
         var ident string
         var byID bool
-        if flagTaskDelID > 0 {
-            ident = fmt.Sprintf("id=%d", flagTaskDelID)
+        if strings.TrimSpace(flagTaskDelID) != "" {
+            ident = fmt.Sprintf("id=%s", flagTaskDelID)
             byID = true
         } else {
             if strings.TrimSpace(flagTaskDelWF)=="" || strings.TrimSpace(flagTaskDelCmd)=="" || strings.TrimSpace(flagTaskDelVer)=="" {
@@ -87,7 +87,7 @@ var deleteCmd = &cobra.Command{
 
 func init() {
     TaskCmd.AddCommand(deleteCmd)
-    deleteCmd.Flags().Int64Var(&flagTaskDelID, "id", 0, "Task numeric id")
+    deleteCmd.Flags().StringVar(&flagTaskDelID, "id", "", "Task UUID")
     deleteCmd.Flags().StringVar(&flagTaskDelWF, "workflow", "", "Workflow name (with --command and --version)")
     deleteCmd.Flags().StringVar(&flagTaskDelCmd, "command", "", "Task command (with --workflow and --version)")
     deleteCmd.Flags().StringVar(&flagTaskDelVar, "variant", "", "Task variant (optional)")

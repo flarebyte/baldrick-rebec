@@ -15,7 +15,7 @@ import (
 )
 
 var (
-    flagStarGetID      int64
+    flagStarGetID      string
     flagStarGetRole    string
     flagStarGetVariant string
 )
@@ -32,7 +32,7 @@ var getCmd = &cobra.Command{
         if err != nil { return err }
         defer db.Close()
         var st *pgdao.StarredTask
-        if flagStarGetID > 0 {
+        if strings.TrimSpace(flagStarGetID) != "" {
             st, err = pgdao.GetStarredTaskByID(ctx, db, flagStarGetID)
         } else {
             if strings.TrimSpace(flagStarGetRole) == "" || strings.TrimSpace(flagStarGetVariant) == "" {
@@ -53,7 +53,7 @@ var getCmd = &cobra.Command{
 
 func init() {
     StarCmd.AddCommand(getCmd)
-    getCmd.Flags().Int64Var(&flagStarGetID, "id", 0, "Starred task id")
+    getCmd.Flags().StringVar(&flagStarGetID, "id", "", "Starred task UUID")
     getCmd.Flags().StringVar(&flagStarGetRole, "role", "", "Role (with --variant)")
     getCmd.Flags().StringVar(&flagStarGetVariant, "variant", "", "Variant (with --role)")
 }

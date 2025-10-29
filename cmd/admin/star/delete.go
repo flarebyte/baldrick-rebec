@@ -16,7 +16,7 @@ import (
 )
 
 var (
-    flagStarDelID      int64
+    flagStarDelID      string
     flagStarDelRole    string
     flagStarDelVariant string
     flagStarDelForce   bool
@@ -29,8 +29,8 @@ var deleteCmd = &cobra.Command{
     RunE: func(cmd *cobra.Command, args []string) error {
         var ident string
         byID := false
-        if flagStarDelID > 0 {
-            ident = fmt.Sprintf("id=%d", flagStarDelID)
+        if strings.TrimSpace(flagStarDelID) != "" {
+            ident = fmt.Sprintf("id=%s", flagStarDelID)
             byID = true
         } else {
             if strings.TrimSpace(flagStarDelRole) == "" || strings.TrimSpace(flagStarDelVariant) == "" {
@@ -77,7 +77,7 @@ var deleteCmd = &cobra.Command{
 
 func init() {
     StarCmd.AddCommand(deleteCmd)
-    deleteCmd.Flags().Int64Var(&flagStarDelID, "id", 0, "Starred task id")
+    deleteCmd.Flags().StringVar(&flagStarDelID, "id", "", "Starred task UUID")
     deleteCmd.Flags().StringVar(&flagStarDelRole, "role", "", "Role (with --variant)")
     deleteCmd.Flags().StringVar(&flagStarDelVariant, "variant", "", "Variant (with --role)")
     deleteCmd.Flags().BoolVar(&flagStarDelForce, "force", false, "Do not prompt for confirmation")

@@ -8,11 +8,11 @@ import (
 )
 
 type StarredTask struct {
-    ID      int64
+    ID      string
     Role    string
     Variant string
     Version string
-    TaskID  int64
+    TaskID  string
     Created sql.NullTime
     Updated sql.NullTime
 }
@@ -24,12 +24,12 @@ func UpsertStarredTask(ctx context.Context, db *pgxpool.Pool, role, variant, ver
     t, err := GetTaskByKey(ctx, db, variant, version)
     if err != nil { return nil, err }
     q := `INSERT INTO starred_tasks (role, variant, version, task_id)
-          VALUES ($1,$2,$3,$4)
+          VALUES ($1,$2,$3,$4::uuid)
           ON CONFLICT (role, variant) DO UPDATE SET
             version = EXCLUDED.version,
             task_id = EXCLUDED.task_id,
             updated = now()
-          RETURNING id, created, updated`
+          RETURNING id::text, created, updated`
     var st StarredTask
     st.Role = role; st.Variant = variant; st.Version = version; st.TaskID = t.ID
     if err := db.QueryRow(ctx, q, role, variant, version, t.ID).Scan(&st.ID, &st.Created, &st.Updated); err != nil {
@@ -39,8 +39,8 @@ func UpsertStarredTask(ctx context.Context, db *pgxpool.Pool, role, variant, ver
 }
 
 // GetStarredTaskByID fetches a starred task by id.
-func GetStarredTaskByID(ctx context.Context, db *pgxpool.Pool, id int64) (*StarredTask, error) {
-    q := `SELECT id, role, variant, version, task_id, created, updated FROM starred_tasks WHERE id=$1`
+func GetStarredTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*StarredTask, error) {
+    q := `SELECT id::text, role, variant, version, task_id::text, created, updated FROM starred_tasks WHERE id=$1::uuid`
     var st StarredTask
     if err := db.QueryRow(ctx, q, id).Scan(&st.ID, &st.Role, &st.Variant, &st.Version, &st.TaskID, &st.Created, &st.Updated); err != nil {
         return nil, err
@@ -50,7 +50,7 @@ func GetStarredTaskByID(ctx context.Context, db *pgxpool.Pool, id int64) (*Starr
 
 // GetStarredTaskByKey fetches a starred task by (role, variant).
 func GetStarredTaskByKey(ctx context.Context, db *pgxpool.Pool, role, variant string) (*StarredTask, error) {
-    q := `SELECT id, role, variant, version, task_id, created, updated FROM starred_tasks WHERE role=$1 AND variant=$2`
+    q := `SELECT id::text, role, variant, version, task_id::text, created, updated FROM starred_tasks WHERE role=$1 AND variant=$2`
     var st StarredTask
     if err := db.QueryRow(ctx, q, role, variant).Scan(&st.ID, &st.Role, &st.Variant, &st.Version, &st.TaskID, &st.Created, &st.Updated); err != nil {
         return nil, err
@@ -66,13 +66,13 @@ func ListStarredTasks(ctx context.Context, db *pgxpool.Pool, role, variant strin
     var err error
     switch {
     case stringsTrim(role) != "" && stringsTrim(variant) != "":
-        rows, err = db.Query(ctx, `SELECT id, role, variant, version, task_id, created, updated FROM starred_tasks WHERE role=$1 AND variant=$2 ORDER BY role, variant LIMIT $3 OFFSET $4`, role, variant, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, role, variant, version, task_id::text, created, updated FROM starred_tasks WHERE role=$1 AND variant=$2 ORDER BY role, variant LIMIT $3 OFFSET $4`, role, variant, limit, offset)
     case stringsTrim(role) != "":
-        rows, err = db.Query(ctx, `SELECT id, role, variant, version, task_id, created, updated FROM starred_tasks WHERE role=$1 ORDER BY variant LIMIT $2 OFFSET $3`, role, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, role, variant, version, task_id::text, created, updated FROM starred_tasks WHERE role=$1 ORDER BY variant LIMIT $2 OFFSET $3`, role, limit, offset)
     case stringsTrim(variant) != "":
-        rows, err = db.Query(ctx, `SELECT id, role, variant, version, task_id, created, updated FROM starred_tasks WHERE variant=$1 ORDER BY role LIMIT $2 OFFSET $3`, variant, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, role, variant, version, task_id::text, created, updated FROM starred_tasks WHERE variant=$1 ORDER BY role LIMIT $2 OFFSET $3`, variant, limit, offset)
     default:
-        rows, err = db.Query(ctx, `SELECT id, role, variant, version, task_id, created, updated FROM starred_tasks ORDER BY role, variant LIMIT $1 OFFSET $2`, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, role, variant, version, task_id::text, created, updated FROM starred_tasks ORDER BY role, variant LIMIT $1 OFFSET $2`, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()
@@ -88,8 +88,8 @@ func ListStarredTasks(ctx context.Context, db *pgxpool.Pool, role, variant strin
 }
 
 // DeleteStarredTaskByID deletes a starred task by id.
-func DeleteStarredTaskByID(ctx context.Context, db *pgxpool.Pool, id int64) (int64, error) {
-    ct, err := db.Exec(ctx, `DELETE FROM starred_tasks WHERE id=$1`, id)
+func DeleteStarredTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (int64, error) {
+    ct, err := db.Exec(ctx, `DELETE FROM starred_tasks WHERE id=$1::uuid`, id)
     if err != nil { return 0, err }
     return ct.RowsAffected(), nil
 }

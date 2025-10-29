@@ -13,7 +13,7 @@ import (
 )
 
 var (
-    flagExpListConv   int64
+    flagExpListConv   string
     flagExpListLimit  int
     flagExpListOffset int
 )
@@ -35,7 +35,6 @@ var listCmd = &cobra.Command{
         arr := make([]map[string]any, 0, len(rows))
         for _, e := range rows {
             item := map[string]any{"id": e.ID, "conversation_id": e.ConversationID}
-            if e.Created.Valid { item["created"] = e.Created.Time.Format(time.RFC3339Nano) }
             arr = append(arr, item)
         }
         enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  ")
@@ -45,8 +44,7 @@ var listCmd = &cobra.Command{
 
 func init() {
     ExperimentCmd.AddCommand(listCmd)
-    listCmd.Flags().Int64Var(&flagExpListConv, "conversation", 0, "Filter by conversation id")
+    listCmd.Flags().StringVar(&flagExpListConv, "conversation", "", "Filter by conversation UUID")
     listCmd.Flags().IntVar(&flagExpListLimit, "limit", 100, "Max rows")
     listCmd.Flags().IntVar(&flagExpListOffset, "offset", 0, "Offset for pagination")
 }
-

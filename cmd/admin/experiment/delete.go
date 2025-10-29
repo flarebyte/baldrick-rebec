@@ -16,7 +16,7 @@ import (
 )
 
 var (
-    flagExpDelID           int64
+    flagExpDelID           string
     flagExpDelForce        bool
     flagExpDelIgnoreMissing bool
 )
@@ -25,7 +25,7 @@ var deleteCmd = &cobra.Command{
     Use:   "delete",
     Short: "Delete an experiment by id (asks for confirmation unless --force)",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if flagExpDelID <= 0 { return errors.New("--id is required and must be > 0") }
+        if strings.TrimSpace(flagExpDelID) == "" { return errors.New("--id is required") }
         if !flagExpDelForce {
             fmt.Fprintf(os.Stderr, "About to delete experiment id=%d.\n", flagExpDelID)
             fmt.Fprint(os.Stderr, "Type 'yes' to confirm: ")
@@ -58,8 +58,7 @@ var deleteCmd = &cobra.Command{
 
 func init() {
     ExperimentCmd.AddCommand(deleteCmd)
-    deleteCmd.Flags().Int64Var(&flagExpDelID, "id", 0, "Experiment id (required)")
+    deleteCmd.Flags().StringVar(&flagExpDelID, "id", "", "Experiment UUID (required)")
     deleteCmd.Flags().BoolVar(&flagExpDelForce, "force", false, "Do not prompt for confirmation")
     deleteCmd.Flags().BoolVar(&flagExpDelIgnoreMissing, "ignore-missing", false, "Do not error if experiment does not exist")
 }
-

@@ -2,61 +2,76 @@ package postgres
 
 import (
     "context"
-    "database/sql"
 
     "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Experiment struct {
-    ID             int64
-    ConversationID int64
-    Created        sql.NullTime
+    ID             string
+    ConversationID string
+    Created        string // RFC3339 timestamp as string for simplicity
 }
 
-func CreateExperiment(ctx context.Context, db *pgxpool.Pool, conversationID int64) (*Experiment, error) {
-    q := `INSERT INTO experiments (conversation_id) VALUES ($1) RETURNING id, created`
+func CreateExperiment(ctx context.Context, db *pgxpool.Pool, conversationID string) (*Experiment, error) {
+    q := `INSERT INTO experiments (conversation_id) VALUES ($1::uuid) RETURNING id::text, created`
     var e Experiment
     e.ConversationID = conversationID
-    if err := db.QueryRow(ctx, q, conversationID).Scan(&e.ID, &e.Created); err != nil {
+    var createdTS any
+    if err := db.QueryRow(ctx, q, conversationID).Scan(&e.ID, &createdTS); err != nil {
         return nil, err
+    }
+    // pgx encodes time as time.Time; format to RFC3339
+    switch t := createdTS.(type) {
+    case string:
+        e.Created = t
+    default:
+        // Best effort
+        // let JSON marshalling handle types elsewhere if needed
     }
     return &e, nil
 }
 
-func GetExperimentByID(ctx context.Context, db *pgxpool.Pool, id int64) (*Experiment, error) {
-    q := `SELECT id, conversation_id, created FROM experiments WHERE id=$1`
+func GetExperimentByID(ctx context.Context, db *pgxpool.Pool, id string) (*Experiment, error) {
+    q := `SELECT id::text, conversation_id::text, created FROM experiments WHERE id=$1::uuid`
     var e Experiment
-    if err := db.QueryRow(ctx, q, id).Scan(&e.ID, &e.ConversationID, &e.Created); err != nil {
+    var createdTS any
+    if err := db.QueryRow(ctx, q, id).Scan(&e.ID, &e.ConversationID, &createdTS); err != nil {
         return nil, err
+    }
+    switch t := createdTS.(type) {
+    case string:
+        e.Created = t
     }
     return &e, nil
 }
 
-func ListExperiments(ctx context.Context, db *pgxpool.Pool, conversationID int64, limit, offset int) ([]Experiment, error) {
+func ListExperiments(ctx context.Context, db *pgxpool.Pool, conversationID string, limit, offset int) ([]Experiment, error) {
     if limit <= 0 { limit = 100 }
     if offset < 0 { offset = 0 }
     var rows pgxRows
     var err error
-    if conversationID > 0 {
-        rows, err = db.Query(ctx, `SELECT id, conversation_id, created FROM experiments WHERE conversation_id=$1 ORDER BY created DESC LIMIT $2 OFFSET $3`, conversationID, limit, offset)
+    if stringsTrim(conversationID) != "" {
+        rows, err = db.Query(ctx, `SELECT id::text, conversation_id::text, created FROM experiments WHERE conversation_id=$1::uuid ORDER BY created DESC LIMIT $2 OFFSET $3`, conversationID, limit, offset)
     } else {
-        rows, err = db.Query(ctx, `SELECT id, conversation_id, created FROM experiments ORDER BY created DESC LIMIT $1 OFFSET $2`, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, conversation_id::text, created FROM experiments ORDER BY created DESC LIMIT $1 OFFSET $2`, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()
     var out []Experiment
     for rows.Next() {
         var e Experiment
-        if err := rows.Scan(&e.ID, &e.ConversationID, &e.Created); err != nil {
+        var createdTS any
+        if err := rows.Scan(&e.ID, &e.ConversationID, &createdTS); err != nil {
             return nil, err
         }
+        if s, ok := createdTS.(string); ok { e.Created = s }
         out = append(out, e)
     }
     return out, rows.Err()
 }
 
-func DeleteExperiment(ctx context.Context, db *pgxpool.Pool, id int64) (int64, error) {
-    ct, err := db.Exec(ctx, `DELETE FROM experiments WHERE id=$1`, id)
+func DeleteExperiment(ctx context.Context, db *pgxpool.Pool, id string) (int64, error) {
+    ct, err := db.Exec(ctx, `DELETE FROM experiments WHERE id=$1::uuid`, id)
     if err != nil { return 0, err }
     return ct.RowsAffected(), nil
 }

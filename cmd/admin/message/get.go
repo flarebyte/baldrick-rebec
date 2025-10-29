@@ -6,6 +6,7 @@ import (
     "errors"
     "fmt"
     "os"
+    "strings"
     "time"
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
@@ -14,7 +15,7 @@ import (
 )
 
 var (
-    flagMsgGetID int64
+    flagMsgGetID string
     flagMsgExpand bool
 )
 
@@ -22,7 +23,7 @@ var getCmd = &cobra.Command{
     Use:   "get",
     Short: "Get a message by id",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if flagMsgGetID <= 0 { return errors.New("--id is required and must be > 0") }
+        if strings.TrimSpace(flagMsgGetID) == "" { return errors.New("--id is required") }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -45,8 +46,8 @@ var getCmd = &cobra.Command{
             "content_id_hash": hash,
             "status": m.Status,
         }
-        if m.TaskID.Valid { out["task_id"] = m.TaskID.Int64 }
-        if m.ExperimentID.Valid { out["experiment_id"] = m.ExperimentID.Int64 }
+        if m.TaskID.Valid { out["task_id"] = m.TaskID.String }
+        if m.ExperimentID.Valid { out["experiment_id"] = m.ExperimentID.String }
         if m.Executor.Valid { out["executor"] = m.Executor.String }
         if m.ErrorMessage.Valid { out["error_message"] = m.ErrorMessage.String }
         if len(m.Tags) > 0 { out["tags"] = m.Tags }
@@ -63,6 +64,6 @@ var getCmd = &cobra.Command{
 
 func init() {
     MessageCmd.AddCommand(getCmd)
-    getCmd.Flags().Int64Var(&flagMsgGetID, "id", 0, "Message id (required)")
+    getCmd.Flags().StringVar(&flagMsgGetID, "id", "", "Message UUID (required)")
     getCmd.Flags().BoolVar(&flagMsgExpand, "expand", false, "Include text_content and is_json in output")
 }

@@ -9,7 +9,9 @@ import (
 // EnsureSchema creates the required tables if they do not exist.
 func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
     stmts := []string{
-        // Roles table for user roles/modes (name as unique identifier)
+        // Enable pgcrypto for gen_random_uuid()
+        `CREATE EXTENSION IF NOT EXISTS pgcrypto`,
+        // Roles table (name as unique identifier)
         `CREATE TABLE IF NOT EXISTS roles (
             name TEXT PRIMARY KEY,
             title TEXT NOT NULL,
@@ -28,9 +30,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT
         )`,
-        // Conversations table (id autoincrement) with created/updated timestamps, notes and tags
+        // Conversations table (id UUID) with created/updated timestamps, notes and tags
         `CREATE TABLE IF NOT EXISTS conversations (
-            id BIGSERIAL PRIMARY KEY,
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             title TEXT NOT NULL,
             description TEXT,
             project TEXT,
@@ -78,10 +80,10 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_conversations_project ON conversations(project)`,
-        // Experiments table (auto id) linked to conversations
+        // Experiments table (UUID) linked to conversations
         `CREATE TABLE IF NOT EXISTS experiments (
-            id BIGSERIAL PRIMARY KEY,
-            conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
             created TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
         `CREATE INDEX IF NOT EXISTS idx_experiments_conversation ON experiments(conversation_id)`,
@@ -91,9 +93,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             workflow_id TEXT NOT NULL REFERENCES workflows(name) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_task_variants_workflow ON task_variants(workflow_id)`,
-        // Tasks table: versioned execution units identified by (variant, version)
+        // Tasks table: versioned execution units identified by (variant, version); UUID id
         `CREATE TABLE IF NOT EXISTS tasks (
-            id BIGSERIAL PRIMARY KEY,
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             command TEXT NOT NULL,
             variant TEXT NOT NULL,
             title TEXT,
@@ -111,19 +113,19 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_variant ON tasks(variant)`,
-        // Content table for message bodies (text + optional parsed JSON)
+        // Content table for message bodies (text + optional parsed JSON); UUID id
         `CREATE TABLE IF NOT EXISTS messages_content (
-            id BIGSERIAL PRIMARY KEY,
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             text_content TEXT NOT NULL,
             json_content JSONB,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
         // Messages table: references tasks.id (optional), experiments.id (optional), content id
         `CREATE TABLE IF NOT EXISTS messages (
-            id BIGSERIAL PRIMARY KEY,
-            content_id BIGINT NOT NULL REFERENCES messages_content(id) ON DELETE CASCADE,
-            task_id BIGINT REFERENCES tasks(id) ON DELETE SET NULL,
-            experiment_id BIGINT REFERENCES experiments(id) ON DELETE SET NULL,
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            content_id UUID NOT NULL REFERENCES messages_content(id) ON DELETE CASCADE,
+            task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+            experiment_id UUID REFERENCES experiments(id) ON DELETE SET NULL,
             executor TEXT,
             received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             processed_at TIMESTAMPTZ,
@@ -136,11 +138,11 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         // Starred tasks per role: binds a role (e.g., user, admin) to a specific
         // variant and version, referencing the task row. Unique per (role, variant).
         `CREATE TABLE IF NOT EXISTS starred_tasks (
-            id BIGSERIAL PRIMARY KEY,
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             role TEXT NOT NULL REFERENCES roles(name) ON DELETE CASCADE,
             variant TEXT NOT NULL,
             version TEXT NOT NULL,
-            task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             UNIQUE (role, variant)

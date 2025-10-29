@@ -10,7 +10,7 @@ import (
 )
 
 type Task struct {
-    ID         int64
+    ID         string
     WorkflowID string
     Command    string
     Variant    string
@@ -87,7 +87,7 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
             tags = EXCLUDED.tags,
             level = EXCLUDED.level
           RETURNING id, created`
-    var id int64
+    var id string
     var created sql.NullTime
     if err := db.QueryRow(ctx, q,
         t.Command, t.Variant, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation), t.Version,
@@ -101,12 +101,12 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
 }
 
 // GetTaskByID fetches a task by numeric id.
-func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id int64) (*Task, error) {
-    q := `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation, t.version,
+func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*Task, error) {
+    q := `SELECT t.id::text, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation, t.version,
                  t.notes, t.shell, t.run, t.timeout::text, t.tags, t.level, t.created
           FROM tasks t
           LEFT JOIN task_variants tv ON tv.variant = t.variant
-          WHERE t.id=$1`
+          WHERE t.id=$1::uuid`
     var t Task
     var tags []string
     if err := db.QueryRow(ctx, q, id).Scan(
@@ -175,8 +175,8 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow string, limit, of
 }
 
 // DeleteTaskByID deletes a task by id.
-func DeleteTaskByID(ctx context.Context, db *pgxpool.Pool, id int64) (int64, error) {
-    ct, err := db.Exec(ctx, `DELETE FROM tasks WHERE id=$1`, id)
+func DeleteTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (int64, error) {
+    ct, err := db.Exec(ctx, `DELETE FROM tasks WHERE id=$1::uuid`, id)
     if err != nil { return 0, err }
     return ct.RowsAffected(), nil
 }

@@ -13,8 +13,8 @@ import (
 )
 
 var (
-    flagMsgListExperiment int64
-    flagMsgListTask       int64
+    flagMsgListExperiment string
+    flagMsgListTask       string
     flagMsgListStatus     string
     flagMsgListLimit      int
     flagMsgListOffset     int
@@ -42,8 +42,8 @@ var listCmd = &cobra.Command{
                 "status": m.Status,
                 "received_at": m.ReceivedAt.Format(time.RFC3339Nano),
             }
-            if m.TaskID.Valid { item["task_id"] = m.TaskID.Int64 }
-            if m.ExperimentID.Valid { item["experiment_id"] = m.ExperimentID.Int64 }
+            if m.TaskID.Valid { item["task_id"] = m.TaskID.String }
+            if m.ExperimentID.Valid { item["experiment_id"] = m.ExperimentID.String }
             if m.Executor.Valid { item["executor"] = m.Executor.String }
             arr = append(arr, item)
         }
@@ -53,8 +53,8 @@ var listCmd = &cobra.Command{
 
 func init() {
     MessageCmd.AddCommand(listCmd)
-    listCmd.Flags().Int64Var(&flagMsgListExperiment, "experiment", 0, "Filter by experiment id")
-    listCmd.Flags().Int64Var(&flagMsgListTask, "task", 0, "Filter by task id")
+    listCmd.Flags().StringVar(&flagMsgListExperiment, "experiment", "", "Filter by experiment UUID")
+    listCmd.Flags().StringVar(&flagMsgListTask, "task", "", "Filter by task UUID")
     listCmd.Flags().StringVar(&flagMsgListStatus, "status", "", "Filter by status")
     listCmd.Flags().IntVar(&flagMsgListLimit, "limit", 100, "Max rows")
     listCmd.Flags().IntVar(&flagMsgListOffset, "offset", 0, "Offset for pagination")

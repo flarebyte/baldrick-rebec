@@ -32,7 +32,7 @@ var (
     flagTags        []string
     flagDescription string
     flagGoal        string
-    flagExperiment  int64
+    flagExperiment  string
     flagFormat      string
 )
 
@@ -121,7 +121,7 @@ var setCmd = &cobra.Command{
             ev := &pgdao.MessageEvent{ ContentID: cid, Status: "ingested", Tags: flagTags }
             // Map optional executor and experiment
             if strings.TrimSpace(flagFrom) != "" { ev.Executor = sql.NullString{String: flagFrom, Valid: true} }
-            if flagExperiment > 0 { ev.ExperimentID = sql.NullInt64{Int64: flagExperiment, Valid: true} }
+            if strings.TrimSpace(flagExperiment) != "" { ev.ExperimentID = sql.NullString{String: flagExperiment, Valid: true} }
             ev.Meta = meta
             if _, err := pgdao.InsertMessageEvent(ctx, db, ev); err != nil { return err }
             fmt.Fprintf(os.Stderr, "stored content id=%d and message row\n", cid)
@@ -139,6 +139,6 @@ func init() {
     setCmd.Flags().StringSliceVar(&flagTags, "tags", nil, "Tags (comma-separated or repeated)")
     setCmd.Flags().StringVar(&flagDescription, "description", "", "Longer explanation or context")
     setCmd.Flags().StringVar(&flagGoal, "goal", "", "Intended outcome of the message")
-    setCmd.Flags().Int64Var(&flagExperiment, "experiment", 0, "Experiment id to link this message to")
+    setCmd.Flags().StringVar(&flagExperiment, "experiment", "", "Experiment UUID to link this message to")
     setCmd.Flags().StringVar(&flagFormat, "format", "", "Optional: interpret stdin as json or yaml and save parsed JSON alongside text")
 }
