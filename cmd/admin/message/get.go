@@ -15,6 +15,7 @@ import (
 
 var (
     flagMsgGetID int64
+    flagMsgExpand bool
 )
 
 var getCmd = &cobra.Command{
@@ -33,10 +34,15 @@ var getCmd = &cobra.Command{
         if err != nil { return err }
         // Human
         fmt.Fprintf(os.Stderr, "message id=%d status=%q\n", m.ID, m.Status)
+        // Fetch content for hash and optional expansion
+        content, err := pgdao.GetContent(ctx, db, m.ContentID)
+        if err != nil { return err }
+        hash := pgdao.HashTextSHA256(content.TextContent)
         // JSON
         out := map[string]any{
             "id": m.ID,
             "content_id": m.ContentID,
+            "content_id_hash": hash,
             "status": m.Status,
         }
         if m.TaskID.Valid { out["task_id"] = m.TaskID.Int64 }
@@ -47,6 +53,10 @@ var getCmd = &cobra.Command{
         if m.ProcessedAt.Valid { out["processed_at"] = m.ProcessedAt.Time.Format(time.RFC3339Nano) }
         out["received_at"] = m.ReceivedAt.Format(time.RFC3339Nano)
         if len(m.Meta) > 0 { out["meta"] = m.Meta }
+        if flagMsgExpand {
+            out["text_content"] = content.TextContent
+            out["is_json"] = (len(content.JSONContent) > 0)
+        }
         enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
     },
 }
@@ -54,4 +64,5 @@ var getCmd = &cobra.Command{
 func init() {
     MessageCmd.AddCommand(getCmd)
     getCmd.Flags().Int64Var(&flagMsgGetID, "id", 0, "Message id (required)")
+    getCmd.Flags().BoolVar(&flagMsgExpand, "expand", false, "Include text_content and is_json in output")
 }

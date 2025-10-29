@@ -2,6 +2,8 @@ package postgres
 
 import (
     "context"
+    "crypto/sha256"
+    "encoding/hex"
     "errors"
     "strings"
 
@@ -57,4 +59,23 @@ func EnsureFTSIndex(ctx context.Context, db *pgxpool.Pool) error {
     _, err := db.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_messages_content_fts
              ON messages_content USING GIN (to_tsvector('simple', text_content))`)
     return err
+}
+
+// CanonicalizeText normalizes text for hashing/deduplication.
+func CanonicalizeText(body string) string {
+    s := strings.ReplaceAll(body, "\r\n", "\n")
+    s = strings.ReplaceAll(s, "\r", "\n")
+    s = strings.TrimSpace(s)
+    lines := strings.Split(s, "\n")
+    for i := range lines {
+        lines[i] = strings.TrimRight(lines[i], " \t")
+    }
+    return strings.Join(lines, "\n")
+}
+
+// HashTextSHA256 returns a hex-encoded SHA-256 hash of the canonicalized text.
+func HashTextSHA256(body string) string {
+    canon := CanonicalizeText(body)
+    sum := sha256.Sum256([]byte(canon))
+    return hex.EncodeToString(sum[:])
 }
