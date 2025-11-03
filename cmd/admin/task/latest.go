@@ -40,6 +40,20 @@ var latestCmd = &cobra.Command{
             id, err = pgdao.FindLatestFrom(ctx, db, flagTaskLatestFromID)
         }
         if err != nil { return err }
+        // If graph lookup didn't find anything, reasonable fallbacks:
+        if strings.TrimSpace(id) == "" {
+            if strings.TrimSpace(flagTaskLatestFromID) != "" {
+                // No replacements found or graph unavailable; return the provided id
+                id = flagTaskLatestFromID
+            } else if strings.TrimSpace(flagTaskLatestVariant) != "" {
+                // With unique variant semantics, latest == the single task for that variant
+                t, err := pgdao.GetTaskByVariant(ctx, db, flagTaskLatestVariant)
+                if err == nil { id = t.ID }
+            }
+        }
+        if strings.TrimSpace(id) == "" {
+            return errors.New("no latest task found")
+        }
         t, err := pgdao.GetTaskByID(ctx, db, id)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "latest task id=%s variant=%q command=%q\n", t.ID, t.Variant, t.Command)
@@ -55,4 +69,3 @@ func init() {
     latestCmd.Flags().StringVar(&flagTaskLatestVariant, "variant", "", "Task variant to search (e.g., unit/go)")
     latestCmd.Flags().StringVar(&flagTaskLatestFromID, "from-id", "", "Find latest reachable from this task UUID")
 }
-

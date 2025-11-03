@@ -72,6 +72,19 @@ rbc admin task set --workflow ci-lint --command lint --variant go-major1 \
   --title "Lint & Vet (Strict)" --description "Major: stricter lint rules" --shell bash --run-script "$sid_lint_major" \
   --replaces "$t_lint_id" --replace-level major --replace-comment "Enable all linters"
 
+# Demonstrate graph queries (best-effort if AGE is available)
+echo "-- Task graph queries (latest/next) --" >&2
+echo "Latest by variant (unit/go):" >&2
+rbc admin task latest --variant unit/go || true
+echo "Latest from id (unit base):" >&2
+rbc admin task latest --from-id "$t_unit_id" || true
+echo "Next patch after unit base:" >&2
+rbc admin task next --id "$t_unit_id" --level patch || true
+echo "Next minor after unit base:" >&2
+rbc admin task next --id "$t_unit_id" --level minor || true
+echo "Next major after lint base:" >&2
+rbc admin task next --id "$t_lint_id" --level major || true
+
 echo "[4/11] Creating sample conversations and experiments" >&2
 cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX")
 cid=$(json_get_id "$cjson")

@@ -43,6 +43,9 @@ var nextCmd = &cobra.Command{
             return errors.New("--level must be one of: patch|minor|major|latest")
         }
         if err != nil { return err }
+        if strings.TrimSpace(id) == "" {
+            return errors.New("no next task found for the requested level")
+        }
         t, err := pgdao.GetTaskByID(ctx, db, id)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "next(%s) task id=%s variant=%q command=%q\n", lvl, t.ID, t.Variant, t.Command)
@@ -58,4 +61,3 @@ func init() {
     nextCmd.Flags().StringVar(&flagTaskNextFromID, "id", "", "Current task UUID (required)")
     nextCmd.Flags().StringVar(&flagTaskNextLevel, "level", "latest", "Replacement level: patch|minor|major|latest (default latest)")
 }
-
