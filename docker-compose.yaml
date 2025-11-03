@@ -1,12 +1,15 @@
----
+version: "3.8"
+
 services:
   postgres:
-    image: postgres:16
+    build: 
+      context: .
+      dockerfile: Dockerfile
     container_name: postgres
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-rbc}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rbcpass}
-      - POSTGRES_DB=${POSTGRES_DB:-rbc}
+      POSTGRES_USER: ${POSTGRES_USER:-rbc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rbcpass}
+      POSTGRES_DB: ${POSTGRES_DB:-rbc}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
@@ -16,5 +19,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
 volumes:
   postgres-data:
