@@ -47,3 +47,48 @@ func CreateTaskReplacesEdge(ctx context.Context, db *pgxpool.Pool, newTaskID, ol
     return err
 }
 
+// FindLatestTaskIDByVariant returns the Task ID with no incoming REPLACES for a variant.
+func FindLatestTaskIDByVariant(ctx context.Context, db *pgxpool.Pool, variant string) (string, error) {
+    v := escapeCypherString(variant)
+    q := fmt.Sprintf(`SELECT id::text FROM cypher('%s', $$
+        MATCH (t:Task {variant: '%s'})
+        WHERE NOT (:Task)-[:REPLACES]->(t)
+        RETURN t.id
+        ORDER BY t.id
+        LIMIT 1
+    $$) as (id agtype)`, graphName, v)
+    var ag string
+    if err := db.QueryRow(ctx, q).Scan(&ag); err != nil { return "", err }
+    return strings.Trim(ag, `"`), nil
+}
+
+// FindNextByLevel returns the next Task ID that directly REPLACES current with given level.
+func FindNextByLevel(ctx context.Context, db *pgxpool.Pool, currentID, level string) (string, error) {
+    cur := escapeCypherString(currentID)
+    lvl := strings.ToLower(strings.TrimSpace(level))
+    if lvl != "patch" && lvl != "minor" && lvl != "major" { return "", fmt.Errorf("invalid level: %s", level) }
+    q := fmt.Sprintf(`SELECT id::text FROM cypher('%s', $$
+        MATCH (n:Task)-[r:REPLACES]->(o:Task {id: '%s'})
+        WHERE r.level = '%s'
+        RETURN n.id, r.created
+        ORDER BY COALESCE(r.created,'') DESC
+        LIMIT 1
+    $$) as (id agtype, created agtype)`, graphName, cur, lvl)
+    var ag string
+    if err := db.QueryRow(ctx, q).Scan(&ag, new(string)); err != nil { return "", err }
+    return strings.Trim(ag, `"`), nil
+}
+
+// FindLatestFrom returns the latest Task ID reachable by REPLACES edges from current.
+func FindLatestFrom(ctx context.Context, db *pgxpool.Pool, currentID string) (string, error) {
+    cur := escapeCypherString(currentID)
+    q := fmt.Sprintf(`SELECT id::text FROM cypher('%s', $$
+        MATCH (n:Task), (c:Task {id: '%s'}), p=(n)-[:REPLACES*]->(c)
+        WHERE NOT (:Task)-[:REPLACES]->(n)
+        RETURN n.id
+        LIMIT 1
+    $$) as (id agtype)`, graphName, cur)
+    var ag string
+    if err := db.QueryRow(ctx, q).Scan(&ag); err != nil { return "", err }
+    return strings.Trim(ag, `"`), nil
+}
