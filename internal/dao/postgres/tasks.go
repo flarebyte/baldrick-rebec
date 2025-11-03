@@ -102,6 +102,8 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
     }
     t.ID = id
     t.Created = created
+    // Ensure a Task vertex exists/updated in AGE graph
+    _ = EnsureTaskVertex(ctx, db, t.ID, t.Variant, t.Command)
     return nil
 }
 

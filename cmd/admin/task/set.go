@@ -32,6 +32,11 @@ var (
     flagTaskTags    []string
     flagTaskLevel   string
     flagTaskToolWS  string
+    // replacement relationship flags (AGE graph)
+    flagTaskReplaces       string
+    flagTaskReplaceLevel   string
+    flagTaskReplaceComment string
+    flagTaskReplaceCreated string
 )
 
 var setCmd = &cobra.Command{
@@ -60,6 +65,13 @@ var setCmd = &cobra.Command{
         if strings.TrimSpace(flagTaskToolWS) != "" { t.ToolWorkspaceID = sql.NullString{String: strings.TrimSpace(flagTaskToolWS), Valid: true} }
         if flagTaskLevel != "" { t.Level = sql.NullString{String: flagTaskLevel, Valid: true} }
         if err := pgdao.UpsertTask(ctx, db, t); err != nil { return err }
+        // Optional: create REPLACES edge in graph
+        if strings.TrimSpace(flagTaskReplaces) != "" {
+            level := strings.ToLower(strings.TrimSpace(flagTaskReplaceLevel))
+            if level == "" { level = "minor" }
+            if level != "patch" && level != "minor" && level != "major" { return fmt.Errorf("--replace-level must be patch|minor|major") }
+            if err := pgdao.CreateTaskReplacesEdge(ctx, db, t.ID, flagTaskReplaces, level, flagTaskReplaceComment, strings.TrimSpace(flagTaskReplaceCreated)); err != nil { return err }
+        }
         // Human
         fmt.Fprintf(os.Stderr, "task upserted workflow=%q command=%q variant=%q id=%s\n", t.WorkflowID, t.Command, t.Variant, t.ID)
         // JSON
@@ -95,6 +107,10 @@ func init() {
     setCmd.Flags().StringSliceVar(&flagTaskTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
     setCmd.Flags().StringVar(&flagTaskLevel, "level", "", "Level: h1..h6")
     setCmd.Flags().StringVar(&flagTaskToolWS, "tool-workspace", "", "Optional workspace UUID used as tooling workspace for the task")
+    setCmd.Flags().StringVar(&flagTaskReplaces, "replaces", "", "Optional task UUID that this task replaces (graph edge)")
+    setCmd.Flags().StringVar(&flagTaskReplaceLevel, "replace-level", "minor", "Replacement level: patch|minor|major (default minor)")
+    setCmd.Flags().StringVar(&flagTaskReplaceComment, "replace-comment", "", "Optional comment for replacement edge")
+    setCmd.Flags().StringVar(&flagTaskReplaceCreated, "replace-created", "", "Optional timestamp (RFC3339) for replacement edge creation; defaults to now on DB side")
 }
 
 // parseTags converts k=v pairs (or bare keys) into a map.

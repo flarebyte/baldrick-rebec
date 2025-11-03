@@ -15,6 +15,14 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         `CREATE EXTENSION IF NOT EXISTS vector`,
         // Enable AGE graph extension (if available)
         `CREATE EXTENSION IF NOT EXISTS age`,
+        // Create a default graph for relationships if not present
+        `DO $$
+        BEGIN
+            PERFORM create_graph('rbc_graph');
+        EXCEPTION WHEN others THEN
+            -- ignore if exists or AGE not installed
+            NULL;
+        END$$;`,
         // Roles table (name as unique identifier)
         `CREATE TABLE IF NOT EXISTS roles (
             name TEXT PRIMARY KEY,
