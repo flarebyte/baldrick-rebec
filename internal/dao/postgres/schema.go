@@ -103,6 +103,30 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_projects_role_name ON projects(role_name)`,
+        // Workspaces table: directories associated to a role (and optional project)
+        `CREATE TABLE IF NOT EXISTS workspaces (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            description TEXT,
+            role_name TEXT NOT NULL DEFAULT 'user',
+            project_name TEXT,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            tags JSONB DEFAULT '{}'::jsonb,
+            directory TEXT NOT NULL,
+            FOREIGN KEY (project_name, role_name) REFERENCES projects(name, role_name) ON DELETE SET NULL
+        )`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'workspaces_set_updated'
+            ) THEN
+                CREATE TRIGGER workspaces_set_updated
+                BEFORE UPDATE ON workspaces
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_workspaces_role_name ON workspaces(role_name)`,
+        `CREATE INDEX IF NOT EXISTS idx_workspaces_project_name ON workspaces(project_name)`,
         `CREATE INDEX IF NOT EXISTS idx_tags_role_name ON tags(role_name)`,
         `DO $$ BEGIN
             IF NOT EXISTS (
