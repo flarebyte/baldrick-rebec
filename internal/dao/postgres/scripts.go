@@ -106,3 +106,13 @@ func DeleteScript(ctx context.Context, db *pgxpool.Pool, id string) (int64, erro
     if err != nil { return 0, err }
     return ct.RowsAffected(), nil
 }
+
+// GetScriptContent returns the script text by hex content id.
+func GetScriptContent(ctx context.Context, db *pgxpool.Pool, contentHex string) (string, error) {
+    if strings.TrimSpace(contentHex) == "" { return "", errors.New("empty content id") }
+    var body string
+    if err := db.QueryRow(ctx, `SELECT script_content FROM scripts_content WHERE id=decode($1,'hex')`, contentHex).Scan(&body); err != nil {
+        return "", err
+    }
+    return body, nil
+}

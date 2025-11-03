@@ -28,12 +28,20 @@ echo "[3/11] Creating sample workflows and tasks" >&2
 rbc admin workflow set --name ci-test --title "Continuous Integration: Test Suite" --description "Runs unit and integration tests." --notes "CI test workflow"
 rbc admin workflow set --name ci-lint --title "Continuous Integration: Lint & Format" --description "Lints and vets the codebase." --notes "CI lint workflow"
 
+# Create scripts for tasks and capture their ids
+sid_unit_json=$(printf "go test ./...\n" | rbc admin script set --role user --title "Unit: go test" --description "Run unit tests")
+sid_unit=$(json_get_id "$sid_unit_json")
+sid_integ_json=$(printf "docker compose up -d && go test -tags=integration ./...\n" | rbc admin script set --role user --title "Integration: compose+test" --description "Run integration tests")
+sid_integ=$(json_get_id "$sid_integ_json")
+sid_lint_json=$(printf "go vet ./... && golangci-lint run\n" | rbc admin script set --role user --title "Lint & Vet" --description "Runs vet and lints")
+sid_lint=$(json_get_id "$sid_lint_json")
+
 rbc admin task set --workflow ci-test --command unit --variant go --version 1.0.0 \
-  --title "Run Unit Tests" --description "Executes unit tests." --shell bash --run "go test ./..." --timeout "10 minutes" --tags unit,fast --level h2
+  --title "Run Unit Tests" --description "Executes unit tests." --shell bash --run-script "$sid_unit" --timeout "10 minutes" --tags unit,fast --level h2
 rbc admin task set --workflow ci-test --command integration --variant "" --version 1.0.0 \
-  --title "Run Integration Tests" --description "Runs integration tests." --shell bash --run "docker compose up -d && go test -tags=integration ./..." --timeout "30 minutes" --tags integration,slow --level h2
+  --title "Run Integration Tests" --description "Runs integration tests." --shell bash --run-script "$sid_integ" --timeout "30 minutes" --tags integration,slow --level h2
 rbc admin task set --workflow ci-lint --command lint --variant go --version 1.0.0 \
-  --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run "go vet ./... && golangci-lint run" --timeout "5 minutes" --tags lint,style --level h2
+  --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run-script "$sid_lint" --timeout "5 minutes" --tags lint,style --level h2
 
 echo "[4/11] Creating sample conversations and experiments" >&2
 cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX")

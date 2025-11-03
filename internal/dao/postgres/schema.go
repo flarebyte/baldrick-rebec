@@ -235,7 +235,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT,
             shell TEXT,
-            run TEXT,
+            run_script_id UUID REFERENCES scripts(id) ON DELETE SET NULL,
             timeout INTERVAL,
             tool_workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL,
             tags JSONB DEFAULT '{}'::jsonb,

@@ -44,8 +44,8 @@ var runCmd = &cobra.Command{
         defer db.Close()
         task, err := pgdao.GetTaskByKey(ctx, db, flagRunVariant, flagRunVersion)
         if err != nil { return err }
-        if !task.Run.Valid || strings.TrimSpace(task.Run.String) == "" {
-            return fmt.Errorf("task %q@%s has no run script defined", task.Variant, task.Version)
+        if !task.RunScriptID.Valid || strings.TrimSpace(task.RunScriptID.String) == "" {
+            return fmt.Errorf("task %q@%s has no run script id defined", task.Variant, task.Version)
         }
         // Parse timeout: flag overrides task's timeout
         toDur, err := chooseTimeout(flagRunTimeout, task.Timeout.String)
@@ -75,7 +75,12 @@ var runCmd = &cobra.Command{
         // Prepare command with context timeout
         runCtx, cancelRun := context.WithTimeout(context.Background(), toDur)
         defer cancelRun()
-        cmdExec, interpreter := buildCommand(runCtx, task)
+        // Resolve script body: task.run_script_id -> scripts -> scripts_content
+        sc, err := pgdao.GetScriptByID(ctx, db, task.RunScriptID.String)
+        if err != nil { return err }
+        body, err := pgdao.GetScriptContent(ctx, db, sc.ScriptContentID)
+        if err != nil { return err }
+        cmdExec, interpreter := buildCommand(runCtx, task, body)
         // Environment
         if len(flagRunEnv) > 0 {
             cmdExec.Env = append(os.Environ(), flagRunEnv...)
@@ -207,9 +212,8 @@ func firstNumber(s string) int { return mustAtoi(s) }
 
 func valueOr(s, def string) string { if strings.TrimSpace(s) == "" { return def }; return s }
 
-func buildCommand(ctx context.Context, task *pgdao.Task) (*exec.Cmd, string) {
+func buildCommand(ctx context.Context, task *pgdao.Task, script string) (*exec.Cmd, string) {
     shell := strings.TrimSpace(task.Shell.String)
-    script := task.Run.String
     switch strings.ToLower(shell) {
     case "bash", "":
         return exec.CommandContext(ctx, "bash", "-c", script), "bash"
