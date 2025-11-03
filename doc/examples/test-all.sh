@@ -67,17 +67,23 @@ rbc admin workspace set --role user --project acme/build-system --directory /tmp
 rbc admin workspace set --role user --project acme/product --directory /tmp/baldrick-workspaces/product \
   --description "Local product workspace" --tags status=active
 
-echo "[9/11] Creating packages (role-bound tasks)" >&2
+echo "[9/12] Creating packages (role-bound tasks)" >&2
 rbc admin package set --role user --variant unit/go --version 1.0.0
 rbc admin package set --role qa   --variant integration --version 1.0.0
 rbc admin package set --role user --variant lint/go --version 1.0.0
 
-echo "[10/11] Creating sample messages" >&2
+echo "[10/12] Creating scripts" >&2
+printf "#!/usr/bin/env bash\nset -euo pipefail\necho Deploying service...\n" | \
+  rbc admin script set --role user --title "Deploy Service" --description "Simple deploy script" --tags status=active,type=deploy
+printf "#!/usr/bin/env bash\nset -euo pipefail\necho Cleaning build artifacts...\n" | \
+  rbc admin script set --role user --title "Cleanup Artifacts" --description "Cleanup build artifacts" --tags status=active,type=maintenance
+
+echo "[11/12] Creating sample messages" >&2
 echo "Hello from user12" | rbc admin message set --executor user12 --experiment "$eid1" --title "Greeting" --tags hello
 echo "Build started" | rbc admin message set --executor build-bot --experiment "$eid1" --title "BuildStart" --tags build
 echo "Onboarding checklist updated" | rbc admin message set --executor docs-bot --experiment "$eid2" --title "DocsUpdate" --tags docs,update
 
-echo "[11/11] Listing all entities and counts" >&2
+echo "[12/12] Listing all entities and counts" >&2
 echo "-- Workflows --" >&2
 rbc admin workflow list --role user --limit 50
 echo "-- Tasks --" >&2
@@ -92,6 +98,8 @@ echo "-- Projects --" >&2
 rbc admin project list --role user --limit 50
 echo "-- Workspaces --" >&2
 rbc admin workspace list --role user --limit 50
+echo "-- Scripts --" >&2
+rbc admin script list --role user --limit 50
 echo "-- Tags --" >&2
 rbc admin tag list --role user --limit 50
 echo "-- Table counts --" >&2
