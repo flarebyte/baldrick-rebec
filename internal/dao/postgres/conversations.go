@@ -49,15 +49,15 @@ func GetConversationByID(ctx context.Context, db *pgxpool.Pool, id string) (*Con
 }
 
 // ListConversations lists conversations, optionally filtered by project, with pagination.
-func ListConversations(ctx context.Context, db *pgxpool.Pool, project string, limit, offset int) ([]Conversation, error) {
+func ListConversations(ctx context.Context, db *pgxpool.Pool, project, roleName string, limit, offset int) ([]Conversation, error) {
     if limit <= 0 { limit = 100 }
     if offset < 0 { offset = 0 }
     var rows pgxRows
     var err error
     if strings.TrimSpace(project) == "" {
-        rows, err = db.Query(ctx, `SELECT id::text, title, description, project, tags, notes, created, updated FROM conversations ORDER BY updated DESC, created DESC LIMIT $1 OFFSET $2`, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, title, description, project, tags, notes, created, updated FROM conversations WHERE role_name=$1 ORDER BY updated DESC, created DESC LIMIT $2 OFFSET $3`, roleName, limit, offset)
     } else {
-        rows, err = db.Query(ctx, `SELECT id::text, title, description, project, tags, notes, created, updated FROM conversations WHERE project=$1 ORDER BY updated DESC, created DESC LIMIT $2 OFFSET $3`, project, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, title, description, project, tags, notes, created, updated FROM conversations WHERE project=$1 AND role_name=$2 ORDER BY updated DESC, created DESC LIMIT $3 OFFSET $4`, project, roleName, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()

@@ -3,6 +3,7 @@ package workflow
 import (
     "context"
     "encoding/json"
+    "errors"
     "fmt"
     "os"
     "strings"
@@ -18,6 +19,7 @@ var (
     flagWFListLimit  int
     flagWFListOffset int
     flagWFListOutput string
+    flagWFListRole   string
 )
 
 var listCmd = &cobra.Command{
@@ -31,7 +33,8 @@ var listCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg)
         if err != nil { return err }
         defer db.Close()
-        ws, err := pgdao.ListWorkflows(ctx, db, flagWFListLimit, flagWFListOffset)
+        if strings.TrimSpace(flagWFListRole) == "" { return errors.New("--role is required") }
+        ws, err := pgdao.ListWorkflows(ctx, db, flagWFListRole, flagWFListLimit, flagWFListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "workflows: %d\n", len(ws))
         out := strings.ToLower(strings.TrimSpace(flagWFListOutput))
@@ -64,4 +67,5 @@ func init() {
     listCmd.Flags().IntVar(&flagWFListLimit, "limit", 100, "Max number of rows")
     listCmd.Flags().IntVar(&flagWFListOffset, "offset", 0, "Offset for pagination")
     listCmd.Flags().StringVar(&flagWFListOutput, "output", "table", "Output format: table or json")
+    listCmd.Flags().StringVar(&flagWFListRole, "role", "", "Role name (required)")
 }

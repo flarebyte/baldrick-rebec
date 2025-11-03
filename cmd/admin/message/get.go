@@ -53,7 +53,7 @@ var getCmd = &cobra.Command{
         if len(m.Tags) > 0 { out["tags"] = m.Tags }
         if m.ProcessedAt.Valid { out["processed_at"] = m.ProcessedAt.Time.Format(time.RFC3339Nano) }
         out["received_at"] = m.ReceivedAt.Format(time.RFC3339Nano)
-        if len(m.Meta) > 0 { out["meta"] = m.Meta }
+        // meta removed
         if flagMsgExpand {
             out["text_content"] = content.TextContent
             out["is_json"] = (len(content.JSONContent) > 0)

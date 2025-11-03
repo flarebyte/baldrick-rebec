@@ -81,7 +81,7 @@ var setCmd = &cobra.Command{
             db, err := pgdao.OpenApp(ctx, cfg)
             if err != nil { return err }
             defer db.Close()
-            // Meta stored on message event (not content)
+            // Meta moved into content JSON when using --format (compose and store in content json if parsed)
             meta := map[string]interface{}{
                 "title": flagTitle,
                 "level": flagLevel,
@@ -99,7 +99,9 @@ var setCmd = &cobra.Command{
                 if err := json.Unmarshal(stdinData, &v); err != nil {
                     parseErr = fmt.Errorf("invalid json: %w", err)
                 } else {
-                    parsed, _ = json.Marshal(v)
+                    // attach meta next to parsed payload
+                    env := map[string]any{"content": v, "meta": meta}
+                    parsed, _ = json.Marshal(env)
                 }
             case "yaml":
                 // Lazy import to avoid hard dependency if not used
@@ -108,7 +110,8 @@ var setCmd = &cobra.Command{
                 if err := yamlUnmarshal(stdinData, &ya); err != nil {
                     parseErr = fmt.Errorf("invalid yaml: %w", err)
                 } else {
-                    parsed, _ = json.Marshal(ya)
+                    env := map[string]any{"content": ya, "meta": meta}
+                    parsed, _ = json.Marshal(env)
                 }
             case "":
                 // no parsing
@@ -122,7 +125,6 @@ var setCmd = &cobra.Command{
             // Map optional executor and experiment
             if strings.TrimSpace(flagFrom) != "" { ev.Executor = sql.NullString{String: flagFrom, Valid: true} }
             if strings.TrimSpace(flagExperiment) != "" { ev.ExperimentID = sql.NullString{String: flagExperiment, Valid: true} }
-            ev.Meta = meta
             if _, err := pgdao.InsertMessageEvent(ctx, db, ev); err != nil { return err }
             fmt.Fprintf(os.Stderr, "stored content id=%d and message row\n", cid)
             // Return parse error if any (after storing content and message)

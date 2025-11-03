@@ -142,7 +142,7 @@ func GetTaskByKey(ctx context.Context, db *pgxpool.Pool, variant, ver string) (*
 }
 
 // ListTasks lists tasks with optional workflow filter.
-func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow string, limit, offset int) ([]Task, error) {
+func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow, roleName string, limit, offset int) ([]Task, error) {
     if limit <= 0 { limit = 100 }
     if offset < 0 { offset = 0 }
     var rows pgxRows
@@ -152,14 +152,15 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow string, limit, of
                                         t.notes, t.shell, t.run, t.timeout::text, t.tags, t.level, t.created
                                    FROM tasks t
                                    LEFT JOIN task_variants tv ON tv.variant = t.variant
-                                   ORDER BY t.variant ASC, t.version ASC LIMIT $1 OFFSET $2`, limit, offset)
+                                   WHERE t.role_name=$1
+                                   ORDER BY t.variant ASC, t.version ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
     } else {
         rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation, t.version,
                                         t.notes, t.shell, t.run, t.timeout::text, t.tags, t.level, t.created
                                    FROM tasks t
                                    LEFT JOIN task_variants tv ON tv.variant = t.variant
-                                   WHERE tv.workflow_id=$1
-                                   ORDER BY t.variant ASC, t.version ASC LIMIT $2 OFFSET $3`, workflow, limit, offset)
+                                   WHERE tv.workflow_id=$1 AND t.role_name=$2
+                                   ORDER BY t.variant ASC, t.version ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()

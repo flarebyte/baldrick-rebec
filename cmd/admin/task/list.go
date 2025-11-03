@@ -3,6 +3,7 @@ package task
 import (
     "context"
     "encoding/json"
+    "errors"
     "fmt"
     "os"
     "strings"
@@ -20,6 +21,7 @@ var (
     flagTaskListOffset int
     flagTaskListMax    int
     flagTaskListOutput string
+    flagTaskListRole   string
 )
 
 var listCmd = &cobra.Command{
@@ -35,7 +37,8 @@ var listCmd = &cobra.Command{
         defer db.Close()
         effLimit := flagTaskListMax
         if effLimit <= 0 { effLimit = flagTaskListLimit }
-        tasks, err := pgdao.ListTasks(ctx, db, flagTaskListWF, effLimit, flagTaskListOffset)
+        if strings.TrimSpace(flagTaskListRole) == "" { return errors.New("--role is required") }
+        tasks, err := pgdao.ListTasks(ctx, db, flagTaskListWF, flagTaskListRole, effLimit, flagTaskListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "tasks: %d\n", len(tasks))
         if strings.ToLower(strings.TrimSpace(flagTaskListOutput)) == "json" {
@@ -63,4 +66,5 @@ func init() {
     listCmd.Flags().IntVar(&flagTaskListOffset, "offset", 0, "Offset for pagination")
     listCmd.Flags().IntVar(&flagTaskListMax, "max-results", 20, "Max results to return (default 20)")
     listCmd.Flags().StringVar(&flagTaskListOutput, "output", "table", "Output format: table or json")
+    listCmd.Flags().StringVar(&flagTaskListRole, "role", "", "Role name (required)")
 }

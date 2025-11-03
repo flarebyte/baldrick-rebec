@@ -136,7 +136,6 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             status TEXT NOT NULL DEFAULT 'ingested',
             error_message TEXT,
             tags JSONB DEFAULT '{}'::jsonb,
-            meta JSONB DEFAULT '{}',
             UNIQUE (content_id, status, received_at)
         )`,
         // Attempt to migrate existing tags columns to JSONB if they exist as arrays

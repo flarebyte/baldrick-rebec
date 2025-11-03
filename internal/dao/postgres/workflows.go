@@ -40,14 +40,15 @@ func GetWorkflowByName(ctx context.Context, db *pgxpool.Pool, name string) (*Wor
 }
 
 // ListWorkflows returns workflows ordered by name with optional pagination.
-func ListWorkflows(ctx context.Context, db *pgxpool.Pool, limit, offset int) ([]Workflow, error) {
+func ListWorkflows(ctx context.Context, db *pgxpool.Pool, roleName string, limit, offset int) ([]Workflow, error) {
     if limit <= 0 { limit = 100 }
     if offset < 0 { offset = 0 }
     q := `SELECT name, title, description, notes, created, updated
           FROM workflows
+          WHERE role_name=$1
           ORDER BY name ASC
-          LIMIT $1 OFFSET $2`
-    rows, err := db.Query(ctx, q, limit, offset)
+          LIMIT $2 OFFSET $3`
+    rows, err := db.Query(ctx, q, roleName, limit, offset)
     if err != nil { return nil, err }
     defer rows.Close()
     var out []Workflow

@@ -3,6 +3,7 @@ package message
 import (
     "context"
     "encoding/json"
+    "errors"
     "fmt"
     "os"
     "strings"
@@ -22,6 +23,7 @@ var (
     flagMsgListOffset     int
     flagMsgListMax        int
     flagMsgListOutput     string
+    flagMsgListRole       string
 )
 
 var listCmd = &cobra.Command{
@@ -37,7 +39,8 @@ var listCmd = &cobra.Command{
         defer db.Close()
         effLimit := flagMsgListMax
         if effLimit <= 0 { effLimit = flagMsgListLimit }
-        ms, err := pgdao.ListMessages(ctx, db, flagMsgListExperiment, flagMsgListTask, flagMsgListStatus, effLimit, flagMsgListOffset)
+        if strings.TrimSpace(flagMsgListRole) == "" { return errors.New("--role is required") }
+        ms, err := pgdao.ListMessages(ctx, db, flagMsgListRole, flagMsgListExperiment, flagMsgListTask, flagMsgListStatus, effLimit, flagMsgListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "messages: %d\n", len(ms))
         if strings.ToLower(strings.TrimSpace(flagMsgListOutput)) == "json" {
@@ -76,4 +79,5 @@ func init() {
     listCmd.Flags().IntVar(&flagMsgListOffset, "offset", 0, "Offset for pagination")
     listCmd.Flags().IntVar(&flagMsgListMax, "max-results", 20, "Max results to return (default 20)")
     listCmd.Flags().StringVar(&flagMsgListOutput, "output", "table", "Output format: table or json")
+    listCmd.Flags().StringVar(&flagMsgListRole, "role", "", "Role name (required)")
 }

@@ -3,6 +3,7 @@ package conversation
 import (
     "context"
     "encoding/json"
+    "errors"
     "fmt"
     "os"
     "strings"
@@ -20,6 +21,7 @@ var (
     flagConvListOffset  int
     flagConvListMax     int
     flagConvListOutput  string
+    flagConvListRole    string
 )
 
 var listCmd = &cobra.Command{
@@ -35,7 +37,8 @@ var listCmd = &cobra.Command{
         defer db.Close()
         effLimit := flagConvListMax
         if effLimit <= 0 { effLimit = flagConvListLimit }
-        rows, err := pgdao.ListConversations(ctx, db, flagConvListProject, effLimit, flagConvListOffset)
+        if strings.TrimSpace(flagConvListRole) == "" { return errors.New("--role is required") }
+        rows, err := pgdao.ListConversations(ctx, db, flagConvListProject, flagConvListRole, effLimit, flagConvListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "conversations: %d\n", len(rows))
         if strings.ToLower(strings.TrimSpace(flagConvListOutput)) == "json" {
@@ -67,4 +70,5 @@ func init() {
     listCmd.Flags().IntVar(&flagConvListOffset, "offset", 0, "Offset for pagination")
     listCmd.Flags().IntVar(&flagConvListMax, "max-results", 20, "Max results to return (default 20)")
     listCmd.Flags().StringVar(&flagConvListOutput, "output", "table", "Output format: table or json")
+    listCmd.Flags().StringVar(&flagConvListRole, "role", "", "Role name (required)")
 }
