@@ -41,6 +41,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT
         )`,
+        // Projects table (name scoped by role) with tags
+        `CREATE TABLE IF NOT EXISTS projects (
+            name TEXT NOT NULL,
+            role_name TEXT NOT NULL DEFAULT 'user',
+            description TEXT,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT,
+            tags JSONB DEFAULT '{}'::jsonb,
+            PRIMARY KEY (name, role_name)
+        )`,
         // Conversations table (id UUID) with created/updated timestamps, notes and tags
         `CREATE TABLE IF NOT EXISTS conversations (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -81,6 +92,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
                 EXECUTE PROCEDURE set_updated();
             END IF;
         END $$;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'projects_set_updated'
+            ) THEN
+                CREATE TRIGGER projects_set_updated
+                BEFORE UPDATE ON projects
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_projects_role_name ON projects(role_name)`,
         `CREATE INDEX IF NOT EXISTS idx_tags_role_name ON tags(role_name)`,
         `DO $$ BEGIN
             IF NOT EXISTS (
