@@ -35,7 +35,6 @@ rbc admin task set \
   --workflow ci-test \
   --command unit \
   --variant go \
-  --version 1.0.0 \
   --title "Run Unit Tests" \
   --description "Executes unit tests across all packages." \
   --shell bash \
@@ -49,7 +48,6 @@ rbc admin task set \
   --workflow ci-test \
   --command integration \
   --variant "" \
-  --version 1.0.0 \
   --title "Run Integration Tests" \
   --description "Brings up services and runs integration tests." \
   --shell bash \
@@ -63,7 +61,6 @@ rbc admin task set \
   --workflow ci-lint \
   --command lint \
   --variant go \
-  --version 1.0.0 \
   --title "Lint & Vet" \
   --description "Runs vet and lints the codebase." \
   --shell bash \

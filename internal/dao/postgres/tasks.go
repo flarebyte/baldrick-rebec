@@ -18,7 +18,6 @@ type Task struct {
     Title      sql.NullString
     Description sql.NullString
     Motivation sql.NullString
-    Version    string
     Created    sql.NullTime
     Notes      sql.NullString
     Shell      sql.NullString
@@ -72,14 +71,14 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
         }
     }
     q := `INSERT INTO tasks (
-            command, variant, title, description, motivation, version,
+            command, variant, title, description, motivation,
             notes, shell, run_script_id, timeout, tool_workspace_id, tags, level
           ) VALUES (
-            $1, $2, NULLIF($3,''), NULLIF($4,''), NULLIF($5,''), $6,
-            NULLIF($7,''), NULLIF($8,''), CASE WHEN $9='' THEN NULL ELSE $9::uuid END, CASE WHEN $10='' THEN NULL ELSE $10::interval END,
-            CASE WHEN $11='' THEN NULL ELSE $11::uuid END, COALESCE($12,'{}'::jsonb), NULLIF($13,'')
+            $1, $2, NULLIF($3,''), NULLIF($4,''), NULLIF($5,''),
+            NULLIF($6,''), NULLIF($7,''), CASE WHEN $8='' THEN NULL ELSE $8::uuid END, CASE WHEN $9='' THEN NULL ELSE $9::interval END,
+            CASE WHEN $10='' THEN NULL ELSE $10::uuid END, COALESCE($11,'{}'::jsonb), NULLIF($12,'')
           )
-          ON CONFLICT (variant, version) DO UPDATE SET
+          ON CONFLICT (variant) DO UPDATE SET
             title = EXCLUDED.title,
             description = EXCLUDED.description,
             motivation = EXCLUDED.motivation,
@@ -96,7 +95,7 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
     var tagsJSON []byte
     if t.Tags != nil { tagsJSON, _ = json.Marshal(t.Tags) }
     if err := db.QueryRow(ctx, q,
-        t.Command, t.Variant, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation), t.Version,
+        t.Command, t.Variant, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation),
         stringOrEmpty(t.Notes), stringOrEmpty(t.Shell), stringOrEmpty(t.RunScriptID), stringOrEmpty(t.Timeout), stringOrEmpty(t.ToolWorkspaceID), tagsJSON, stringOrEmpty(t.Level),
     ).Scan(&id, &created); err != nil {
         return err
@@ -108,7 +107,7 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
 
 // GetTaskByID fetches a task by numeric id.
 func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*Task, error) {
-    q := `SELECT t.id::text, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation, t.version,
+    q := `SELECT t.id::text, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
                  t.notes, t.shell, t.run_script_id::text, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.created
           FROM tasks t
           LEFT JOIN task_variants tv ON tv.variant = t.variant
@@ -116,7 +115,7 @@ func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*Task, error
     var t Task
     var tagsJSON []byte
     if err := db.QueryRow(ctx, q, id).Scan(
-        &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
+        &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
         &t.Notes, &t.Shell, &t.RunScriptID, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created,
     ); err != nil {
         return nil, err
@@ -125,17 +124,17 @@ func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*Task, error
     return &t, nil
 }
 
-// GetTaskByKey fetches a task by (workflow_id, name, version).
-func GetTaskByKey(ctx context.Context, db *pgxpool.Pool, variant, ver string) (*Task, error) {
-    q := `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation, t.version,
+// GetTaskByVariant fetches a task by variant.
+func GetTaskByVariant(ctx context.Context, db *pgxpool.Pool, variant string) (*Task, error) {
+    q := `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
                  t.notes, t.shell, t.run_script_id::text, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.created
           FROM tasks t
           LEFT JOIN task_variants tv ON tv.variant = t.variant
-          WHERE t.variant=$1 AND t.version=$2`
+          WHERE t.variant=$1`
     var t Task
     var tagsJSON []byte
-    if err := db.QueryRow(ctx, q, variant, ver).Scan(
-        &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
+    if err := db.QueryRow(ctx, q, variant).Scan(
+        &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
         &t.Notes, &t.Shell, &t.RunScriptID, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created,
     ); err != nil {
         return nil, err
@@ -151,19 +150,19 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow, roleName string,
     var rows pgxRows
     var err error
     if stringsTrim(workflow) == "" {
-        rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation, t.version,
+        rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
                                         t.notes, t.shell, t.run_script_id::text, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.created
                                    FROM tasks t
                                    LEFT JOIN task_variants tv ON tv.variant = t.variant
                                    WHERE t.role_name=$1
-                                   ORDER BY t.variant ASC, t.version ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
+                                   ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
     } else {
-        rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation, t.version,
+        rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
                                         t.notes, t.shell, t.run_script_id::text, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.created
                                    FROM tasks t
                                    LEFT JOIN task_variants tv ON tv.variant = t.variant
                                    WHERE tv.workflow_id=$1 AND t.role_name=$2
-                                   ORDER BY t.variant ASC, t.version ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
+                                   ORDER BY t.variant ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()
@@ -171,7 +170,7 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow, roleName string,
     for rows.Next() {
         var t Task
         var tagsJSON []byte
-        if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation, &t.Version,
+        if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
             &t.Notes, &t.Shell, &t.RunScriptID, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created); err != nil {
             return nil, err
         }
@@ -189,8 +188,8 @@ func DeleteTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (int64, er
 }
 
 // DeleteTaskByKey deletes a task by (workflow_id, name, version).
-func DeleteTaskByKey(ctx context.Context, db *pgxpool.Pool, variant, ver string) (int64, error) {
-    ct, err := db.Exec(ctx, `DELETE FROM tasks WHERE variant=$1 AND version=$2`, variant, ver)
+func DeleteTaskByKey(ctx context.Context, db *pgxpool.Pool, variant, _ string) (int64, error) {
+    ct, err := db.Exec(ctx, `DELETE FROM tasks WHERE variant=$1`, variant)
     if err != nil { return 0, err }
     return ct.RowsAffected(), nil
 }

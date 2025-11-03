@@ -43,7 +43,7 @@ var listCmd = &cobra.Command{
         if strings.ToLower(strings.TrimSpace(flagPkgListOutput)) == "json" {
             arr := make([]map[string]any, 0, len(items))
             for _, p := range items {
-                m := map[string]any{"id": p.ID, "role_name": p.RoleName, "variant": p.Variant, "version": p.Version, "task_id": p.TaskID}
+                m := map[string]any{"id": p.ID, "role_name": p.RoleName, "task_id": p.TaskID}
                 if p.Created.Valid { m["created"] = p.Created.Time.Format(time.RFC3339Nano) }
                 if p.Updated.Valid { m["updated"] = p.Updated.Time.Format(time.RFC3339Nano) }
                 arr = append(arr, m)
@@ -51,8 +51,8 @@ var listCmd = &cobra.Command{
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
         tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "ID\tVARIANT\tVERSION\tROLE")
-        for _, p := range items { fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", p.ID, p.Variant, p.Version, p.RoleName) }
+        fmt.Fprintln(tw, "ID\tROLE\tTASK_ID")
+        for _, p := range items { fmt.Fprintf(tw, "%s\t%s\t%s\n", p.ID, p.RoleName, p.TaskID) }
         tw.Flush(); return nil
     },
 }

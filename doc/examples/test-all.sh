@@ -36,11 +36,11 @@ sid_integ=$(json_get_id "$sid_integ_json")
 sid_lint_json=$(printf "go vet ./... && golangci-lint run\n" | rbc admin script set --role user --title "Lint & Vet" --description "Runs vet and lints")
 sid_lint=$(json_get_id "$sid_lint_json")
 
-rbc admin task set --workflow ci-test --command unit --variant go --version 1.0.0 \
+rbc admin task set --workflow ci-test --command unit --variant go \
   --title "Run Unit Tests" --description "Executes unit tests." --shell bash --run-script "$sid_unit" --timeout "10 minutes" --tags unit,fast --level h2
-rbc admin task set --workflow ci-test --command integration --variant "" --version 1.0.0 \
+rbc admin task set --workflow ci-test --command integration --variant "" \
   --title "Run Integration Tests" --description "Runs integration tests." --shell bash --run-script "$sid_integ" --timeout "30 minutes" --tags integration,slow --level h2
-rbc admin task set --workflow ci-lint --command lint --variant go --version 1.0.0 \
+rbc admin task set --workflow ci-lint --command lint --variant go \
   --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run-script "$sid_lint" --timeout "5 minutes" --tags lint,style --level h2
 
 echo "[4/11] Creating sample conversations and experiments" >&2
@@ -76,9 +76,9 @@ rbc admin workspace set --role user --project acme/product \
   --description "Local product workspace" --tags status=active
 
 echo "[9/12] Creating packages (role-bound tasks)" >&2
-rbc admin package set --role user --variant unit/go --version 1.0.0
-rbc admin package set --role qa   --variant integration --version 1.0.0
-rbc admin package set --role user --variant lint/go --version 1.0.0
+rbc admin package set --role user --variant unit/go
+rbc admin package set --role qa   --variant integration
+rbc admin package set --role user --variant lint/go
 
 echo "[10/12] Creating scripts" >&2
 printf "#!/usr/bin/env bash\nset -euo pipefail\necho Deploying service...\n" | \

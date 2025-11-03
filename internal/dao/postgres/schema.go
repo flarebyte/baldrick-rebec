@@ -226,7 +226,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             workflow_id TEXT NOT NULL REFERENCES workflows(name) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_task_variants_workflow ON task_variants(workflow_id)`,
-        // Tasks table: versioned execution units identified by (variant, version); UUID id
+        // Tasks table: execution units identified by variant; UUID id
         `CREATE TABLE IF NOT EXISTS tasks (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             command TEXT NOT NULL,
@@ -234,7 +234,6 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             title TEXT,
             description TEXT,
             motivation TEXT,
-            version TEXT NOT NULL CHECK (version ~ '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z\.-]+)?(\+[0-9A-Za-z\.-]+)?$'),
             role_name TEXT NOT NULL DEFAULT 'user',
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT,
@@ -244,7 +243,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             tool_workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL,
             tags JSONB DEFAULT '{}'::jsonb,
             level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
-            UNIQUE (variant, version),
+            UNIQUE (variant),
             FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_variant ON tasks(variant)`,
@@ -271,19 +270,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             UNIQUE (content_id, status, received_at)
         )`,
         // Packages per role_name: bind a role (e.g., user, admin) to a specific
-        // variant and version, referencing the task row. Unique per (role_name, variant).
+        // task (by id). Unique per (role_name, task_id).
         `CREATE TABLE IF NOT EXISTS packages (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             role_name TEXT NOT NULL REFERENCES roles(name) ON DELETE CASCADE,
-            variant TEXT NOT NULL,
-            version TEXT NOT NULL,
             task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
-            UNIQUE (role_name, variant)
+            UNIQUE (role_name, task_id)
         )`,
         `CREATE INDEX IF NOT EXISTS idx_packages_role_name ON packages(role_name)`,
-        `CREATE INDEX IF NOT EXISTS idx_packages_variant ON packages(variant)`,
+        `CREATE INDEX IF NOT EXISTS idx_packages_task ON packages(task_id)`,
         `DO $$ BEGIN
             IF NOT EXISTS (
                 SELECT 1 FROM pg_trigger WHERE tgname = 'packages_set_updated'

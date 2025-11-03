@@ -36,10 +36,10 @@ var deleteCmd = &cobra.Command{
             ident = fmt.Sprintf("id=%s", flagTaskDelID)
             byID = true
         } else {
-            if strings.TrimSpace(flagTaskDelWF)=="" || strings.TrimSpace(flagTaskDelCmd)=="" || strings.TrimSpace(flagTaskDelVer)=="" {
-                return errors.New("provide --id or all of --workflow, --command, --version (and optionally --variant)")
+            if strings.TrimSpace(flagTaskDelWF)=="" || strings.TrimSpace(flagTaskDelCmd)=="" {
+                return errors.New("provide --id or both --workflow and --command (and optionally --variant)")
             }
-            ident = fmt.Sprintf("workflow=%s command=%s variant=%s version=%s", flagTaskDelWF, flagTaskDelCmd, flagTaskDelVar, flagTaskDelVer)
+            ident = fmt.Sprintf("workflow=%s command=%s variant=%s", flagTaskDelWF, flagTaskDelCmd, flagTaskDelVar)
         }
         if !flagTaskDelForce {
             fmt.Fprintf(os.Stderr, "About to delete task (%s).\n", ident)
@@ -63,13 +63,13 @@ var deleteCmd = &cobra.Command{
         } else {
             selector := flagTaskDelVar
             if strings.TrimSpace(selector) == "" { selector = flagTaskDelCmd }
-            affected, err = pgdao.DeleteTaskByKey(ctx, db, selector, flagTaskDelVer)
+            affected, err = pgdao.DeleteTaskByKey(ctx, db, selector, "")
         }
         if err != nil { return err }
         if affected == 0 {
             if flagTaskDelIgnoreMissing {
                 fmt.Fprintf(os.Stderr, "task (%s) not found; ignoring\n", ident)
-                out := map[string]any{"status":"not_found_ignored","id": flagTaskDelID, "workflow": flagTaskDelWF, "command": flagTaskDelCmd, "variant": flagTaskDelVar, "version": flagTaskDelVer}
+                out := map[string]any{"status":"not_found_ignored","id": flagTaskDelID, "workflow": flagTaskDelWF, "command": flagTaskDelCmd, "variant": flagTaskDelVar}
                 enc := json.NewEncoder(os.Stdout)
                 enc.SetIndent("", "  ")
                 return enc.Encode(out)
@@ -78,7 +78,7 @@ var deleteCmd = &cobra.Command{
         }
         fmt.Fprintf(os.Stderr, "task deleted (%s)\n", ident)
         out := map[string]any{"status":"deleted","deleted":true}
-        if byID { out["id"] = flagTaskDelID } else { out["workflow"]=flagTaskDelWF; out["command"]=flagTaskDelCmd; out["variant"]=flagTaskDelVar; out["version"]=flagTaskDelVer }
+        if byID { out["id"] = flagTaskDelID } else { out["workflow"]=flagTaskDelWF; out["command"]=flagTaskDelCmd; out["variant"]=flagTaskDelVar }
         enc := json.NewEncoder(os.Stdout)
         enc.SetIndent("", "  ")
         return enc.Encode(out)
@@ -88,10 +88,9 @@ var deleteCmd = &cobra.Command{
 func init() {
     TaskCmd.AddCommand(deleteCmd)
     deleteCmd.Flags().StringVar(&flagTaskDelID, "id", "", "Task UUID")
-    deleteCmd.Flags().StringVar(&flagTaskDelWF, "workflow", "", "Workflow name (with --command and --version)")
-    deleteCmd.Flags().StringVar(&flagTaskDelCmd, "command", "", "Task command (with --workflow and --version)")
+    deleteCmd.Flags().StringVar(&flagTaskDelWF, "workflow", "", "Workflow name (with --command)")
+    deleteCmd.Flags().StringVar(&flagTaskDelCmd, "command", "", "Task command (with --workflow)")
     deleteCmd.Flags().StringVar(&flagTaskDelVar, "variant", "", "Task variant (optional)")
-    deleteCmd.Flags().StringVar(&flagTaskDelVer, "version", "", "Task version (with --workflow and --command)")
     deleteCmd.Flags().BoolVar(&flagTaskDelForce, "force", false, "Do not prompt for confirmation")
     deleteCmd.Flags().BoolVar(&flagTaskDelIgnoreMissing, "ignore-missing", false, "Do not error if task does not exist")
 }

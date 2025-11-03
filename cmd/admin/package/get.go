@@ -42,9 +42,9 @@ var getCmd = &cobra.Command{
         }
         if err != nil { return err }
         // Human
-        fmt.Fprintf(os.Stderr, "package id=%s role_name=%q variant=%q version=%q task_id=%s\n", p.ID, p.RoleName, p.Variant, p.Version, p.TaskID)
+        fmt.Fprintf(os.Stderr, "package id=%s role_name=%q task_id=%s\n", p.ID, p.RoleName, p.TaskID)
         // JSON
-        out := map[string]any{ "id": p.ID, "role_name": p.RoleName, "variant": p.Variant, "version": p.Version, "task_id": p.TaskID }
+        out := map[string]any{ "id": p.ID, "role_name": p.RoleName, "task_id": p.TaskID }
         if p.Created.Valid { out["created"] = p.Created.Time.Format(time.RFC3339Nano) }
         if p.Updated.Valid { out["updated"] = p.Updated.Time.Format(time.RFC3339Nano) }
         enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
@@ -57,4 +57,3 @@ func init() {
     getCmd.Flags().StringVar(&flagPkgGetRole, "role", "", "Role name (with --variant)")
     getCmd.Flags().StringVar(&flagPkgGetVariant, "variant", "", "Variant (with --role)")
 }
-

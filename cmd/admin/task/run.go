@@ -20,7 +20,7 @@ import (
 
 var (
     flagRunVariant   string
-    flagRunVersion   string
+    // removed: version
     flagRunExperiment string
     flagRunExecutor  string
     flagRunTimeout   string // go duration; overrides task timeout
@@ -29,10 +29,10 @@ var (
 
 var runCmd = &cobra.Command{
     Use:   "run",
-    Short: "Run a task by variant and version with timeout and experiment id",
+    Short: "Run a task by variant with timeout and experiment id",
     RunE: func(cmd *cobra.Command, args []string) error {
-        if strings.TrimSpace(flagRunVariant) == "" || strings.TrimSpace(flagRunVersion) == "" {
-            return errors.New("--variant and --version are required")
+        if strings.TrimSpace(flagRunVariant) == "" {
+            return errors.New("--variant is required")
         }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
@@ -42,10 +42,10 @@ var runCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg)
         if err != nil { return err }
         defer db.Close()
-        task, err := pgdao.GetTaskByKey(ctx, db, flagRunVariant, flagRunVersion)
+        task, err := pgdao.GetTaskByVariant(ctx, db, flagRunVariant)
         if err != nil { return err }
         if !task.RunScriptID.Valid || strings.TrimSpace(task.RunScriptID.String) == "" {
-            return fmt.Errorf("task %q@%s has no run script id defined", task.Variant, task.Version)
+            return fmt.Errorf("task %q has no run script id defined", task.Variant)
         }
         // Parse timeout: flag overrides task's timeout
         toDur, err := chooseTimeout(flagRunTimeout, task.Timeout.String)
@@ -53,10 +53,10 @@ var runCmd = &cobra.Command{
         if toDur <= 0 { toDur = 10 * time.Minute }
 
         // Start message: status=starting
-        startText := fmt.Sprintf("starting task %s@%s (shell=%s, timeout=%s)", task.Variant, task.Version, valueOr(task.Shell.String, "bash"), toDur)
+        startText := fmt.Sprintf("starting task %s (shell=%s, timeout=%s)", task.Variant, valueOr(task.Shell.String, "bash"), toDur)
         metaStart := map[string]any{
             "variant": task.Variant,
-            "version": task.Version,
+            
             "status":  "starting",
             "timeout": toDur.String(),
             "shell":   valueOr(task.Shell.String, "bash"),
@@ -70,7 +70,7 @@ var runCmd = &cobra.Command{
         if strings.TrimSpace(flagRunExecutor) != "" { ev.Executor = sql.NullString{String: flagRunExecutor, Valid: true} }
         msgID, err := pgdao.InsertMessageEvent(ctx, db, ev)
         if err != nil { return err }
-        fmt.Fprintf(os.Stderr, "running task %s@%s (message id=%d)\n", task.Variant, task.Version, msgID)
+        fmt.Fprintf(os.Stderr, "running task %s (message id=%d)\n", task.Variant, msgID)
 
         // Prepare command with context timeout
         runCtx, cancelRun := context.WithTimeout(context.Background(), toDur)
@@ -118,7 +118,6 @@ var runCmd = &cobra.Command{
         // Prepare completion content and update message
         compMeta := map[string]any{
             "variant":  task.Variant,
-            "version":  task.Version,
             "status":   status,
             "duration": dur.String(),
             "exit_code": exitCode,
@@ -138,12 +137,11 @@ var runCmd = &cobra.Command{
         if err := pgdao.UpdateMessageEvent(context.Background(), db, msgID, upd); err != nil { return err }
 
         // Human output
-        fmt.Fprintf(os.Stderr, "task %s@%s finished status=%s duration=%s exit_code=%d\n", task.Variant, task.Version, status, dur, exitCode)
+        fmt.Fprintf(os.Stderr, "task %s finished status=%s duration=%s exit_code=%d\n", task.Variant, status, dur, exitCode)
         // JSON output
         out := map[string]any{
             "message_id": msgID,
             "variant": task.Variant,
-            "version": task.Version,
             "status":  status,
             "duration": dur.String(),
             "exit_code": exitCode,
@@ -158,7 +156,6 @@ var runCmd = &cobra.Command{
 func init() {
     TaskCmd.AddCommand(runCmd)
     runCmd.Flags().StringVar(&flagRunVariant, "variant", "", "Task selector variant, e.g., unit/go (required)")
-    runCmd.Flags().StringVar(&flagRunVersion, "version", "", "Task semver version (required)")
     runCmd.Flags().StringVar(&flagRunExperiment, "experiment", "", "Experiment UUID to link execution")
     runCmd.Flags().StringVar(&flagRunExecutor, "executor", "cli", "Executor identifier")
     runCmd.Flags().StringVar(&flagRunTimeout, "timeout", "", "Override timeout as Go duration, e.g., 5m30s")
@@ -231,7 +228,7 @@ func buildCommand(ctx context.Context, task *pgdao.Task, script string) (*exec.C
 
 func buildCompletionContent(task *pgdao.Task, interpreter string, dur time.Duration, exitCode int, stdout, stderr *bytes.Buffer, errMsg string) string {
     b := &strings.Builder{}
-    fmt.Fprintf(b, "task: %s@%s\n", task.Variant, task.Version)
+    fmt.Fprintf(b, "task: %s\n", task.Variant)
     fmt.Fprintf(b, "shell: %s\n", interpreter)
     fmt.Fprintf(b, "duration: %s\n", dur)
     fmt.Fprintf(b, "exit_code: %d\n", exitCode)

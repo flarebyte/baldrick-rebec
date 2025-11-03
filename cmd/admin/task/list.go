@@ -44,7 +44,7 @@ var listCmd = &cobra.Command{
         if strings.ToLower(strings.TrimSpace(flagTaskListOutput)) == "json" {
             arr := make([]map[string]any, 0, len(tasks))
             for _, t := range tasks {
-                item := map[string]any{"id": t.ID, "workflow": t.WorkflowID, "command": t.Command, "variant": t.Variant, "version": t.Version}
+                item := map[string]any{"id": t.ID, "workflow": t.WorkflowID, "command": t.Command, "variant": t.Variant}
                 if t.Created.Valid { item["created"] = t.Created.Time.Format(time.RFC3339Nano) }
                 if t.Title.Valid { item["title"] = t.Title.String }
                 if len(t.Tags) > 0 { item["tags"] = t.Tags }
@@ -53,8 +53,8 @@ var listCmd = &cobra.Command{
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
         tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "ID\tVARIANT\tVERSION\tCOMMAND")
-        for _, t := range tasks { fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", t.ID, t.Variant, t.Version, t.Command) }
+        fmt.Fprintln(tw, "ID\tVARIANT\tCOMMAND")
+        for _, t := range tasks { fmt.Fprintf(tw, "%s\t%s\t%s\n", t.ID, t.Variant, t.Command) }
         tw.Flush(); return nil
     },
 }

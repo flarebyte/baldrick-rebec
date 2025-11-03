@@ -10,8 +10,6 @@ import (
 type Package struct {
     ID        string
     RoleName  string
-    Variant   string
-    Version   string
     TaskID    string
     Created   sql.NullTime
     Updated   sql.NullTime
@@ -19,20 +17,19 @@ type Package struct {
 
 // UpsertStarredTask binds a role to a specific (variant, version) by referencing the task row.
 // Enforces uniqueness on (role, variant) so later calls update the chosen version.
-func UpsertPackage(ctx context.Context, db *pgxpool.Pool, roleName, variant, version string) (*Package, error) {
-    // Resolve the task id for integrity
-    t, err := GetTaskByKey(ctx, db, variant, version)
+func UpsertPackage(ctx context.Context, db *pgxpool.Pool, roleName, variant string) (*Package, error) {
+    // Resolve the task id for integrity by variant
+    t, err := GetTaskByVariant(ctx, db, variant)
     if err != nil { return nil, err }
-    q := `INSERT INTO packages (role_name, variant, version, task_id)
-          VALUES ($1,$2,$3,$4::uuid)
-          ON CONFLICT (role_name, variant) DO UPDATE SET
-            version = EXCLUDED.version,
+    q := `INSERT INTO packages (role_name, task_id)
+          VALUES ($1,$2::uuid)
+          ON CONFLICT (role_name, task_id) DO UPDATE SET
             task_id = EXCLUDED.task_id,
             updated = now()
           RETURNING id::text, created, updated`
     var p Package
-    p.RoleName = roleName; p.Variant = variant; p.Version = version; p.TaskID = t.ID
-    if err := db.QueryRow(ctx, q, roleName, variant, version, t.ID).Scan(&p.ID, &p.Created, &p.Updated); err != nil {
+    p.RoleName = roleName; p.TaskID = t.ID
+    if err := db.QueryRow(ctx, q, roleName, t.ID).Scan(&p.ID, &p.Created, &p.Updated); err != nil {
         return nil, err
     }
     return &p, nil
@@ -40,9 +37,9 @@ func UpsertPackage(ctx context.Context, db *pgxpool.Pool, roleName, variant, ver
 
 // GetStarredTaskByID fetches a starred task by id.
 func GetPackageByID(ctx context.Context, db *pgxpool.Pool, id string) (*Package, error) {
-    q := `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE id=$1::uuid`
+    q := `SELECT id::text, role_name, task_id::text, created, updated FROM packages WHERE id=$1::uuid`
     var p Package
-    if err := db.QueryRow(ctx, q, id).Scan(&p.ID, &p.RoleName, &p.Variant, &p.Version, &p.TaskID, &p.Created, &p.Updated); err != nil {
+    if err := db.QueryRow(ctx, q, id).Scan(&p.ID, &p.RoleName, &p.TaskID, &p.Created, &p.Updated); err != nil {
         return nil, err
     }
     return &p, nil
@@ -50,9 +47,13 @@ func GetPackageByID(ctx context.Context, db *pgxpool.Pool, id string) (*Package,
 
 // GetStarredTaskByKey fetches a starred task by (role, variant).
 func GetPackageByKey(ctx context.Context, db *pgxpool.Pool, roleName, variant string) (*Package, error) {
-    q := `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE role_name=$1 AND variant=$2`
+    // Join with tasks to filter by variant
+    q := `SELECT p.id::text, p.role_name, p.task_id::text, p.created, p.updated
+          FROM packages p
+          JOIN tasks t ON t.id = p.task_id
+          WHERE p.role_name=$1 AND t.variant=$2`
     var p Package
-    if err := db.QueryRow(ctx, q, roleName, variant).Scan(&p.ID, &p.RoleName, &p.Variant, &p.Version, &p.TaskID, &p.Created, &p.Updated); err != nil {
+    if err := db.QueryRow(ctx, q, roleName, variant).Scan(&p.ID, &p.RoleName, &p.TaskID, &p.Created, &p.Updated); err != nil {
         return nil, err
     }
     return &p, nil
@@ -64,22 +65,32 @@ func ListPackages(ctx context.Context, db *pgxpool.Pool, roleName, variant strin
     if offset < 0 { offset = 0 }
     var rows pgxRows
     var err error
-    switch {
-    case stringsTrim(roleName) != "" && stringsTrim(variant) != "":
-        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE role_name=$1 AND variant=$2 ORDER BY variant ASC, version ASC LIMIT $3 OFFSET $4`, roleName, variant, limit, offset)
-    case stringsTrim(roleName) != "":
-        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE role_name=$1 ORDER BY variant ASC, version ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
-    case stringsTrim(variant) != "":
-        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages WHERE variant=$1 ORDER BY variant ASC, version ASC LIMIT $2 OFFSET $3`, variant, limit, offset)
-    default:
-        rows, err = db.Query(ctx, `SELECT id::text, role_name, variant, version, task_id::text, created, updated FROM packages ORDER BY variant ASC, version ASC LIMIT $1 OFFSET $2`, limit, offset)
+    if stringsTrim(roleName) != "" && stringsTrim(variant) != "" {
+        rows, err = db.Query(ctx, `SELECT p.id::text, p.role_name, p.task_id::text, p.created, p.updated
+                                    FROM packages p JOIN tasks t ON t.id = p.task_id
+                                    WHERE p.role_name=$1 AND t.variant=$2
+                                    ORDER BY t.variant ASC LIMIT $3 OFFSET $4`, roleName, variant, limit, offset)
+    } else if stringsTrim(roleName) != "" {
+        rows, err = db.Query(ctx, `SELECT p.id::text, p.role_name, p.task_id::text, p.created, p.updated
+                                    FROM packages p JOIN tasks t ON t.id = p.task_id
+                                    WHERE p.role_name=$1
+                                    ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
+    } else if stringsTrim(variant) != "" {
+        rows, err = db.Query(ctx, `SELECT p.id::text, p.role_name, p.task_id::text, p.created, p.updated
+                                    FROM packages p JOIN tasks t ON t.id = p.task_id
+                                    WHERE t.variant=$1
+                                    ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, variant, limit, offset)
+    } else {
+        rows, err = db.Query(ctx, `SELECT p.id::text, p.role_name, p.task_id::text, p.created, p.updated
+                                    FROM packages p JOIN tasks t ON t.id = p.task_id
+                                    ORDER BY t.variant ASC LIMIT $1 OFFSET $2`, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()
     var out []Package
     for rows.Next() {
         var p Package
-        if err := rows.Scan(&p.ID, &p.RoleName, &p.Variant, &p.Version, &p.TaskID, &p.Created, &p.Updated); err != nil {
+        if err := rows.Scan(&p.ID, &p.RoleName, &p.TaskID, &p.Created, &p.Updated); err != nil {
             return nil, err
         }
         out = append(out, p)
@@ -96,7 +107,7 @@ func DeletePackageByID(ctx context.Context, db *pgxpool.Pool, id string) (int64,
 
 // DeleteStarredTaskByKey deletes a starred task by (role, variant).
 func DeletePackageByKey(ctx context.Context, db *pgxpool.Pool, roleName, variant string) (int64, error) {
-    ct, err := db.Exec(ctx, `DELETE FROM packages WHERE role_name=$1 AND variant=$2`, roleName, variant)
+    ct, err := db.Exec(ctx, `DELETE FROM packages p USING tasks t WHERE p.task_id=t.id AND p.role_name=$1 AND t.variant=$2`, roleName, variant)
     if err != nil { return 0, err }
     return ct.RowsAffected(), nil
 }
