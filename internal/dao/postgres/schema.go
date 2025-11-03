@@ -127,6 +127,37 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_workspaces_role_name ON workspaces(role_name)`,
         `CREATE INDEX IF NOT EXISTS idx_workspaces_project_name ON workspaces(project_name)`,
+        // Scripts content: store script body once keyed by SHA-256 (bytea) and role
+        `CREATE TABLE IF NOT EXISTS scripts_content (
+            id BYTEA PRIMARY KEY,
+            script_content TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            role_name TEXT NOT NULL DEFAULT 'user'
+        )`,
+        // Scripts: metadata referencing content by hash
+        `CREATE TABLE IF NOT EXISTS scripts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            title TEXT NOT NULL,
+            description TEXT,
+            motivation TEXT,
+            notes TEXT,
+            script_content_id BYTEA,
+            role_name TEXT NOT NULL DEFAULT 'user',
+            tags JSONB DEFAULT '{}'::jsonb,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'scripts_set_updated'
+            ) THEN
+                CREATE TRIGGER scripts_set_updated
+                BEFORE UPDATE ON scripts
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_role_name ON scripts(role_name)`,
         `CREATE INDEX IF NOT EXISTS idx_tags_role_name ON tags(role_name)`,
         `DO $$ BEGIN
             IF NOT EXISTS (
