@@ -41,7 +41,7 @@ var listCmd = &cobra.Command{
         if out == "json" {
             arr := make([]map[string]any, 0, len(ws))
             for _, w := range ws {
-                item := map[string]any{"id": w.ID, "role": w.RoleName, "directory": w.Directory}
+                item := map[string]any{"id": w.ID, "role": w.RoleName}
                 if w.Created.Valid { item["created"] = w.Created.Time.Format(time.RFC3339Nano) }
                 if w.Updated.Valid { item["updated"] = w.Updated.Time.Format(time.RFC3339Nano) }
                 if w.Description.Valid && w.Description.String != "" { item["description"] = w.Description.String }
@@ -52,10 +52,11 @@ var listCmd = &cobra.Command{
         }
         // table default
         tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "ID\tDIRECTORY\tUPDATED")
+        fmt.Fprintln(tw, "ID\tPROJECT\tUPDATED")
         for _, w := range ws {
             updated := ""; if w.Updated.Valid { updated = w.Updated.Time.Format(time.RFC3339) }
-            fmt.Fprintf(tw, "%s\t%s\t%s\n", w.ID, w.Directory, updated)
+            proj := ""; if w.ProjectName.Valid { proj = w.ProjectName.String }
+            fmt.Fprintf(tw, "%s\t%s\t%s\n", w.ID, proj, updated)
         }
         tw.Flush()
         return nil
@@ -69,4 +70,3 @@ func init() {
     listCmd.Flags().StringVar(&flagWSListOutput, "output", "table", "Output format: table or json")
     listCmd.Flags().StringVar(&flagWSListRole, "role", "", "Role name (required)")
 }
-

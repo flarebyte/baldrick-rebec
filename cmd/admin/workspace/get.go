@@ -33,12 +33,12 @@ var getCmd = &cobra.Command{
         w, err := pgdao.GetWorkspaceByID(ctx, db, flagWSGetID)
         if err != nil { return err }
         // stderr line
-        fmt.Fprintf(os.Stderr, "workspace id=%s role=%q dir=%q\n", w.ID, w.RoleName, w.Directory)
+        fmt.Fprintf(os.Stderr, "workspace id=%s role=%q\n", w.ID, w.RoleName)
         // stdout JSON
         out := map[string]any{
             "id":        w.ID,
             "role":      w.RoleName,
-            "directory": w.Directory,
+            
         }
         if w.Created.Valid { out["created"] = w.Created.Time.Format(time.RFC3339Nano) }
         if w.Updated.Valid { out["updated"] = w.Updated.Time.Format(time.RFC3339Nano) }
@@ -54,4 +54,3 @@ func init() {
     WorkspaceCmd.AddCommand(getCmd)
     getCmd.Flags().StringVar(&flagWSGetID, "id", "", "Workspace UUID (required)")
 }
-

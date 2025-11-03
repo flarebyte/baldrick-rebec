@@ -62,9 +62,9 @@ rbc admin project set --name acme/build-system --role user --description "Build 
 rbc admin project set --name acme/product      --role user --description "Main product" --tags status=active,type=app
 
 echo "[8/11] Creating workspaces" >&2
-rbc admin workspace set --role user --project acme/build-system --directory /tmp/baldrick-workspaces/build-system \
+rbc admin workspace set --role user --project acme/build-system \
   --description "Local build-system workspace" --tags status=active
-rbc admin workspace set --role user --project acme/product --directory /tmp/baldrick-workspaces/product \
+rbc admin workspace set --role user --project acme/product \
   --description "Local product workspace" --tags status=active
 
 echo "[9/12] Creating packages (role-bound tasks)" >&2

@@ -7,7 +7,6 @@ import (
     "errors"
     "fmt"
     "os"
-    "path/filepath"
     "strings"
     "time"
 
@@ -22,7 +21,6 @@ var (
     flagWSDesc   string
     flagWSProj   string
     flagWSTags   []string
-    flagWSDir    string
 )
 
 var setCmd = &cobra.Command{
@@ -30,10 +28,6 @@ var setCmd = &cobra.Command{
     Short: "Create or update a workspace (by id)",
     RunE: func(cmd *cobra.Command, args []string) error {
         if strings.TrimSpace(flagWSRole) == "" { return errors.New("--role is required") }
-        if strings.TrimSpace(flagWSDir) == "" { return errors.New("--directory is required") }
-        if !filepath.IsAbs(flagWSDir) {
-            return errors.New("--directory must be an absolute path")
-        }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -42,20 +36,20 @@ var setCmd = &cobra.Command{
         if err != nil { return err }
         defer db.Close()
 
-        w := &pgdao.Workspace{ ID: flagWSID, RoleName: flagWSRole, Directory: flagWSDir }
+        w := &pgdao.Workspace{ ID: flagWSID, RoleName: flagWSRole }
         if flagWSDesc != "" { w.Description = sql.NullString{String: flagWSDesc, Valid: true} }
         if flagWSProj != "" { w.ProjectName = sql.NullString{String: flagWSProj, Valid: true} }
         if len(flagWSTags) > 0 { w.Tags = parseTags(flagWSTags) }
         if err := pgdao.UpsertWorkspace(ctx, db, w); err != nil { return err }
 
         // stderr summary
-        fmt.Fprintf(os.Stderr, "workspace upserted id=%s role=%q dir=%q\n", w.ID, w.RoleName, w.Directory)
+        fmt.Fprintf(os.Stderr, "workspace upserted id=%s role=%q\n", w.ID, w.RoleName)
         // stdout JSON
         out := map[string]any{
             "status":    "upserted",
             "id":        w.ID,
             "role":      w.RoleName,
-            "directory": w.Directory,
+            
         }
         if w.Created.Valid { out["created"] = w.Created.Time.Format(time.RFC3339Nano) }
         if w.Updated.Valid { out["updated"] = w.Updated.Time.Format(time.RFC3339Nano) }
@@ -71,7 +65,6 @@ func init() {
     setCmd.Flags().StringVar(&flagWSRole, "role", "", "Role name (required)")
     setCmd.Flags().StringVar(&flagWSDesc, "description", "", "Plain text description")
     setCmd.Flags().StringVar(&flagWSProj, "project", "", "Project name (must exist for role if provided)")
-    setCmd.Flags().StringVar(&flagWSDir, "directory", "", "Absolute path to workspace directory (required)")
     setCmd.Flags().StringSliceVar(&flagWSTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
 }
 
@@ -96,4 +89,3 @@ func parseTags(items []string) map[string]any {
     }
     return out
 }
-

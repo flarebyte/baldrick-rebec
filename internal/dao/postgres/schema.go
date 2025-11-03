@@ -103,7 +103,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_projects_role_name ON projects(role_name)`,
-        // Workspaces table: directories associated to a role (and optional project)
+        // Workspaces table associated to a role (and optional project)
         `CREATE TABLE IF NOT EXISTS workspaces (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             description TEXT,
@@ -112,7 +112,6 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             tags JSONB DEFAULT '{}'::jsonb,
-            directory TEXT NOT NULL,
             FOREIGN KEY (project_name, role_name) REFERENCES projects(name, role_name) ON DELETE SET NULL
         )`,
         `DO $$ BEGIN
@@ -133,15 +132,6 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             script_content TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
-        // Migration: drop role_name from scripts_content if present (to allow sharing across roles)
-        `DO $$ BEGIN
-            IF EXISTS (
-                SELECT 1 FROM information_schema.columns
-                WHERE table_schema='public' AND table_name='scripts_content' AND column_name='role_name'
-            ) THEN
-                ALTER TABLE scripts_content DROP COLUMN role_name;
-            END IF;
-        END $$;`,
         // Scripts: metadata referencing content by hash
         `CREATE TABLE IF NOT EXISTS scripts (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -244,21 +234,6 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             tags JSONB DEFAULT '{}'::jsonb,
             UNIQUE (content_id, status, received_at)
         )`,
-        // Attempt to migrate existing tags columns to JSONB if they exist as arrays
-        `DO $$ BEGIN
-            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='roles' AND column_name='tags' AND data_type<>'jsonb') THEN
-                ALTER TABLE roles ALTER COLUMN tags TYPE jsonb USING COALESCE(tags::jsonb,'{}'::jsonb);
-            END IF;
-            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='conversations' AND column_name='tags' AND data_type<>'jsonb') THEN
-                ALTER TABLE conversations ALTER COLUMN tags TYPE jsonb USING COALESCE(tags::jsonb,'{}'::jsonb);
-            END IF;
-            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='tags' AND data_type<>'jsonb') THEN
-                ALTER TABLE tasks ALTER COLUMN tags TYPE jsonb USING COALESCE(tags::jsonb,'{}'::jsonb);
-            END IF;
-            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='tags' AND data_type<>'jsonb') THEN
-                ALTER TABLE messages ALTER COLUMN tags TYPE jsonb USING COALESCE(tags::jsonb,'{}'::jsonb);
-            END IF;
-        END $$;`,
         // Packages per role_name: bind a role (e.g., user, admin) to a specific
         // variant and version, referencing the task row. Unique per (role_name, variant).
         `CREATE TABLE IF NOT EXISTS packages (
@@ -273,17 +248,6 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_packages_role_name ON packages(role_name)`,
         `CREATE INDEX IF NOT EXISTS idx_packages_variant ON packages(variant)`,
-        // Optional migration: rename old starred_tasks table/column if present.
-        `DO $$ BEGIN
-            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='starred_tasks')
-               AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='packages') THEN
-                ALTER TABLE starred_tasks RENAME TO packages;
-            END IF;
-            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='packages' AND column_name='role')
-               AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='packages' AND column_name='role_name') THEN
-                ALTER TABLE packages RENAME COLUMN role TO role_name;
-            END IF;
-        END $$;`,
         `DO $$ BEGIN
             IF NOT EXISTS (
                 SELECT 1 FROM pg_trigger WHERE tgname = 'packages_set_updated'
