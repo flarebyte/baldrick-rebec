@@ -38,7 +38,9 @@ var getCmd = &cobra.Command{
         out := map[string]any{
             "id":        w.ID,
             "role":      w.RoleName,
-            
+        }
+        if w.BuildScriptID.Valid {
+            out["build_script_id"] = w.BuildScriptID.String
         }
         if w.Created.Valid { out["created"] = w.Created.Time.Format(time.RFC3339Nano) }
         if w.Updated.Valid { out["updated"] = w.Updated.Time.Format(time.RFC3339Nano) }

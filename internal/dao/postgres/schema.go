@@ -103,12 +103,43 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_projects_role_name ON projects(role_name)`,
+        // Scripts content: store script body once keyed by SHA-256 (bytea)
+        `CREATE TABLE IF NOT EXISTS scripts_content (
+            id BYTEA PRIMARY KEY,
+            script_content TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+        // Scripts: metadata referencing content by hash
+        `CREATE TABLE IF NOT EXISTS scripts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            title TEXT NOT NULL,
+            description TEXT,
+            motivation TEXT,
+            notes TEXT,
+            script_content_id BYTEA,
+            role_name TEXT NOT NULL DEFAULT 'user',
+            tags JSONB DEFAULT '{}'::jsonb,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'scripts_set_updated'
+            ) THEN
+                CREATE TRIGGER scripts_set_updated
+                BEFORE UPDATE ON scripts
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_role_name ON scripts(role_name)`,
         // Workspaces table associated to a role (and optional project)
         `CREATE TABLE IF NOT EXISTS workspaces (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             description TEXT,
             role_name TEXT NOT NULL DEFAULT 'user',
             project_name TEXT,
+            build_script_id UUID REFERENCES scripts(id) ON DELETE SET NULL,
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             tags JSONB DEFAULT '{}'::jsonb,

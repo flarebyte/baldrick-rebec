@@ -46,6 +46,7 @@ var listCmd = &cobra.Command{
                 if w.Updated.Valid { item["updated"] = w.Updated.Time.Format(time.RFC3339Nano) }
                 if w.Description.Valid && w.Description.String != "" { item["description"] = w.Description.String }
                 if w.ProjectName.Valid && w.ProjectName.String != "" { item["project"] = w.ProjectName.String }
+                if w.BuildScriptID.Valid { item["build_script_id"] = w.BuildScriptID.String }
                 arr = append(arr, item)
             }
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)

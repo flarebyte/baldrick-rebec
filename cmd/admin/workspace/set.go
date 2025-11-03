@@ -20,6 +20,7 @@ var (
     flagWSRole   string
     flagWSDesc   string
     flagWSProj   string
+    flagWSBuild  string
     flagWSTags   []string
 )
 
@@ -39,6 +40,7 @@ var setCmd = &cobra.Command{
         w := &pgdao.Workspace{ ID: flagWSID, RoleName: flagWSRole }
         if flagWSDesc != "" { w.Description = sql.NullString{String: flagWSDesc, Valid: true} }
         if flagWSProj != "" { w.ProjectName = sql.NullString{String: flagWSProj, Valid: true} }
+        if strings.TrimSpace(flagWSBuild) != "" { w.BuildScriptID = sql.NullString{String: strings.TrimSpace(flagWSBuild), Valid: true} }
         if len(flagWSTags) > 0 { w.Tags = parseTags(flagWSTags) }
         if err := pgdao.UpsertWorkspace(ctx, db, w); err != nil { return err }
 
@@ -49,7 +51,9 @@ var setCmd = &cobra.Command{
             "status":    "upserted",
             "id":        w.ID,
             "role":      w.RoleName,
-            
+        }
+        if w.BuildScriptID.Valid {
+            out["build_script_id"] = w.BuildScriptID.String
         }
         if w.Created.Valid { out["created"] = w.Created.Time.Format(time.RFC3339Nano) }
         if w.Updated.Valid { out["updated"] = w.Updated.Time.Format(time.RFC3339Nano) }
@@ -65,6 +69,7 @@ func init() {
     setCmd.Flags().StringVar(&flagWSRole, "role", "", "Role name (required)")
     setCmd.Flags().StringVar(&flagWSDesc, "description", "", "Plain text description")
     setCmd.Flags().StringVar(&flagWSProj, "project", "", "Project name (must exist for role if provided)")
+    setCmd.Flags().StringVar(&flagWSBuild, "build-script", "", "Optional script UUID to run when building the workspace")
     setCmd.Flags().StringSliceVar(&flagWSTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
 }
 
