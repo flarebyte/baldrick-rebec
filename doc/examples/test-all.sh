@@ -36,12 +36,41 @@ sid_integ=$(json_get_id "$sid_integ_json")
 sid_lint_json=$(printf "go vet ./... && golangci-lint run\n" | rbc admin script set --role user --title "Lint & Vet" --description "Runs vet and lints")
 sid_lint=$(json_get_id "$sid_lint_json")
 
-rbc admin task set --workflow ci-test --command unit --variant go \
-  --title "Run Unit Tests" --description "Executes unit tests." --shell bash --run-script "$sid_unit" --timeout "10 minutes" --tags unit,fast --level h2
-rbc admin task set --workflow ci-test --command integration --variant "" \
-  --title "Run Integration Tests" --description "Runs integration tests." --shell bash --run-script "$sid_integ" --timeout "30 minutes" --tags integration,slow --level h2
-rbc admin task set --workflow ci-lint --command lint --variant go \
-  --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run-script "$sid_lint" --timeout "5 minutes" --tags lint,style --level h2
+t_unit_json=$(rbc admin task set --workflow ci-test --command unit --variant go \
+  --title "Run Unit Tests" --description "Executes unit tests." --shell bash --run-script "$sid_unit" --timeout "10 minutes" --tags unit,fast --level h2)
+t_unit_id=$(json_get_id "$t_unit_json")
+
+t_integ_json=$(rbc admin task set --workflow ci-test --command integration --variant "" \
+  --title "Run Integration Tests" --description "Runs integration tests." --shell bash --run-script "$sid_integ" --timeout "30 minutes" --tags integration,slow --level h2)
+t_integ_id=$(json_get_id "$t_integ_json")
+
+t_lint_json=$(rbc admin task set --workflow ci-lint --command lint --variant go \
+  --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run-script "$sid_lint" --timeout "5 minutes" --tags lint,style --level h2)
+t_lint_id=$(json_get_id "$t_lint_json")
+
+# Add examples of patch/minor/major replacements using the graph
+# Create updated scripts for replacements
+sid_unit_patch_json=$(printf "go test ./... -run Quick\n" | rbc admin script set --role user --title "Unit: quick subset" --description "Patch: quick tests")
+sid_unit_patch=$(json_get_id "$sid_unit_patch_json")
+sid_unit_minor_json=$(printf "go test ./... -race\n" | rbc admin script set --role user --title "Unit: race" --description "Minor: enable -race")
+sid_unit_minor=$(json_get_id "$sid_unit_minor_json")
+sid_lint_major_json=$(printf "golangci-lint run --enable-all\n" | rbc admin script set --role user --title "Lint: strict" --description "Major: stricter lint")
+sid_lint_major=$(json_get_id "$sid_lint_major_json")
+
+# Create replacement tasks with --replaces and levels
+rbc admin task set --workflow ci-test --command unit --variant go-patch1 \
+  --title "Run Unit Tests (Quick)" --description "Patch: run quick subset" --shell bash --run-script "$sid_unit_patch" \
+  --replaces "$t_unit_id" --replace-level patch --replace-comment "Flaky test workaround"
+
+# Minor replaces the original unit test task (or could replace patch)
+rbc admin task set --workflow ci-test --command unit --variant go-minor1 \
+  --title "Run Unit Tests (Race)" --description "Minor: enable race detector" --shell bash --run-script "$sid_unit_minor" \
+  --replaces "$t_unit_id" --replace-level minor --replace-comment "Add -race"
+
+# Major replacement for lint task
+rbc admin task set --workflow ci-lint --command lint --variant go-major1 \
+  --title "Lint & Vet (Strict)" --description "Major: stricter lint rules" --shell bash --run-script "$sid_lint_major" \
+  --replaces "$t_lint_id" --replace-level major --replace-comment "Enable all linters"
 
 echo "[4/11] Creating sample conversations and experiments" >&2
 cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX")

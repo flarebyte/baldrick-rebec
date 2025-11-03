@@ -13,16 +13,24 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         `CREATE EXTENSION IF NOT EXISTS pgcrypto`,
         // Enable pgvector (vector) extension for vector similarity
         `CREATE EXTENSION IF NOT EXISTS vector`,
-        // Enable AGE graph extension (if available)
+        // Enable AGE graph extension (if available). Ignore errors downstream.
         `CREATE EXTENSION IF NOT EXISTS age`,
-        // Create a default graph for relationships if not present
+        // Create a default graph for relationships if not present (dynamic SQL; ignore errors)
         `DO $$
         BEGIN
-            PERFORM create_graph('rbc_graph');
+            EXECUTE 'SELECT ag_catalog.create_graph(''rbc_graph'')';
         EXCEPTION WHEN others THEN
-            -- ignore if exists or AGE not installed
             NULL;
         END$$;`,
+        // Grant usage on ag_catalog and execute on its functions to current_user (best effort)
+        `DO $$
+        DECLARE usr text := current_user; BEGIN
+            EXECUTE 'GRANT USAGE ON SCHEMA ag_catalog TO ' || quote_ident(usr);
+        EXCEPTION WHEN others THEN NULL; END$$;`,
+        `DO $$
+        DECLARE usr text := current_user; BEGIN
+            EXECUTE 'GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ag_catalog TO ' || quote_ident(usr);
+        EXCEPTION WHEN others THEN NULL; END$$;`,
         // Roles table (name as unique identifier)
         `CREATE TABLE IF NOT EXISTS roles (
             name TEXT PRIMARY KEY,
