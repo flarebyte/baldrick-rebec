@@ -64,15 +64,15 @@ echo "Onboarding checklist updated" | rbc admin message set --executor docs-bot 
 
 echo "[8/8] Listing all entities and counts" >&2
 echo "-- Workflows --" >&2
-rbc admin workflow list --limit 50
+rbc admin workflow list --role user --limit 50
 echo "-- Tasks --" >&2
-rbc admin task list --limit 50
+rbc admin task list --role user --limit 50
 echo "-- Conversations --" >&2
-rbc admin conversation list --limit 50
+rbc admin conversation list --role user --limit 50
 echo "-- Experiments --" >&2
 rbc admin experiment list --limit 50
 echo "-- Messages --" >&2
-rbc admin message list --limit 50
+rbc admin message list --role user --limit 50
 echo "-- Table counts --" >&2
 rbc admin db count --json
 
