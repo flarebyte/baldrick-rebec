@@ -237,6 +237,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             shell TEXT,
             run TEXT,
             timeout INTERVAL,
+            tool_workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL,
             tags JSONB DEFAULT '{}'::jsonb,
             level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
             UNIQUE (variant, version),

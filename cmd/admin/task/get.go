@@ -65,6 +65,7 @@ var getCmd = &cobra.Command{
         if t.Timeout.Valid { out["timeout"] = t.Timeout.String }
         if len(t.Tags) > 0 { out["tags"] = t.Tags }
         if t.Level.Valid { out["level"] = t.Level.String }
+        if t.ToolWorkspaceID.Valid { out["tool_workspace_id"] = t.ToolWorkspaceID.String }
         enc := json.NewEncoder(os.Stdout)
         enc.SetIndent("", "  ")
         return enc.Encode(out)

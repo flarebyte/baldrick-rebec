@@ -30,6 +30,7 @@ var (
     flagTaskTimeout string
     flagTaskTags    []string
     flagTaskLevel   string
+    flagTaskToolWS  string
 )
 
 var setCmd = &cobra.Command{
@@ -55,6 +56,7 @@ var setCmd = &cobra.Command{
         if flagTaskRun   != "" { t.Run   = sql.NullString{String: flagTaskRun, Valid: true} }
         if flagTaskTimeout != "" { t.Timeout = sql.NullString{String: flagTaskTimeout, Valid: true} }
         if len(flagTaskTags) > 0 { t.Tags = parseTags(flagTaskTags) }
+        if strings.TrimSpace(flagTaskToolWS) != "" { t.ToolWorkspaceID = sql.NullString{String: strings.TrimSpace(flagTaskToolWS), Valid: true} }
         if flagTaskLevel != "" { t.Level = sql.NullString{String: flagTaskLevel, Valid: true} }
         if err := pgdao.UpsertTask(ctx, db, t); err != nil { return err }
         // Human
@@ -69,6 +71,7 @@ var setCmd = &cobra.Command{
             "version": t.Version,
         }
         if t.Created.Valid { out["created"] = t.Created.Time.Format(time.RFC3339Nano) }
+        if t.ToolWorkspaceID.Valid { out["tool_workspace_id"] = t.ToolWorkspaceID.String }
         enc := json.NewEncoder(os.Stdout)
         enc.SetIndent("", "  ")
         return enc.Encode(out)
@@ -90,6 +93,7 @@ func init() {
     setCmd.Flags().StringVar(&flagTaskTimeout, "timeout", "", "Text interval, e.g., '5 minutes'")
     setCmd.Flags().StringSliceVar(&flagTaskTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
     setCmd.Flags().StringVar(&flagTaskLevel, "level", "", "Level: h1..h6")
+    setCmd.Flags().StringVar(&flagTaskToolWS, "tool-workspace", "", "Optional workspace UUID used as tooling workspace for the task")
 }
 
 // parseTags converts k=v pairs (or bare keys) into a map.
