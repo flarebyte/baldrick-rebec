@@ -5,10 +5,12 @@ import (
     "encoding/json"
     "fmt"
     "os"
+    "strings"
     "time"
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
+    tt "text/tabwriter"
     "github.com/spf13/cobra"
 )
 
@@ -17,6 +19,7 @@ var (
     flagExpListLimit  int
     flagExpListOffset int
     flagExpListMax    int
+    flagExpListOutput string
 )
 
 var listCmd = &cobra.Command{
@@ -35,13 +38,17 @@ var listCmd = &cobra.Command{
         rows, err := pgdao.ListExperiments(ctx, db, flagExpListConv, effLimit, flagExpListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "experiments: %d\n", len(rows))
-        arr := make([]map[string]any, 0, len(rows))
-        for _, e := range rows {
-            item := map[string]any{"id": e.ID, "conversation_id": e.ConversationID}
-            arr = append(arr, item)
+        if strings.ToLower(strings.TrimSpace(flagExpListOutput)) == "json" {
+            arr := make([]map[string]any, 0, len(rows))
+            for _, e := range rows {
+                arr = append(arr, map[string]any{"id": e.ID, "conversation_id": e.ConversationID})
+            }
+            enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
-        enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  ")
-        return enc.Encode(arr)
+        tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+        fmt.Fprintln(tw, "ID\tCONVERSATION")
+        for _, e := range rows { fmt.Fprintf(tw, "%s\t%s\n", e.ID, e.ConversationID) }
+        tw.Flush(); return nil
     },
 }
 
@@ -51,4 +58,5 @@ func init() {
     listCmd.Flags().IntVar(&flagExpListLimit, "limit", 100, "Max rows (deprecated; prefer --max-results)")
     listCmd.Flags().IntVar(&flagExpListOffset, "offset", 0, "Offset for pagination")
     listCmd.Flags().IntVar(&flagExpListMax, "max-results", 20, "Max results to return (default 20)")
+    listCmd.Flags().StringVar(&flagExpListOutput, "output", "table", "Output format: table or json")
 }

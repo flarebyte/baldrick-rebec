@@ -11,6 +11,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
+    tt "text/tabwriter"
     "github.com/spf13/cobra"
 )
 
@@ -19,6 +20,7 @@ var (
     flagPkgListVariant  string
     flagPkgListLimit    int
     flagPkgListOffset   int
+    flagPkgListOutput   string
 )
 
 var listCmd = &cobra.Command{
@@ -38,22 +40,20 @@ var listCmd = &cobra.Command{
         items, err := pgdao.ListPackages(ctx, db, flagPkgListRoleName, flagPkgListVariant, flagPkgListLimit, flagPkgListOffset)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "packages: %d\n", len(items))
-        arr := make([]map[string]any, 0, len(items))
-        for _, p := range items {
-            m := map[string]any{
-                "id": p.ID,
-                "role_name": p.RoleName,
-                "variant": p.Variant,
-                "version": p.Version,
-                "task_id": p.TaskID,
+        if strings.ToLower(strings.TrimSpace(flagPkgListOutput)) == "json" {
+            arr := make([]map[string]any, 0, len(items))
+            for _, p := range items {
+                m := map[string]any{"id": p.ID, "role_name": p.RoleName, "variant": p.Variant, "version": p.Version, "task_id": p.TaskID}
+                if p.Created.Valid { m["created"] = p.Created.Time.Format(time.RFC3339Nano) }
+                if p.Updated.Valid { m["updated"] = p.Updated.Time.Format(time.RFC3339Nano) }
+                arr = append(arr, m)
             }
-            if p.Created.Valid { m["created"] = p.Created.Time.Format(time.RFC3339Nano) }
-            if p.Updated.Valid { m["updated"] = p.Updated.Time.Format(time.RFC3339Nano) }
-            arr = append(arr, m)
+            enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
-        enc := json.NewEncoder(os.Stdout)
-        enc.SetIndent("", "  ")
-        return enc.Encode(arr)
+        tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+        fmt.Fprintln(tw, "ID\tVARIANT\tVERSION\tROLE")
+        for _, p := range items { fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", p.ID, p.Variant, p.Version, p.RoleName) }
+        tw.Flush(); return nil
     },
 }
 
@@ -63,4 +63,5 @@ func init() {
     listCmd.Flags().StringVar(&flagPkgListVariant, "variant", "", "Filter by variant")
     listCmd.Flags().IntVar(&flagPkgListLimit, "limit", 100, "Max rows")
     listCmd.Flags().IntVar(&flagPkgListOffset, "offset", 0, "Offset for pagination")
+    listCmd.Flags().StringVar(&flagPkgListOutput, "output", "table", "Output format: table or json")
 }
