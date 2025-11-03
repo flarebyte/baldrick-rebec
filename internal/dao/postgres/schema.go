@@ -127,13 +127,21 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_workspaces_role_name ON workspaces(role_name)`,
         `CREATE INDEX IF NOT EXISTS idx_workspaces_project_name ON workspaces(project_name)`,
-        // Scripts content: store script body once keyed by SHA-256 (bytea) and role
+        // Scripts content: store script body once keyed by SHA-256 (bytea)
         `CREATE TABLE IF NOT EXISTS scripts_content (
             id BYTEA PRIMARY KEY,
             script_content TEXT NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            role_name TEXT NOT NULL DEFAULT 'user'
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
+        // Migration: drop role_name from scripts_content if present (to allow sharing across roles)
+        `DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema='public' AND table_name='scripts_content' AND column_name='role_name'
+            ) THEN
+                ALTER TABLE scripts_content DROP COLUMN role_name;
+            END IF;
+        END $$;`,
         // Scripts: metadata referencing content by hash
         `CREATE TABLE IF NOT EXISTS scripts (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

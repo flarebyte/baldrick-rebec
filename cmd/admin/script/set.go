@@ -59,8 +59,8 @@ var setCmd = &cobra.Command{
         if err != nil { return err }
         defer db.Close()
 
-        // Ensure content exists and get its hex id
-        cid, err := pgdao.InsertScriptContent(ctx, db, string(body), flagScrRole)
+        // Ensure content exists and get its hex id (no role scoping on content)
+        cid, err := pgdao.InsertScriptContent(ctx, db, string(body))
         if err != nil { return err }
 
         // Upsert script
@@ -122,4 +122,3 @@ func parseTags(items []string) map[string]any {
     }
     return out
 }
-

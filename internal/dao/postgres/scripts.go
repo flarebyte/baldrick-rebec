@@ -26,15 +26,15 @@ type Script struct {
 }
 
 // InsertScriptContent ensures a content row exists for the given text and returns its hex id.
-func InsertScriptContent(ctx context.Context, db *pgxpool.Pool, body, roleName string) (string, error) {
+func InsertScriptContent(ctx context.Context, db *pgxpool.Pool, body string) (string, error) {
     canon := CanonicalizeText(body)
     if strings.TrimSpace(canon) == "" { return "", errors.New("empty script content") }
     sum := sha256.Sum256([]byte(canon))
     idHex := hex.EncodeToString(sum[:])
     // Insert if missing; use decode(hex,'hex') to convert to bytea
-    _, err := db.Exec(ctx, `INSERT INTO scripts_content (id, script_content, role_name)
-                            VALUES (decode($1,'hex'), $2, $3)
-                            ON CONFLICT (id) DO NOTHING`, idHex, canon, roleName)
+    _, err := db.Exec(ctx, `INSERT INTO scripts_content (id, script_content)
+                            VALUES (decode($1,'hex'), $2)
+                            ON CONFLICT (id) DO NOTHING`, idHex, canon)
     if err != nil { return "", err }
     return idHex, nil
 }
@@ -106,4 +106,3 @@ func DeleteScript(ctx context.Context, db *pgxpool.Pool, id string) (int64, erro
     if err != nil { return 0, err }
     return ct.RowsAffected(), nil
 }
-
