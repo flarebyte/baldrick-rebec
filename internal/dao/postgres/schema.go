@@ -31,6 +31,16 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT
         )`,
+        // Tags table (name as unique identifier) similar to workflows
+        `CREATE TABLE IF NOT EXISTS tags (
+            name TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            role_name TEXT NOT NULL DEFAULT 'user',
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT
+        )`,
         // Conversations table (id UUID) with created/updated timestamps, notes and tags
         `CREATE TABLE IF NOT EXISTS conversations (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -61,6 +71,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
                 EXECUTE PROCEDURE set_updated();
             END IF;
         END $$;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'tags_set_updated'
+            ) THEN
+                CREATE TRIGGER tags_set_updated
+                BEFORE UPDATE ON tags
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_tags_role_name ON tags(role_name)`,
         `DO $$ BEGIN
             IF NOT EXISTS (
                 SELECT 1 FROM pg_trigger WHERE tgname = 'roles_set_updated'

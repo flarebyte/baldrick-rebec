@@ -18,13 +18,13 @@ json_get_id() {
   fi
 }
 
-echo "[1/7] Resetting database (destructive)" >&2
+echo "[1/9] Resetting database (destructive)" >&2
 rbc admin db reset --force
 
-echo "[2/7] Scaffolding roles, database, privileges, schema, and content index" >&2
+echo "[2/9] Scaffolding roles, database, privileges, schema, and content index" >&2
 rbc admin db scaffold --all --yes
 
-echo "[3/7] Creating sample workflows and tasks" >&2
+echo "[3/9] Creating sample workflows and tasks" >&2
 rbc admin workflow set --name ci-test --title "Continuous Integration: Test Suite" --description "Runs unit and integration tests." --notes "CI test workflow"
 rbc admin workflow set --name ci-lint --title "Continuous Integration: Lint & Format" --description "Lints and vets the codebase." --notes "CI lint workflow"
 
@@ -35,7 +35,7 @@ rbc admin task set --workflow ci-test --command integration --variant "" --versi
 rbc admin task set --workflow ci-lint --command lint --variant go --version 1.0.0 \
   --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run "go vet ./... && golangci-lint run" --timeout "5 minutes" --tags lint,style --level h2
 
-echo "[4/7] Creating sample conversations and experiments" >&2
+echo "[4/9] Creating sample conversations and experiments" >&2
 cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX")
 cid=$(json_get_id "$cjson")
 
@@ -48,21 +48,26 @@ eid1=$(json_get_id "$ejson1")
 ejson2=$(rbc admin experiment create --conversation "$cid2")
 eid2=$(json_get_id "$ejson2")
 
-echo "[5/8] Creating roles" >&2
+echo "[5/9] Creating roles" >&2
 rbc admin role set --name user --title "User" --description "Regular end-user role" --tags default
 rbc admin role set --name qa   --title "QA"   --description "Quality assurance role" --tags testing
 
-echo "[6/8] Creating packages (role-bound tasks)" >&2
+echo "[6/9] Creating tags" >&2
+rbc admin tag set --name status  --title "Status"  --description "Common values: draft, active, archived"
+rbc admin tag set --name type    --title "Type"    --description "Common values: unit, integration"
+rbc admin tag set --name project --title "Project" --description "Example values: ci, website, product"
+
+echo "[7/9] Creating packages (role-bound tasks)" >&2
 rbc admin package set --role user --variant unit/go --version 1.0.0
 rbc admin package set --role qa   --variant integration --version 1.0.0
 rbc admin package set --role user --variant lint/go --version 1.0.0
 
-echo "[7/8] Creating sample messages" >&2
+echo "[8/9] Creating sample messages" >&2
 echo "Hello from user12" | rbc admin message set --executor user12 --experiment "$eid1" --title "Greeting" --tags hello
 echo "Build started" | rbc admin message set --executor build-bot --experiment "$eid1" --title "BuildStart" --tags build
 echo "Onboarding checklist updated" | rbc admin message set --executor docs-bot --experiment "$eid2" --title "DocsUpdate" --tags docs,update
 
-echo "[8/8] Listing all entities and counts" >&2
+echo "[9/9] Listing all entities and counts" >&2
 echo "-- Workflows --" >&2
 rbc admin workflow list --role user --limit 50
 echo "-- Tasks --" >&2
@@ -73,6 +78,8 @@ echo "-- Experiments --" >&2
 rbc admin experiment list --limit 50
 echo "-- Messages --" >&2
 rbc admin message list --role user --limit 50
+echo "-- Tags --" >&2
+rbc admin tag list --role user --limit 50
 echo "-- Table counts --" >&2
 rbc admin db count --json
 
