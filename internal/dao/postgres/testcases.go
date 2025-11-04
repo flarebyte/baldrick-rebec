@@ -30,8 +30,10 @@ func InsertTestcase(ctx context.Context, db *pgxpool.Pool, t *Testcase) error {
     q := `INSERT INTO testcases (
             name, package, classname, title, experiment_id, role_name, status, error_message, tags, level, file, line, execution_time
           ) VALUES (
-            NULLIF($1,''), NULLIF($2,''), NULLIF($3,''), $4, NULLIF($5,''), COALESCE(NULLIF($6,''),'user'), COALESCE(NULLIF($7,''),'KO'),
-            NULLIF($8,''), COALESCE($9,'{}'::jsonb), NULLIF($10,''), NULLIF($11,''), NULLIF($12,0), NULLIF($13,0.0)
+            NULLIF($1,''), NULLIF($2,''), NULLIF($3,''), $4,
+            CASE WHEN $5='' THEN NULL ELSE $5::uuid END,
+            COALESCE(NULLIF($6,''),'user'), COALESCE(NULLIF($7,''),'KO'),
+            NULLIF($8,''), COALESCE($9,'{}'::jsonb), NULLIF($10,''), NULLIF($11,''), $12, $13
           ) RETURNING id::text, created`
     var tagsJSON []byte
     if t.Tags != nil { tagsJSON, _ = json.Marshal(t.Tags) }
@@ -83,4 +85,3 @@ func DeleteTestcase(ctx context.Context, db *pgxpool.Pool, id string) (int64, er
 
 func nullOrInt(n sql.NullInt64) any { if n.Valid { return n.Int64 }; return nil }
 func nullOrFloat(f sql.NullFloat64) any { if f.Valid { return f.Float64 }; return nil }
-

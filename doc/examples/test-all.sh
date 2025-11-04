@@ -18,15 +18,25 @@ json_get_id() {
   fi
 }
 
+# Helper: create a testcase documenting a step
+tc() {
+  local title="$1"; shift
+  local line="$1"; shift || true
+  rbc admin testcase create --role user --title "$title" --status OK --file "$0" --line "${line:-0}" --tags example,script=test-all >/dev/null
+}
+
 echo "[1/11] Resetting database (destructive)" >&2
-rbc admin db reset --force
+# Make reset idempotent even if roles don't exist yet
+rbc admin db reset --force --drop-app-role=false
 
 echo "[2/11] Scaffolding roles, database, privileges, schema, and content index" >&2
 rbc admin db scaffold --all --yes
+tc "db scaffold --all --yes" "$LINENO"
 
 echo "[3/11] Creating sample workflows and tasks" >&2
 rbc admin workflow set --name ci-test --title "Continuous Integration: Test Suite" --description "Runs unit and integration tests." --notes "CI test workflow"
 rbc admin workflow set --name ci-lint --title "Continuous Integration: Lint & Format" --description "Lints and vets the codebase." --notes "CI lint workflow"
+tc "workflow set ci-test" "$LINENO"; tc "workflow set ci-lint" "$LINENO"
 
 # Create scripts for tasks and capture their ids
 sid_unit_json=$(printf "go test ./...\n" | rbc admin script set --role user --title "Unit: go test" --description "Run unit tests")
@@ -35,18 +45,22 @@ sid_integ_json=$(printf "docker compose up -d && go test -tags=integration ./...
 sid_integ=$(json_get_id "$sid_integ_json")
 sid_lint_json=$(printf "go vet ./... && golangci-lint run\n" | rbc admin script set --role user --title "Lint & Vet" --description "Runs vet and lints")
 sid_lint=$(json_get_id "$sid_lint_json")
+tc "script set Unit: go test" "$LINENO"; tc "script set Integration: compose+test" "$LINENO"; tc "script set Lint & Vet" "$LINENO"
 
 t_unit_json=$(rbc admin task set --workflow ci-test --command unit --variant go \
   --title "Run Unit Tests" --description "Executes unit tests." --shell bash --run-script "$sid_unit" --timeout "10 minutes" --tags unit,fast --level h2)
 t_unit_id=$(json_get_id "$t_unit_json")
+tc "task set ci-test unit/go" "$LINENO"
 
 t_integ_json=$(rbc admin task set --workflow ci-test --command integration --variant "" \
   --title "Run Integration Tests" --description "Runs integration tests." --shell bash --run-script "$sid_integ" --timeout "30 minutes" --tags integration,slow --level h2)
 t_integ_id=$(json_get_id "$t_integ_json")
+tc "task set ci-test integration" "$LINENO"
 
 t_lint_json=$(rbc admin task set --workflow ci-lint --command lint --variant go \
   --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run-script "$sid_lint" --timeout "5 minutes" --tags lint,style --level h2)
 t_lint_id=$(json_get_id "$t_lint_json")
+tc "task set ci-lint lint/go" "$LINENO"
 
 # Add examples of patch/minor/major replacements using the graph
 # Create updated scripts for replacements
@@ -88,50 +102,61 @@ rbc admin task next --id "$t_lint_id" --level major || true
 echo "[4/11] Creating sample conversations and experiments" >&2
 cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX")
 cid=$(json_get_id "$cjson")
+tc "conversation set Build System Refresh" "$LINENO"
 
 cjson2=$(rbc admin conversation set --title "Onboarding Improvement" --project "github.com/acme/product" --tags onboarding,docs,dx --description "Improve onboarding artifacts." --notes "Scope: docs, templates, scripts")
 cid2=$(json_get_id "$cjson2")
+tc "conversation set Onboarding Improvement" "$LINENO"
 
 ejson1=$(rbc admin experiment create --conversation "$cid")
 eid1=$(json_get_id "$ejson1")
+tc "experiment create for conversation $cid" "$LINENO"
 
 ejson2=$(rbc admin experiment create --conversation "$cid2")
 eid2=$(json_get_id "$ejson2")
+tc "experiment create for conversation $cid2" "$LINENO"
 
 echo "[5/11] Creating roles" >&2
 rbc admin role set --name user --title "User" --description "Regular end-user role" --tags default
 rbc admin role set --name qa   --title "QA"   --description "Quality assurance role" --tags testing
+tc "role set user" "$LINENO"; tc "role set qa" "$LINENO"
 
 echo "[6/11] Creating tags" >&2
 rbc admin tag set --name status  --title "Status"  --description "Common values: draft, active, archived"
 rbc admin tag set --name type    --title "Type"    --description "Common values: unit, integration"
 rbc admin tag set --name project --title "Project" --description "Example values: ci, website, product"
+tc "tag set status" "$LINENO"; tc "tag set type" "$LINENO"; tc "tag set project" "$LINENO"
 
 echo "[7/11] Creating projects" >&2
 rbc admin project set --name acme/build-system --role user --description "Build system and CI pipeline" --tags status=active,type=ci
 rbc admin project set --name acme/product      --role user --description "Main product" --tags status=active,type=app
+tc "project set acme/build-system" "$LINENO"; tc "project set acme/product" "$LINENO"
 
 echo "[8/11] Creating workspaces" >&2
 rbc admin workspace set --role user --project acme/build-system \
   --description "Local build-system workspace" --tags status=active
 rbc admin workspace set --role user --project acme/product \
   --description "Local product workspace" --tags status=active
+tc "workspace set for acme/build-system" "$LINENO"; tc "workspace set for acme/product" "$LINENO"
 
 echo "[9/12] Creating packages (role-bound tasks)" >&2
 rbc admin package set --role user --variant unit/go
 rbc admin package set --role qa   --variant integration
 rbc admin package set --role user --variant lint/go
+tc "package set user unit/go" "$LINENO"; tc "package set qa integration" "$LINENO"; tc "package set user lint/go" "$LINENO"
 
 echo "[10/12] Creating scripts" >&2
 printf "#!/usr/bin/env bash\nset -euo pipefail\necho Deploying service...\n" | \
   rbc admin script set --role user --title "Deploy Service" --description "Simple deploy script" --tags status=active,type=deploy
 printf "#!/usr/bin/env bash\nset -euo pipefail\necho Cleaning build artifacts...\n" | \
   rbc admin script set --role user --title "Cleanup Artifacts" --description "Cleanup build artifacts" --tags status=active,type=maintenance
+tc "script set Deploy Service" "$LINENO"; tc "script set Cleanup Artifacts" "$LINENO"
 
 echo "[11/13] Creating sample messages" >&2
 echo "Hello from user12" | rbc admin message set --experiment "$eid1" --title "Greeting" --tags hello
 echo "Build started" | rbc admin message set --experiment "$eid1" --title "BuildStart" --tags build
 echo "Onboarding checklist updated" | rbc admin message set --experiment "$eid2" --title "DocsUpdate" --tags docs,update
+tc "message set Greeting" "$LINENO"; tc "message set BuildStart" "$LINENO"; tc "message set DocsUpdate" "$LINENO"
 
 echo "[12/13] Creating queues" >&2
 qid1_json=$(rbc admin queue add --description "Run quick unit subset" --status Waiting --why "waiting for CI window" --tags kind=test,priority=low)
@@ -143,10 +168,13 @@ qid3=$(json_get_id "$qid3_json")
 
 echo "-- Queue: peek oldest two --" >&2
 rbc admin queue peek --limit 2
+tc "queue peek --limit 2" "$LINENO"
 echo "-- Queue: size (all) --" >&2
 rbc admin queue size
+tc "queue size" "$LINENO"
 echo "-- Queue: take one --" >&2
 rbc admin queue take --id "$qid1"
+tc "queue take $qid1" "$LINENO"
 
 echo "[13/13] Listing all entities and counts" >&2
 echo "-- Workflows --" >&2
