@@ -309,6 +309,26 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_queues_status ON queues(status)`,
         `CREATE INDEX IF NOT EXISTS idx_queues_inqueue_since ON queues(inQueueSince)`,
+        // Test cases table
+        `CREATE TABLE IF NOT EXISTS testcases (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT,
+            package TEXT,
+            classname TEXT,
+            title TEXT NOT NULL,
+            experiment_id UUID REFERENCES experiments(id) ON DELETE SET NULL,
+            role_name TEXT NOT NULL DEFAULT 'user',
+            status TEXT NOT NULL DEFAULT 'KO',
+            error_message TEXT,
+            tags JSONB DEFAULT '{}'::jsonb,
+            level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            file TEXT,
+            line INT,
+            execution_time DOUBLE PRECISION
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_testcases_role_name ON testcases(role_name)`,
+        `CREATE INDEX IF NOT EXISTS idx_testcases_experiment ON testcases(experiment_id)`,
         `DO $$ BEGIN
             IF NOT EXISTS (
                 SELECT 1 FROM pg_trigger WHERE tgname = 'packages_set_updated'

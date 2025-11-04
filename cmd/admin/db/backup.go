@@ -33,6 +33,7 @@ var backupTables = []string{
     "messages",
     "workspaces",
     "packages",
+    "testcases",
 }
 
 var backupCmd = &cobra.Command{
