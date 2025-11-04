@@ -270,20 +270,18 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             json_content JSONB,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
-        // Messages table: references tasks.id (optional), experiments.id (optional), content id
+        // Messages table: references tasks.id (optional) as from_task_id, experiments.id (optional), content id
         `CREATE TABLE IF NOT EXISTS messages (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             content_id UUID NOT NULL REFERENCES messages_content(id) ON DELETE CASCADE,
-            task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+            from_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
             experiment_id UUID REFERENCES experiments(id) ON DELETE SET NULL,
             role_name TEXT NOT NULL DEFAULT 'user',
-            executor TEXT,
-            received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            processed_at TIMESTAMPTZ,
             status TEXT NOT NULL DEFAULT 'ingested',
             error_message TEXT,
             tags JSONB DEFAULT '{}'::jsonb,
-            UNIQUE (content_id, status, received_at)
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            UNIQUE (content_id, status, created)
         )`,
         // Packages per role_name: bind a role (e.g., user, admin) to a specific
         // task (by id). Unique per (role_name, task_id).

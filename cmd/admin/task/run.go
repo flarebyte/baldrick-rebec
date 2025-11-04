@@ -22,7 +22,6 @@ var (
     flagRunVariant   string
     // removed: version
     flagRunExperiment string
-    flagRunExecutor  string
     flagRunTimeout   string // go duration; overrides task timeout
     flagRunEnv       []string
 )
@@ -65,9 +64,8 @@ var runCmd = &cobra.Command{
         contentID, err := pgdao.InsertContent(ctx, db, startText, metaStartJSON)
         if err != nil { return err }
         ev := &pgdao.MessageEvent{ ContentID: contentID, Status: "starting", Tags: map[string]any{"task": true, "run": true} }
-        if strings.TrimSpace(task.ID) != "" { ev.TaskID = sql.NullString{String: task.ID, Valid: true} }
+        if strings.TrimSpace(task.ID) != "" { ev.FromTaskID = sql.NullString{String: task.ID, Valid: true} }
         if strings.TrimSpace(flagRunExperiment) != "" { ev.ExperimentID = sql.NullString{String: flagRunExperiment, Valid: true} }
-        if strings.TrimSpace(flagRunExecutor) != "" { ev.Executor = sql.NullString{String: flagRunExecutor, Valid: true} }
         msgID, err := pgdao.InsertMessageEvent(ctx, db, ev)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "running task %s (message id=%d)\n", task.Variant, msgID)
@@ -128,11 +126,7 @@ var runCmd = &cobra.Command{
         compCID, err := pgdao.InsertContent(context.Background(), db, content, compMetaJSON)
         if err != nil { return err }
         // Update message row
-        upd := pgdao.MessageEvent{
-            ContentID:   compCID,
-            Status:      status,
-            ProcessedAt: sql.NullTime{Time: time.Now(), Valid: true},
-        }
+        upd := pgdao.MessageEvent{ ContentID: compCID, Status: status }
         if errMsg != "" { upd.ErrorMessage = sql.NullString{String: errMsg, Valid: true} }
         if err := pgdao.UpdateMessageEvent(context.Background(), db, msgID, upd); err != nil { return err }
 
@@ -157,7 +151,6 @@ func init() {
     TaskCmd.AddCommand(runCmd)
     runCmd.Flags().StringVar(&flagRunVariant, "variant", "", "Task selector variant, e.g., unit/go (required)")
     runCmd.Flags().StringVar(&flagRunExperiment, "experiment", "", "Experiment UUID to link execution")
-    runCmd.Flags().StringVar(&flagRunExecutor, "executor", "cli", "Executor identifier")
     runCmd.Flags().StringVar(&flagRunTimeout, "timeout", "", "Override timeout as Go duration, e.g., 5m30s")
     runCmd.Flags().StringSliceVar(&flagRunEnv, "env", nil, "Extra environment variables KEY=VALUE (repeatable)")
 }

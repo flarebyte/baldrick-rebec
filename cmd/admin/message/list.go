@@ -46,26 +46,17 @@ var listCmd = &cobra.Command{
         if strings.ToLower(strings.TrimSpace(flagMsgListOutput)) == "json" {
             arr := make([]map[string]any, 0, len(ms))
             for _, m := range ms {
-                item := map[string]any{
-                    "id": m.ID,
-                    "content_id": m.ContentID,
-                    "status": m.Status,
-                    "received_at": m.ReceivedAt.Format(time.RFC3339Nano),
-                }
-                if m.TaskID.Valid { item["task_id"] = m.TaskID.String }
+                item := map[string]any{"id": m.ID, "content_id": m.ContentID, "status": m.Status, "created": m.Created.Format(time.RFC3339Nano)}
+                if m.FromTaskID.Valid { item["from_task_id"] = m.FromTaskID.String }
                 if m.ExperimentID.Valid { item["experiment_id"] = m.ExperimentID.String }
                 if len(m.Tags) > 0 { item["tags"] = m.Tags }
-                if m.Executor.Valid { item["executor"] = m.Executor.String }
                 arr = append(arr, item)
             }
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
         tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "ID\tSTATUS\tRECEIVED\tEXECUTOR")
-        for _, m := range ms {
-            ex := ""; if m.Executor.Valid { ex = m.Executor.String }
-            fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", m.ID, m.Status, m.ReceivedAt.Format(time.RFC3339), ex)
-        }
+        fmt.Fprintln(tw, "ID\tSTATUS\tCREATED")
+        for _, m := range ms { fmt.Fprintf(tw, "%s\t%s\t%s\n", m.ID, m.Status, m.Created.Format(time.RFC3339)) }
         tw.Flush(); return nil
     },
 }

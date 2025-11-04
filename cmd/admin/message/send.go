@@ -28,11 +28,11 @@ func yamlUnmarshal(b []byte, v any) error {
 var (
     flagTitle       string
     flagLevel       string
-    flagFrom        string
     flagTags        []string
     flagDescription string
     flagGoal        string
     flagExperiment  string
+    flagFromTask    string
     flagFormat      string
 )
 
@@ -62,8 +62,8 @@ var setCmd = &cobra.Command{
         }
 
         // Log parsed parameters to stderr, to avoid polluting stdout pipeline
-        fmt.Fprintf(os.Stderr, "rbc admin message set: title=%q level=%q executor=%q tags=%q\n",
-            flagTitle, flagLevel, flagFrom, strings.Join(flagTags, ","),
+        fmt.Fprintf(os.Stderr, "rbc admin message set: title=%q level=%q tags=%q\n",
+            flagTitle, flagLevel, strings.Join(flagTags, ","),
         )
         if flagDescription != "" || flagGoal != "" {
             fmt.Fprintf(os.Stderr, "description=%q goal=%q\n", flagDescription, flagGoal)
@@ -85,7 +85,6 @@ var setCmd = &cobra.Command{
             meta := map[string]interface{}{
                 "title": flagTitle,
                 "level": flagLevel,
-                "executor":  flagFrom,
                 "tags":  parseTags(flagTags),
                 "description": flagDescription,
                 "goal":  flagGoal,
@@ -122,8 +121,8 @@ var setCmd = &cobra.Command{
             if insErr != nil { return insErr }
             // Insert event referencing content
             ev := &pgdao.MessageEvent{ ContentID: cid, Status: "ingested", Tags: parseTags(flagTags) }
-            // Map optional executor and experiment
-            if strings.TrimSpace(flagFrom) != "" { ev.Executor = sql.NullString{String: flagFrom, Valid: true} }
+            // Map optional from_task and experiment
+            if strings.TrimSpace(flagFromTask) != "" { ev.FromTaskID = sql.NullString{String: flagFromTask, Valid: true} }
             if strings.TrimSpace(flagExperiment) != "" { ev.ExperimentID = sql.NullString{String: flagExperiment, Valid: true} }
             if _, err := pgdao.InsertMessageEvent(ctx, db, ev); err != nil { return err }
             fmt.Fprintf(os.Stderr, "stored content id=%d and message row\n", cid)
@@ -137,7 +136,7 @@ func init() {
     // Optional
     setCmd.Flags().StringVar(&flagTitle, "title", "", "Short label for the message")
     setCmd.Flags().StringVar(&flagLevel, "level", "", "Hierarchical depth (e.g., h1, h2, h3)")
-    setCmd.Flags().StringVar(&flagFrom, "executor", "", "Executor identifier (actor id)")
+    setCmd.Flags().StringVar(&flagFromTask, "from-task", "", "From task UUID (optional)")
     setCmd.Flags().StringSliceVar(&flagTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
     setCmd.Flags().StringVar(&flagDescription, "description", "", "Longer explanation or context")
     setCmd.Flags().StringVar(&flagGoal, "goal", "", "Intended outcome of the message")

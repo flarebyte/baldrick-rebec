@@ -129,9 +129,9 @@ printf "#!/usr/bin/env bash\nset -euo pipefail\necho Cleaning build artifacts...
   rbc admin script set --role user --title "Cleanup Artifacts" --description "Cleanup build artifacts" --tags status=active,type=maintenance
 
 echo "[11/13] Creating sample messages" >&2
-echo "Hello from user12" | rbc admin message set --executor user12 --experiment "$eid1" --title "Greeting" --tags hello
-echo "Build started" | rbc admin message set --executor build-bot --experiment "$eid1" --title "BuildStart" --tags build
-echo "Onboarding checklist updated" | rbc admin message set --executor docs-bot --experiment "$eid2" --title "DocsUpdate" --tags docs,update
+echo "Hello from user12" | rbc admin message set --experiment "$eid1" --title "Greeting" --tags hello
+echo "Build started" | rbc admin message set --experiment "$eid1" --title "BuildStart" --tags build
+echo "Onboarding checklist updated" | rbc admin message set --experiment "$eid2" --title "DocsUpdate" --tags docs,update
 
 echo "[12/13] Creating queues" >&2
 qid1_json=$(rbc admin queue add --description "Run quick unit subset" --status Waiting --why "waiting for CI window" --tags kind=test,priority=low)

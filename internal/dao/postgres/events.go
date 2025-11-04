@@ -13,11 +13,9 @@ import (
 type MessageEvent struct {
     ID             string
     ContentID      string
-    TaskID         sql.NullString
+    FromTaskID     sql.NullString
     ExperimentID   sql.NullString
-    Executor       sql.NullString
-    ReceivedAt     time.Time
-    ProcessedAt    sql.NullTime
+    Created        time.Time
     Status         string
     ErrorMessage   sql.NullString
     Tags           map[string]any
@@ -28,24 +26,20 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
         return "", errors.New("nil event")
     }
     q := `INSERT INTO messages (
-            content_id, task_id, experiment_id, executor,
-            received_at, processed_at, status, error_message, tags
+            content_id, from_task_id, experiment_id,
+            status, error_message, tags, created
         ) VALUES (
-            $1::uuid,$2,$3,$4,
-            COALESCE($5, now()),$6,$7,$8,COALESCE($9,'{}'::jsonb)
+            $1::uuid,$2,$3,
+            $4,$5,COALESCE($6,'{}'::jsonb),COALESCE($7, now())
         ) RETURNING id::text`
     var id string
-    var receivedAt any
-    if ev.ReceivedAt.IsZero() {
-        receivedAt = nil
-    } else {
-        receivedAt = ev.ReceivedAt
-    }
+    var created any
+    if ev.Created.IsZero() { created = nil } else { created = ev.Created }
     var tagsJSON []byte
     if ev.Tags != nil { tagsJSON, _ = json.Marshal(ev.Tags) }
     err := db.QueryRow(ctx, q,
-        ev.ContentID, nullOrUUID(ev.TaskID), nullOrUUID(ev.ExperimentID), nullOrString(ev.Executor),
-        receivedAt, nullOrTime(ev.ProcessedAt), ev.Status, nullOrString(ev.ErrorMessage), tagsJSON,
+        ev.ContentID, nullOrUUID(ev.FromTaskID), nullOrUUID(ev.ExperimentID),
+        ev.Status, nullOrString(ev.ErrorMessage), tagsJSON, created,
     ).Scan(&id)
     if err != nil {
         return "", err
@@ -54,28 +48,24 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
     return id, nil
 }
 
-// UpdateMessageEvent updates mutable fields of a message event: status, processed_at,
-// error_message, content_id, executor, tags and meta. Any zero-value/empty inputs are ignored
+// UpdateMessageEvent updates mutable fields of a message event: status,
+// error_message, content_id, tags. Any zero-value/empty inputs are ignored
 // unless explicitly provided via sql.Null* with Valid=true.
 func UpdateMessageEvent(ctx context.Context, db *pgxpool.Pool, id string, update MessageEvent) error {
     // Build a compact UPDATE with COALESCE on provided fields while staying parameterized.
     // We purposely keep a fixed-shape query to avoid dynamic SQL per DB guidelines.
     q := `UPDATE messages SET
             status = COALESCE(NULLIF($1,''), status),
-            processed_at = COALESCE($2, processed_at),
-            error_message = COALESCE($3, error_message),
-            content_id = COALESCE(NULLIF($4::uuid,'00000000-0000-0000-0000-000000000000'::uuid), content_id),
-            executor = COALESCE($5, executor),
-            tags = COALESCE($6, tags)
-          WHERE id=$7::uuid`
+            error_message = COALESCE($2, error_message),
+            content_id = COALESCE(NULLIF($3::uuid,'00000000-0000-0000-0000-000000000000'::uuid), content_id),
+            tags = COALESCE($4, tags)
+          WHERE id=$5::uuid`
     var tagsJSON []byte
     if update.Tags != nil { tagsJSON, _ = json.Marshal(update.Tags) }
     _, err := db.Exec(ctx, q,
         update.Status,
-        nullOrTime(update.ProcessedAt),
         nullOrString(update.ErrorMessage),
         update.ContentID,
-        nullOrString(update.Executor),
         jsonOrNil(tagsJSON),
         id,
     )
@@ -84,8 +74,8 @@ func UpdateMessageEvent(ctx context.Context, db *pgxpool.Pool, id string, update
 
 func GetMessageEventByID(ctx context.Context, db *pgxpool.Pool, id string) (*MessageEvent, error) {
     q := `SELECT id::text, content_id::text,
-                 task_id, experiment_id, executor,
-                 received_at, processed_at, status, error_message, tags
+                 from_task_id, experiment_id,
+                 created, status, error_message, tags
           FROM messages WHERE id=$1::uuid`
     row := db.QueryRow(ctx, q, id)
     var out MessageEvent
@@ -94,13 +84,13 @@ func GetMessageEventByID(ctx context.Context, db *pgxpool.Pool, id string) (*Mes
     var taskID, expID sql.NullString
     err := row.Scan(
         &out.ID, &out.ContentID,
-        &taskID, &expID, &out.Executor,
-        &out.ReceivedAt, &out.ProcessedAt, &out.Status, &out.ErrorMessage, &tagsJSON,
+        &taskID, &expID,
+        &out.Created, &out.Status, &out.ErrorMessage, &tagsJSON,
     )
     if err != nil {
         return nil, err
     }
-    out.TaskID = taskID
+    out.FromTaskID = taskID
     out.ExperimentID = expID
     if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &out.Tags) }
     _ = metaBytes
@@ -116,36 +106,36 @@ func ListMessages(ctx context.Context, db *pgxpool.Pool, roleName, experimentID,
     var err error
     switch {
     case stringsTrim(experimentID) != "" && stringsTrim(taskID) != "" && status != "":
-        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, task_id, experiment_id, executor, received_at, processed_at, status, error_message, tags
-                                   FROM messages WHERE role_name=$1 AND experiment_id=$2::uuid AND task_id=$3::uuid AND status=$4
-                                   ORDER BY received_at DESC LIMIT $5 OFFSET $6`, roleName, experimentID, taskID, status, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, from_task_id, experiment_id, created, status, error_message, tags
+                                   FROM messages WHERE role_name=$1 AND experiment_id=$2::uuid AND from_task_id=$3::uuid AND status=$4
+                                   ORDER BY created DESC LIMIT $5 OFFSET $6`, roleName, experimentID, taskID, status, limit, offset)
     case stringsTrim(experimentID) != "" && stringsTrim(taskID) != "":
-        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, task_id, experiment_id, executor, received_at, processed_at, status, error_message, tags
-                                   FROM messages WHERE role_name=$1 AND experiment_id=$2::uuid AND task_id=$3::uuid
-                                   ORDER BY received_at DESC LIMIT $4 OFFSET $5`, roleName, experimentID, taskID, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, from_task_id, experiment_id, created, status, error_message, tags
+                                   FROM messages WHERE role_name=$1 AND experiment_id=$2::uuid AND from_task_id=$3::uuid
+                                   ORDER BY created DESC LIMIT $4 OFFSET $5`, roleName, experimentID, taskID, limit, offset)
     case stringsTrim(experimentID) != "" && status != "":
-        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, task_id, experiment_id, executor, received_at, processed_at, status, error_message, tags
+        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, from_task_id, experiment_id, created, status, error_message, tags
                                    FROM messages WHERE role_name=$1 AND experiment_id=$2::uuid AND status=$3
-                                   ORDER BY received_at DESC LIMIT $4 OFFSET $5`, roleName, experimentID, status, limit, offset)
+                                   ORDER BY created DESC LIMIT $4 OFFSET $5`, roleName, experimentID, status, limit, offset)
     case stringsTrim(taskID) != "" && status != "":
-        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, task_id, experiment_id, executor, received_at, processed_at, status, error_message, tags
-                                   FROM messages WHERE role_name=$1 AND task_id=$2::uuid AND status=$3
-                                   ORDER BY received_at DESC LIMIT $4 OFFSET $5`, roleName, taskID, status, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, from_task_id, experiment_id, created, status, error_message, tags
+                                   FROM messages WHERE role_name=$1 AND from_task_id=$2::uuid AND status=$3
+                                   ORDER BY created DESC LIMIT $4 OFFSET $5`, roleName, taskID, status, limit, offset)
     case stringsTrim(experimentID) != "":
-        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, task_id, experiment_id, executor, received_at, processed_at, status, error_message, tags
+        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, from_task_id, experiment_id, created, status, error_message, tags
                                    FROM messages WHERE role_name=$1 AND experiment_id=$2::uuid
-                                   ORDER BY received_at DESC LIMIT $3 OFFSET $4`, roleName, experimentID, limit, offset)
+                                   ORDER BY created DESC LIMIT $3 OFFSET $4`, roleName, experimentID, limit, offset)
     case stringsTrim(taskID) != "":
-        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, task_id, experiment_id, executor, received_at, processed_at, status, error_message, tags
-                                   FROM messages WHERE role_name=$1 AND task_id=$2::uuid
-                                   ORDER BY received_at DESC LIMIT $3 OFFSET $4`, roleName, taskID, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, from_task_id, experiment_id, created, status, error_message, tags
+                                   FROM messages WHERE role_name=$1 AND from_task_id=$2::uuid
+                                   ORDER BY created DESC LIMIT $3 OFFSET $4`, roleName, taskID, limit, offset)
     case status != "":
-        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, task_id, experiment_id, executor, received_at, processed_at, status, error_message, tags
+        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, from_task_id, experiment_id, created, status, error_message, tags
                                    FROM messages WHERE role_name=$1 AND status=$2
-                                   ORDER BY received_at DESC LIMIT $3 OFFSET $4`, roleName, status, limit, offset)
+                                   ORDER BY created DESC LIMIT $3 OFFSET $4`, roleName, status, limit, offset)
     default:
-        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, task_id, experiment_id, executor, received_at, processed_at, status, error_message, tags
-                                   FROM messages WHERE role_name=$1 ORDER BY received_at DESC LIMIT $2 OFFSET $3`, roleName, limit, offset)
+        rows, err = db.Query(ctx, `SELECT id::text, content_id::text, from_task_id, experiment_id, created, status, error_message, tags
+                                   FROM messages WHERE role_name=$1 ORDER BY created DESC LIMIT $2 OFFSET $3`, roleName, limit, offset)
     }
     if err != nil { return nil, err }
     defer rows.Close()
@@ -153,7 +143,7 @@ func ListMessages(ctx context.Context, db *pgxpool.Pool, roleName, experimentID,
     for rows.Next() {
         var r MessageEvent
         var tagsJSON []byte
-        if err := rows.Scan(&r.ID, &r.ContentID, &r.TaskID, &r.ExperimentID, &r.Executor, &r.ReceivedAt, &r.ProcessedAt, &r.Status, &r.ErrorMessage, &tagsJSON); err != nil {
+        if err := rows.Scan(&r.ID, &r.ContentID, &r.FromTaskID, &r.ExperimentID, &r.Created, &r.Status, &r.ErrorMessage, &tagsJSON); err != nil {
             return nil, err
         }
         if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &r.Tags) }

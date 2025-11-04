@@ -34,7 +34,7 @@ var getCmd = &cobra.Command{
         m, err := pgdao.GetMessageEventByID(ctx, db, flagMsgGetID)
         if err != nil { return err }
         // Human
-        fmt.Fprintf(os.Stderr, "message id=%d status=%q\n", m.ID, m.Status)
+        fmt.Fprintf(os.Stderr, "message id=%s status=%q\n", m.ID, m.Status)
         // Fetch content for hash and optional expansion
         content, err := pgdao.GetContent(ctx, db, m.ContentID)
         if err != nil { return err }
@@ -46,13 +46,11 @@ var getCmd = &cobra.Command{
             "content_id_hash": hash,
             "status": m.Status,
         }
-        if m.TaskID.Valid { out["task_id"] = m.TaskID.String }
+        if m.FromTaskID.Valid { out["from_task_id"] = m.FromTaskID.String }
         if m.ExperimentID.Valid { out["experiment_id"] = m.ExperimentID.String }
-        if m.Executor.Valid { out["executor"] = m.Executor.String }
         if m.ErrorMessage.Valid { out["error_message"] = m.ErrorMessage.String }
         if len(m.Tags) > 0 { out["tags"] = m.Tags }
-        if m.ProcessedAt.Valid { out["processed_at"] = m.ProcessedAt.Time.Format(time.RFC3339Nano) }
-        out["received_at"] = m.ReceivedAt.Format(time.RFC3339Nano)
+        out["created"] = m.Created.Format(time.RFC3339Nano)
         // meta removed
         if flagMsgExpand {
             out["text_content"] = content.TextContent

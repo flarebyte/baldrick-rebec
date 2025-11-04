@@ -101,7 +101,7 @@ func upsertRow(ctx context.Context, db *pgxpool.Pool, tbl string, obj rowObj, up
     case "messages_content":
         return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"text_content",""},{"json_content",":jsonb"},{"created_at",":timestamptz"}}, "id", upsert, obj)
     case "messages":
-        return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"content_id",":uuid"},{"task_id",":uuid"},{"experiment_id",":uuid"},{"role_name",""},{"executor",""},{"received_at",":timestamptz"},{"processed_at",":timestamptz"},{"status",""},{"error_message",""},{"tags",":jsonb"}}, "id", upsert, obj)
+        return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"content_id",":uuid"},{"from_task_id",":uuid"},{"experiment_id",":uuid"},{"role_name",""},{"status",""},{"error_message",""},{"tags",":jsonb"},{"created",":timestamptz"}}, "id", upsert, obj)
     case "workspaces":
         return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"description",""},{"role_name",""},{"project_name",""},{"build_script_id",":uuid"},{"created",":timestamptz"},{"updated",":timestamptz"},{"tags",":jsonb"}}, "id", upsert, obj)
     case "packages":
@@ -161,4 +161,3 @@ func init() {
     restoreCmd.Flags().BoolVar(&flagRestoreDelete, "delete-existing", false, "Delete existing records before restore")
     restoreCmd.Flags().BoolVar(&flagRestoreUpsert, "upsert", false, "Upsert (create/update) existing records (default true if no flags)")
 }
-
