@@ -128,12 +128,27 @@ printf "#!/usr/bin/env bash\nset -euo pipefail\necho Deploying service...\n" | \
 printf "#!/usr/bin/env bash\nset -euo pipefail\necho Cleaning build artifacts...\n" | \
   rbc admin script set --role user --title "Cleanup Artifacts" --description "Cleanup build artifacts" --tags status=active,type=maintenance
 
-echo "[11/12] Creating sample messages" >&2
+echo "[11/13] Creating sample messages" >&2
 echo "Hello from user12" | rbc admin message set --executor user12 --experiment "$eid1" --title "Greeting" --tags hello
 echo "Build started" | rbc admin message set --executor build-bot --experiment "$eid1" --title "BuildStart" --tags build
 echo "Onboarding checklist updated" | rbc admin message set --executor docs-bot --experiment "$eid2" --title "DocsUpdate" --tags docs,update
 
-echo "[12/12] Listing all entities and counts" >&2
+echo "[12/13] Creating queues" >&2
+qid1_json=$(rbc admin queue add --description "Run quick unit subset" --status Waiting --why "waiting for CI window" --tags kind=test,priority=low)
+qid1=$(json_get_id "$qid1_json")
+qid2_json=$(rbc admin queue add --description "Run full integration suite" --status Buildable --tags kind=test,priority=high)
+qid2=$(json_get_id "$qid2_json")
+qid3_json=$(rbc admin queue add --description "Strict lint pass" --status Blocked --why "env not ready" --tags kind=lint)
+qid3=$(json_get_id "$qid3_json")
+
+echo "-- Queue: peek oldest two --" >&2
+rbc admin queue peek --limit 2
+echo "-- Queue: size (all) --" >&2
+rbc admin queue size
+echo "-- Queue: take one --" >&2
+rbc admin queue take --id "$qid1"
+
+echo "[13/13] Listing all entities and counts" >&2
 echo "-- Workflows --" >&2
 rbc admin workflow list --role user --limit 50
 echo "-- Tasks --" >&2

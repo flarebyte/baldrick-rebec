@@ -5,6 +5,7 @@ import (
     configcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/config"
     dbcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/db"
     scripcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/script"
+    qcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/queue"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/message"
     wscmd "github.com/flarebyte/baldrick-rebec/cmd/admin/workspace"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/role"
@@ -27,6 +28,7 @@ func init() {
     AdminCmd.AddCommand(conversation.ConversationCmd)
     AdminCmd.AddCommand(configcmd.ConfigCmd)
     AdminCmd.AddCommand(dbcmd.DBCmd)
+    AdminCmd.AddCommand(qcmd.QueueCmd)
     AdminCmd.AddCommand(scripcmd.ScriptCmd)
     AdminCmd.AddCommand(message.MessageCmd)
     AdminCmd.AddCommand(wscmd.WorkspaceCmd)
