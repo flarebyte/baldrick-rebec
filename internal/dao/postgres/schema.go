@@ -417,6 +417,51 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_topics_role_name ON topics(role_name)`,
+        // Stickies: notes attached to blackboards, optionally associated to topics
+        `CREATE TABLE IF NOT EXISTS stickies (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            blackboard_id UUID NOT NULL REFERENCES blackboards(id) ON DELETE CASCADE,
+            topic_name TEXT,
+            topic_role_name TEXT,
+            note TEXT,
+            labels TEXT[],
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            created_by_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+            edit_count INT NOT NULL DEFAULT 0,
+            priority_level TEXT CHECK (priority_level IN ('must','should','could','wont') OR priority_level IS NULL),
+            FOREIGN KEY (topic_name, topic_role_name) REFERENCES topics(name, role_name) ON DELETE SET NULL
+        )`,
+        // Trigger to auto-increment edit_count on any update
+        `CREATE OR REPLACE FUNCTION inc_edit_count()
+         RETURNS TRIGGER AS $$
+         BEGIN
+            NEW.edit_count = COALESCE(OLD.edit_count,0) + 1;
+            RETURN NEW;
+         END;
+         $$ LANGUAGE plpgsql;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'stickies_inc_edit_count'
+            ) THEN
+                CREATE TRIGGER stickies_inc_edit_count
+                BEFORE UPDATE ON stickies
+                FOR EACH ROW
+                EXECUTE PROCEDURE inc_edit_count();
+            END IF;
+        END $$;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'stickies_set_updated'
+            ) THEN
+                CREATE TRIGGER stickies_set_updated
+                BEFORE UPDATE ON stickies
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_stickies_blackboard ON stickies(blackboard_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_stickies_topic ON stickies(topic_name, topic_role_name)`,
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {

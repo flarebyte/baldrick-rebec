@@ -26,6 +26,7 @@ var backupTables = []string{
     "stores",
     "topics",
     "blackboards",
+    "stickies",
     "conversations",
     "experiments",
     "task_variants",
