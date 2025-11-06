@@ -157,6 +157,18 @@ bb2_json=$(rbc admin blackboard set --role user --store-id "$s2" \
 bb2=$(json_get_id "$bb2_json")
 tc "blackboard set for ideas-acme-build ($bb1)" "$LINENO"; tc "blackboard set for blackboard-global ($bb2)" "$LINENO"
 
+echo "[8.2/11] Creating stickies" >&2
+st1_json=$(rbc admin stickie set --blackboard "$bb1" --topic-name onboarding --topic-role user \
+  --note "Draft project setup checklist" --labels todo,checklist --created-by-task "$t_unit_id" --priority should)
+st1=$(json_get_id "$st1_json")
+st2_json=$(rbc admin stickie set --blackboard "$bb1" --topic-name devops --topic-role user \
+  --note "Consider migrating to Taskfile" --labels idea,devops --priority could)
+st2=$(json_get_id "$st2_json")
+st3_json=$(rbc admin stickie set --blackboard "$bb2" \
+  --note "Team retro every Friday" --labels team,ritual --priority must)
+st3=$(json_get_id "$st3_json")
+tc "stickie set onboarding ($st1)" "$LINENO"; tc "stickie set devops ($st2)" "$LINENO"; tc "stickie set team ritual ($st3)" "$LINENO"
+
 echo "[8/11] Creating workspaces" >&2
 rbc admin workspace set --role user --project acme/build-system \
   --description "Local build-system workspace" --tags status=active
@@ -224,6 +236,12 @@ echo "-- Topics --" >&2
 rbc admin topic list --role user --limit 50
 echo "-- Blackboards --" >&2
 rbc admin blackboard list --role user --limit 50
+echo "-- Stickies (all) --" >&2
+rbc admin stickie list --limit 50
+echo "-- Stickies for ideas-acme-build board --" >&2
+rbc admin stickie list --blackboard "$bb1" --limit 50
+echo "-- Stickies with topic=devops --" >&2
+rbc admin stickie list --topic-name devops --topic-role user --limit 50
 echo "-- Tags --" >&2
 rbc admin tag list --role user --limit 50
 echo "-- Table counts --" >&2
