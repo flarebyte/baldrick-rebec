@@ -137,6 +137,21 @@ rbc admin store set --name ideas-acme-build --role user --title "Ideas for acme/
 rbc admin store set --name blackboard-global --role user --title "Shared Blackboard" --description "Scratch space for team" --type blackboard --scope shared --lifecycle weekly --tags visibility=team
 tc "store set ideas-acme-build" "$LINENO"; tc "store set blackboard-global" "$LINENO"
 
+echo "[8.1/11] Creating blackboards" >&2
+# Fetch store ids
+s1_json=$(rbc admin store get --name ideas-acme-build --role user)
+s1=$(json_get_id "$s1_json")
+s2_json=$(rbc admin store get --name blackboard-global --role user)
+s2=$(json_get_id "$s2_json")
+# Create blackboards linked to stores
+bb1_json=$(rbc admin blackboard set --role user --store-id "$s1" --project acme/build-system --conversation "$cid" \
+  --background "Ideas board for build system" --guidelines "Keep concise; tag items with priority")
+bb1=$(json_get_id "$bb1_json")
+bb2_json=$(rbc admin blackboard set --role user --store-id "$s2" \
+  --background "Team-wide blackboard" --guidelines "Wipe weekly on Mondays")
+bb2=$(json_get_id "$bb2_json")
+tc "blackboard set for ideas-acme-build ($bb1)" "$LINENO"; tc "blackboard set for blackboard-global ($bb2)" "$LINENO"
+
 echo "[8/11] Creating workspaces" >&2
 rbc admin workspace set --role user --project acme/build-system \
   --description "Local build-system workspace" --tags status=active
@@ -200,6 +215,8 @@ echo "-- Scripts --" >&2
 rbc admin script list --role user --limit 50
 echo "-- Stores --" >&2
 rbc admin store list --role user --limit 50
+echo "-- Blackboards --" >&2
+rbc admin blackboard list --role user --limit 50
 echo "-- Tags --" >&2
 rbc admin tag list --role user --limit 50
 echo "-- Table counts --" >&2
