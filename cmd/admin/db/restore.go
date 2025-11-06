@@ -47,7 +47,7 @@ var restoreCmd = &cobra.Command{
             if err := truncateAll(ctx, db); err != nil { return err }
         }
         // Insert in FK-safe order
-        order := []string{"roles","workflows","tags","projects","stores","conversations","experiments","task_variants","tasks","scripts_content","scripts","messages_content","messages","workspaces","packages","testcases"}
+        order := []string{"roles","workflows","tags","projects","stores","conversations","experiments","task_variants","tasks","scripts_content","scripts","messages_content","messages","workspaces","blackboards","packages","testcases"}
         for _, tbl := range order {
             rows := dump[tbl]
             for _, raw := range rows {
@@ -62,7 +62,7 @@ var restoreCmd = &cobra.Command{
 }
 
 func truncateAll(ctx context.Context, db *pgxpool.Pool) error {
-    _, err := db.Exec(ctx, `TRUNCATE TABLE packages, messages, messages_content, scripts, scripts_content, tasks, task_variants, experiments, conversations, workspaces, stores, projects, workflows, roles, tags RESTART IDENTITY CASCADE`)
+    _, err := db.Exec(ctx, `TRUNCATE TABLE packages, blackboards, messages, messages_content, scripts, scripts_content, tasks, task_variants, experiments, conversations, workspaces, stores, projects, workflows, roles, tags RESTART IDENTITY CASCADE`)
     return err
 }
 
@@ -104,6 +104,8 @@ func upsertRow(ctx context.Context, db *pgxpool.Pool, tbl string, obj rowObj, up
         return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"content_id",":uuid"},{"from_task_id",":uuid"},{"experiment_id",":uuid"},{"role_name",""},{"status",""},{"error_message",""},{"tags",":jsonb"},{"created",":timestamptz"}}, "id", upsert, obj)
     case "workspaces":
         return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"description",""},{"role_name",""},{"project_name",""},{"build_script_id",":uuid"},{"created",":timestamptz"},{"updated",":timestamptz"},{"tags",":jsonb"}}, "id", upsert, obj)
+    case "blackboards":
+        return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"store_id",":uuid"},{"role_name",""},{"conversation_id",":uuid"},{"project_name",""},{"task_id",":uuid"},{"created",":timestamptz"},{"updated",":timestamptz"},{"background",""},{"guidelines",""}}, "id", upsert, obj)
     case "packages":
         return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"role_name",""},{"task_id",":uuid"},{"created",":timestamptz"},{"updated",":timestamptz"}}, "id", upsert, obj)
     case "testcases":

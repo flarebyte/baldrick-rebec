@@ -8,6 +8,7 @@ import (
     qcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/queue"
     tccmd "github.com/flarebyte/baldrick-rebec/cmd/admin/testcase"
     storecmd "github.com/flarebyte/baldrick-rebec/cmd/admin/store"
+    bbcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/blackboard"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/message"
     wscmd "github.com/flarebyte/baldrick-rebec/cmd/admin/workspace"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/role"
@@ -33,6 +34,7 @@ func init() {
     AdminCmd.AddCommand(qcmd.QueueCmd)
     AdminCmd.AddCommand(tccmd.TestcaseCmd)
     AdminCmd.AddCommand(storecmd.StoreCmd)
+    AdminCmd.AddCommand(bbcmd.BlackboardCmd)
     AdminCmd.AddCommand(scripcmd.ScriptCmd)
     AdminCmd.AddCommand(message.MessageCmd)
     AdminCmd.AddCommand(wscmd.WorkspaceCmd)

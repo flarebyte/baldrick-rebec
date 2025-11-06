@@ -369,6 +369,31 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_stores_role_name ON stores(role_name)`,
+        // Blackboards: notes tied to a store with optional links
+        `CREATE TABLE IF NOT EXISTS blackboards (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+            role_name TEXT NOT NULL DEFAULT 'user',
+            conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+            project_name TEXT,
+            task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            background TEXT,
+            guidelines TEXT,
+            FOREIGN KEY (project_name, role_name) REFERENCES projects(name, role_name) ON DELETE SET NULL
+        )`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'blackboards_set_updated'
+            ) THEN
+                CREATE TRIGGER blackboards_set_updated
+                BEFORE UPDATE ON blackboards
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_blackboards_role_name ON blackboards(role_name)`,
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
