@@ -127,6 +127,11 @@ rbc admin tag set --name type    --title "Type"    --description "Common values:
 rbc admin tag set --name project --title "Project" --description "Example values: ci, website, product"
 tc "tag set status" "$LINENO"; tc "tag set type" "$LINENO"; tc "tag set project" "$LINENO"
 
+echo "[6.5/11] Creating topics" >&2
+rbc admin topic set --name onboarding --role user --title "Onboarding" --description "Docs and environment setup" --tags area=docs,priority=med
+rbc admin topic set --name devops     --role user --title "DevOps"    --description "Build, deploy, CI/CD"     --tags area=platform,priority=high
+tc "topic set onboarding" "$LINENO"; tc "topic set devops" "$LINENO"
+
 echo "[7/11] Creating projects" >&2
 rbc admin project set --name acme/build-system --role user --description "Build system and CI pipeline" --tags status=active,type=ci
 rbc admin project set --name acme/product      --role user --description "Main product" --tags status=active,type=app
@@ -215,6 +220,8 @@ echo "-- Scripts --" >&2
 rbc admin script list --role user --limit 50
 echo "-- Stores --" >&2
 rbc admin store list --role user --limit 50
+echo "-- Topics --" >&2
+rbc admin topic list --role user --limit 50
 echo "-- Blackboards --" >&2
 rbc admin blackboard list --role user --limit 50
 echo "-- Tags --" >&2
