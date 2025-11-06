@@ -47,7 +47,7 @@ var restoreCmd = &cobra.Command{
             if err := truncateAll(ctx, db); err != nil { return err }
         }
         // Insert in FK-safe order
-        order := []string{"roles","workflows","tags","projects","stores","conversations","experiments","task_variants","tasks","scripts_content","scripts","messages_content","messages","workspaces","blackboards","packages","testcases"}
+        order := []string{"roles","workflows","tags","projects","stores","topics","conversations","experiments","task_variants","tasks","scripts_content","scripts","messages_content","messages","workspaces","blackboards","packages","testcases"}
         for _, tbl := range order {
             rows := dump[tbl]
             for _, raw := range rows {
@@ -62,7 +62,7 @@ var restoreCmd = &cobra.Command{
 }
 
 func truncateAll(ctx context.Context, db *pgxpool.Pool) error {
-    _, err := db.Exec(ctx, `TRUNCATE TABLE packages, blackboards, messages, messages_content, scripts, scripts_content, tasks, task_variants, experiments, conversations, workspaces, stores, projects, workflows, roles, tags RESTART IDENTITY CASCADE`)
+    _, err := db.Exec(ctx, `TRUNCATE TABLE packages, blackboards, messages, messages_content, scripts, scripts_content, tasks, task_variants, experiments, conversations, workspaces, topics, stores, projects, workflows, roles, tags RESTART IDENTITY CASCADE`)
     return err
 }
 
@@ -112,6 +112,8 @@ func upsertRow(ctx context.Context, db *pgxpool.Pool, tbl string, obj rowObj, up
         return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"name",""},{"package",""},{"classname",""},{"title",""},{"experiment_id",":uuid"},{"role_name",""},{"status",""},{"error_message",""},{"tags",":jsonb"},{"level",""},{"created",":timestamptz"},{"file",""},{"line",""},{"execution_time",""}}, "id", upsert, obj)
     case "stores":
         return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"name",""},{"title",""},{"description",""},{"motivation",""},{"security",""},{"privacy",""},{"role_name",""},{"created",":timestamptz"},{"updated",":timestamptz"},{"notes",""},{"tags",":jsonb"},{"store_type",""},{"scope",""},{"lifecycle",""}}, "id", upsert, obj)
+    case "topics":
+        return insertGeneric(ctx, db, tbl, []col{{"name",""},{"role_name",""},{"title",""},{"description",""},{"created",":timestamptz"},{"updated",":timestamptz"},{"notes",""},{"tags",":jsonb"}}, "(name,role_name)", upsert, obj)
     default:
         return errors.New("unknown table: "+tbl)
     }

@@ -14,6 +14,7 @@ import (
     "github.com/flarebyte/baldrick-rebec/cmd/admin/role"
     prjcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/project"
     tagcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/tag"
+    topiccmd "github.com/flarebyte/baldrick-rebec/cmd/admin/topic"
     pkgcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/package"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/workflow"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/task"
@@ -41,6 +42,7 @@ func init() {
     AdminCmd.AddCommand(role.RoleCmd)
     AdminCmd.AddCommand(prjcmd.ProjectCmd)
     AdminCmd.AddCommand(tagcmd.TagCmd)
+    AdminCmd.AddCommand(topiccmd.TopicCmd)
     AdminCmd.AddCommand(pkgcmd.PackageCmd)
     AdminCmd.AddCommand(workflow.WorkflowCmd)
     AdminCmd.AddCommand(task.TaskCmd)
