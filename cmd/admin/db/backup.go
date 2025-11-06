@@ -23,6 +23,7 @@ var backupTables = []string{
     "workflows",
     "tags",
     "projects",
+    "stores",
     "conversations",
     "experiments",
     "task_variants",

@@ -132,6 +132,11 @@ rbc admin project set --name acme/build-system --role user --description "Build 
 rbc admin project set --name acme/product      --role user --description "Main product" --tags status=active,type=app
 tc "project set acme/build-system" "$LINENO"; tc "project set acme/product" "$LINENO"
 
+echo "[8/11] Creating stores" >&2
+rbc admin store set --name ideas-acme-build --role user --title "Ideas for acme/build-system" --description "Idea backlog" --type journal --scope project --lifecycle monthly --tags topic=ideas,project=acme/build-system
+rbc admin store set --name blackboard-global --role user --title "Shared Blackboard" --description "Scratch space for team" --type blackboard --scope shared --lifecycle weekly --tags visibility=team
+tc "store set ideas-acme-build" "$LINENO"; tc "store set blackboard-global" "$LINENO"
+
 echo "[8/11] Creating workspaces" >&2
 rbc admin workspace set --role user --project acme/build-system \
   --description "Local build-system workspace" --tags status=active
@@ -193,6 +198,8 @@ echo "-- Workspaces --" >&2
 rbc admin workspace list --role user --limit 50
 echo "-- Scripts --" >&2
 rbc admin script list --role user --limit 50
+echo "-- Stores --" >&2
+rbc admin store list --role user --limit 50
 echo "-- Tags --" >&2
 rbc admin tag list --role user --limit 50
 echo "-- Table counts --" >&2

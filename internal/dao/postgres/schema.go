@@ -339,6 +339,36 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
                 EXECUTE PROCEDURE set_updated();
             END IF;
         END $$;`,
+        // Stores: generic storage for notes/ideas/etc scoped by role and name
+        `CREATE TABLE IF NOT EXISTS stores (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            motivation TEXT,
+            security TEXT,
+            privacy TEXT,
+            role_name TEXT NOT NULL DEFAULT 'user',
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT,
+            tags JSONB DEFAULT '{}'::jsonb,
+            store_type TEXT,
+            scope TEXT CHECK (scope IN ('conversation','shared','project','task') OR scope IS NULL),
+            lifecycle TEXT CHECK (lifecycle IN ('permanent','yearly','quarterly','monthly','weekly','daily') OR lifecycle IS NULL),
+            UNIQUE (name, role_name)
+        )`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'stores_set_updated'
+            ) THEN
+                CREATE TRIGGER stores_set_updated
+                BEFORE UPDATE ON stores
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_stores_role_name ON stores(role_name)`,
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
