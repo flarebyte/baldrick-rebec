@@ -11,7 +11,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    tt "text/tabwriter"
+    "github.com/olekukonko/tablewriter"
     "github.com/spf13/cobra"
 )
 
@@ -50,13 +50,13 @@ var listCmd = &cobra.Command{
             }
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
-        tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "ID\tTITLE\tSTATUS\tCREATED")
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"ID", "TITLE", "STATUS", "CREATED"})
         for _, t := range items {
             created := ""; if t.Created.Valid { created = t.Created.Time.Format(time.RFC3339) }
-            fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", t.ID, t.Title, t.Status, created)
+            table.Append([]string{t.ID, t.Title, t.Status, created})
         }
-        tw.Flush(); return nil
+        table.Render(); return nil
     },
 }
 
@@ -69,4 +69,3 @@ func init() {
     listCmd.Flags().IntVar(&flagTCListOffset, "offset", 0, "Offset")
     listCmd.Flags().StringVar(&flagTCListOutput, "output", "table", "Output format: table or json")
 }
-

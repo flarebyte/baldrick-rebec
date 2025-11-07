@@ -10,7 +10,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    tt "text/tabwriter"
+    "github.com/olekukonko/tablewriter"
     "github.com/spf13/cobra"
 )
 
@@ -41,13 +41,13 @@ var peekCmd = &cobra.Command{
             }
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
-        tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "ID\tSTATUS\tSINCE")
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"ID", "STATUS", "SINCE"})
         for _, q := range items {
             since := ""; if q.InQueueSince.Valid { since = q.InQueueSince.Time.Format(time.RFC3339) }
-            fmt.Fprintf(tw, "%s\t%s\t%s\n", q.ID, q.Status, since)
+            table.Append([]string{q.ID, q.Status, since})
         }
-        tw.Flush(); return nil
+        table.Render(); return nil
     },
 }
 
@@ -57,4 +57,3 @@ func init() {
     peekCmd.Flags().StringVar(&flagQPeekStatus, "status", "", "Filter by status")
     peekCmd.Flags().StringVar(&flagQPeekOutput, "output", "table", "Output: table|json")
 }
-

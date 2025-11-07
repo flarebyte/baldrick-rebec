@@ -10,7 +10,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    tt "text/tabwriter"
+    "github.com/olekukonko/tablewriter"
     "github.com/spf13/cobra"
 )
 
@@ -47,10 +47,10 @@ var listCmd = &cobra.Command{
             }
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
-        tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "NAME\tTITLE")
-        for _, r := range roles { fmt.Fprintf(tw, "%s\t%s\n", r.Name, r.Title) }
-        tw.Flush(); return nil
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"NAME", "TITLE"})
+        for _, r := range roles { table.Append([]string{r.Name, r.Title}) }
+        table.Render(); return nil
     },
 }
 

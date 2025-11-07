@@ -11,7 +11,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    tt "text/tabwriter"
+    "github.com/olekukonko/tablewriter"
     "github.com/spf13/cobra"
 )
 
@@ -54,10 +54,10 @@ var listCmd = &cobra.Command{
             }
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
-        tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "ID\tSTATUS\tCREATED")
-        for _, m := range ms { fmt.Fprintf(tw, "%s\t%s\t%s\n", m.ID, m.Status, m.Created.Format(time.RFC3339)) }
-        tw.Flush(); return nil
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"ID", "STATUS", "CREATED"})
+        for _, m := range ms { table.Append([]string{m.ID, m.Status, m.Created.Format(time.RFC3339)}) }
+        table.Render(); return nil
     },
 }
 
