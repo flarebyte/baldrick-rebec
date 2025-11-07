@@ -94,6 +94,11 @@ var scaffoldCmd = &cobra.Command{
             return err
         }
 
+        // Grant AGE privileges to app role (best-effort)
+        if err := pgdao.GrantAGEPrivileges(ctx, db, cfg.Postgres.App.User); err != nil {
+            fmt.Fprintf(os.Stderr, "db:scaffold - warn: grant AGE privileges: %v\n", err)
+        }
+
         // If --all is set, also ensure content table and FTS (same as db init)
         if flagAll {
             fmt.Fprintln(os.Stderr, "db:scaffold - ensuring PostgreSQL content table and FTS...")

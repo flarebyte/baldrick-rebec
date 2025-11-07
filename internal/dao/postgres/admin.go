@@ -94,6 +94,34 @@ func GrantRuntimePrivileges(ctx context.Context, db *pgxpool.Pool, appRole strin
     return nil
 }
 
+// GrantAGEPrivileges grants permissions for the AGE extension and the default graph schema to the app role.
+// Best-effort: if AGE or the graph schema are missing, returns nil to avoid hard failures during scaffold.
+func GrantAGEPrivileges(ctx context.Context, db *pgxpool.Pool, appRole string) error {
+    if appRole == "" { return errors.New("empty app role") }
+    ar, err := safeIdent(appRole)
+    if err != nil { return err }
+    stmts := []string{
+        // Allow using AGE functions
+        fmt.Sprintf("GRANT USAGE ON SCHEMA ag_catalog TO %s", ar),
+        fmt.Sprintf("GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ag_catalog TO %s", ar),
+        // Allow using the default graph schema (created as 'rbc_graph')
+        fmt.Sprintf("GRANT USAGE ON SCHEMA rbc_graph TO %s", ar),
+        fmt.Sprintf("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA rbc_graph TO %s", ar),
+    }
+    for _, s := range stmts {
+        if _, err := db.Exec(ctx, s); err != nil {
+            // If schema doesn't exist or AGE is unavailable, ignore
+            if strings.Contains(err.Error(), "schema \"rbc_graph\" does not exist") ||
+               strings.Contains(err.Error(), "schema \"ag_catalog\" does not exist") ||
+               strings.Contains(err.Error(), "age") {
+                continue
+            }
+            return err
+        }
+    }
+    return nil
+}
+
 // RevokeRuntimePrivileges revokes typical runtime privileges for the app role in the connected DB.
 func RevokeRuntimePrivileges(ctx context.Context, db *pgxpool.Pool, appRole string) error {
     if appRole == "" { return errors.New("empty app role") }
