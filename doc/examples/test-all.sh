@@ -169,6 +169,15 @@ st3_json=$(rbc admin stickie set --blackboard "$bb2" \
 st3=$(json_get_id "$st3_json")
 tc "stickie set onboarding ($st1)" "$LINENO"; tc "stickie set devops ($st2)" "$LINENO"; tc "stickie set team ritual ($st3)" "$LINENO"
 
+echo "[8.3/11] Creating stickie relationships" >&2
+# st1 uses st2; st2 includes st3; st1 contrasts_with st3
+rbc admin stickie-rel set --from "$st1" --to "$st2" --type uses --labels ref,dependency
+tc "stickie-rel set uses (st1 -> st2)" "$LINENO"
+rbc admin stickie-rel set --from "$st2" --to "$st3" --type includes --labels backlog
+tc "stickie-rel set includes (st2 -> st3)" "$LINENO"
+rbc admin stickie-rel set --from "$st1" --to "$st3" --type contrasts_with --labels tradeoff
+tc "stickie-rel set contrasts_with (st1 -> st3)" "$LINENO"
+
 echo "[8/11] Creating workspaces" >&2
 rbc admin workspace set --role user --project acme/build-system \
   --description "Local build-system workspace" --tags status=active
@@ -242,6 +251,10 @@ echo "-- Stickies for ideas-acme-build board --" >&2
 rbc admin stickie list --blackboard "$bb1" --limit 50
 echo "-- Stickies with topic=devops --" >&2
 rbc admin stickie list --topic-name devops --topic-role user --limit 50
+echo "-- Stickie relations (out from st1) --" >&2
+rbc admin stickie-rel list --id "$st1" --direction out
+echo "-- Stickie relation get (st1 uses st2) --" >&2
+rbc admin stickie-rel get --from "$st1" --to "$st2" --type uses || true
 echo "-- Tags --" >&2
 rbc admin tag list --role user --limit 50
 echo "-- Table counts --" >&2
