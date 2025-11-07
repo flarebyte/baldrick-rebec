@@ -10,7 +10,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    tt "text/tabwriter"
+    "github.com/olekukonko/tablewriter"
     "github.com/spf13/cobra"
 )
 
@@ -47,14 +47,14 @@ var listCmd = &cobra.Command{
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
         // table default
-        tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "ID\tBLACKBOARD\tTOPIC\tUPDATED\tEDIT#")
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"ID", "BLACKBOARD", "TOPIC", "UPDATED", "EDIT#"})
         for _, s := range ss {
             updated := ""; if s.Updated.Valid { updated = s.Updated.Time.Format(time.RFC3339) }
             topic := ""; if s.TopicName.Valid { topic = s.TopicName.String }
-            fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\n", s.ID, s.BlackboardID, topic, updated, s.EditCount)
+            table.Append([]string{s.ID, s.BlackboardID, topic, updated, fmt.Sprintf("%d", s.EditCount)})
         }
-        tw.Flush(); return nil
+        table.Render(); return nil
     },
 }
 
@@ -67,4 +67,3 @@ func init() {
     listCmd.Flags().StringVar(&flagStListTopicName, "topic-name", "", "Filter by topic name")
     listCmd.Flags().StringVar(&flagStListTopicRole, "topic-role", "", "Filter by topic role name")
 }
-

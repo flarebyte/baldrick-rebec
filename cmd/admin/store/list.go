@@ -11,7 +11,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    tt "text/tabwriter"
+    "github.com/olekukonko/tablewriter"
     "github.com/spf13/cobra"
 )
 
@@ -51,16 +51,16 @@ var listCmd = &cobra.Command{
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
         // table default
-        tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-        fmt.Fprintln(tw, "NAME\tTITLE\tTYPE\tSCOPE\tLIFECYCLE\tUPDATED")
+        table := tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"NAME", "TITLE", "TYPE", "SCOPE", "LIFECYCLE", "UPDATED"})
         for _, s := range ss {
             updated := ""; if s.Updated.Valid { updated = s.Updated.Time.Format(time.RFC3339) }
             st := ""; if s.StoreType.Valid { st = s.StoreType.String }
             sc := ""; if s.Scope.Valid { sc = s.Scope.String }
             lc := ""; if s.Lifecycle.Valid { lc = s.Lifecycle.String }
-            fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", s.Name, s.Title, st, sc, lc, updated)
+            table.Append([]string{s.Name, s.Title, st, sc, lc, updated})
         }
-        tw.Flush()
+        table.Render()
         return nil
     },
 }
@@ -72,4 +72,3 @@ func init() {
     listCmd.Flags().StringVar(&flagStoreListOutput, "output", "table", "Output format: table or json")
     listCmd.Flags().StringVar(&flagStoreListRole, "role", "", "Role name (required)")
 }
-

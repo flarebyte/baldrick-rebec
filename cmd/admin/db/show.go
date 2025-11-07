@@ -11,7 +11,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    tt "text/tabwriter"
+    "github.com/olekukonko/tablewriter"
     "github.com/spf13/cobra"
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -136,20 +136,18 @@ func showAsTables(ctx context.Context, db *pgxpool.Pool, schema string, tables [
         cols, err := fetchColumns(ctx, db, schema, t)
         if err != nil { return err }
         fmt.Fprintf(os.Stdout, "TABLE: %s\n", t)
-        tw := tt.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+        table := tablewriter.NewWriter(os.Stdout)
         if concise {
-            fmt.Fprintln(tw, "COLUMN\tTYPE")
-            for _, c := range cols {
-                fmt.Fprintf(tw, "%s\t%s\n", c.Name, c.DataType)
-            }
+            table.SetHeader([]string{"COLUMN", "TYPE"})
+            for _, c := range cols { table.Append([]string{c.Name, c.DataType}) }
         } else {
-            fmt.Fprintln(tw, "COLUMN\tTYPE\tNULL\tDEFAULT\tPK")
+            table.SetHeader([]string{"COLUMN", "TYPE", "NULL", "DEFAULT", "PK"})
             for _, c := range cols {
                 pk := ""; if c.PK { pk = "yes" }
-                fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", c.Name, c.DataType, strings.ToLower(c.Nullable), c.Default, pk)
+                table.Append([]string{c.Name, c.DataType, strings.ToLower(c.Nullable), c.Default, pk})
             }
         }
-        tw.Flush()
+        table.Render()
         if i < len(tables)-1 { fmt.Fprintln(os.Stdout) }
     }
     return nil
