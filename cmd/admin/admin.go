@@ -10,6 +10,7 @@ import (
     storecmd "github.com/flarebyte/baldrick-rebec/cmd/admin/store"
     bbcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/blackboard"
     stickcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/stickie"
+    stickrelcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/stickie_rel"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/message"
     wscmd "github.com/flarebyte/baldrick-rebec/cmd/admin/workspace"
     "github.com/flarebyte/baldrick-rebec/cmd/admin/role"
@@ -38,6 +39,7 @@ func init() {
     AdminCmd.AddCommand(storecmd.StoreCmd)
     AdminCmd.AddCommand(bbcmd.BlackboardCmd)
     AdminCmd.AddCommand(stickcmd.StickieCmd)
+    AdminCmd.AddCommand(stickrelcmd.StickieRelCmd)
     AdminCmd.AddCommand(scripcmd.ScriptCmd)
     AdminCmd.AddCommand(message.MessageCmd)
     AdminCmd.AddCommand(wscmd.WorkspaceCmd)
