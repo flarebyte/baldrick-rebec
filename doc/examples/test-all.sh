@@ -254,7 +254,7 @@ rbc admin stickie list --topic-name devops --topic-role user --limit 50
 echo "-- Stickie relations (out from st1) --" >&2
 rbc admin stickie-rel list --id "$st1" --direction out
 echo "-- Stickie relation get (st1 uses st2) --" >&2
-rbc admin stickie-rel get --from "$st1" --to "$st2" --type uses || true
+rbc admin stickie-rel get --from "$st1" --to "$st2" --type uses --ignore-missing
 echo "-- Tags --" >&2
 rbc admin tag list --role user --limit 50
 echo "-- Table counts --" >&2

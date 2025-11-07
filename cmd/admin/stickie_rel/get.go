@@ -18,6 +18,7 @@ var (
     flagRelGetFrom string
     flagRelGetTo   string
     flagRelGetType string
+    flagRelGetIgnoreMissing bool
 )
 
 var getCmd = &cobra.Command{
@@ -33,7 +34,13 @@ var getCmd = &cobra.Command{
         defer db.Close()
         rel, err := pgdao.GetStickieEdge(ctx, db, flagRelGetFrom, flagRelGetTo, flagRelGetType)
         if err != nil { return err }
-        if rel == nil { return fmt.Errorf("relationship not found") }
+        if rel == nil {
+            if flagRelGetIgnoreMissing {
+                out := map[string]any{"status":"not_found","from":flagRelGetFrom,"to":flagRelGetTo,"type":flagRelGetType}
+                enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
+            }
+            return fmt.Errorf("relationship not found")
+        }
         out := map[string]any{"from": rel.FromID, "to": rel.ToID, "type": rel.Type, "labels": rel.Labels}
         enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
     },
@@ -44,5 +51,5 @@ func init() {
     getCmd.Flags().StringVar(&flagRelGetFrom, "from", "", "From stickie UUID (required)")
     getCmd.Flags().StringVar(&flagRelGetTo, "to", "", "To stickie UUID (required)")
     getCmd.Flags().StringVar(&flagRelGetType, "type", "", "Relation type: includes|causes|uses|represents|contrasts_with")
+    getCmd.Flags().BoolVar(&flagRelGetIgnoreMissing, "ignore-missing", false, "Return not_found JSON instead of error if relation is absent")
 }
-
