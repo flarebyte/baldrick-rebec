@@ -5,6 +5,7 @@ import (
     "encoding/json"
     "fmt"
     "os"
+    "strings"
     "time"
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
@@ -37,16 +38,6 @@ var ageStatusCmd = &cobra.Command{
         }
         status["extension_installed"] = extInstalled
 
-        // Check graph exists (if ag_catalog available)
-        var graphExists bool
-        if extInstalled {
-            if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM ag_catalog.ag_graph WHERE name='rbc_graph')").Scan(&graphExists); err != nil {
-                // If ag_catalog is not accessible, record error
-                status["graph_check_error"] = err.Error()
-            }
-        }
-        status["graph_exists"] = graphExists
-
         // Privileges on schemas (best-effort)
         var hasAgUsage, hasGraphUsage bool
         _ = db.QueryRow(ctx, "SELECT has_schema_privilege(current_user, 'ag_catalog', 'USAGE')").Scan(&hasAgUsage)
@@ -54,17 +45,24 @@ var ageStatusCmd = &cobra.Command{
         status["has_ag_usage"] = hasAgUsage
         status["has_graph_usage"] = hasGraphUsage
 
-        // Can execute a trivial cypher query
+        // Try a trivial cypher query to infer graph existence and usability
         var cypherOK bool
-        if extInstalled && graphExists {
+        var graphExists bool
+        if extInstalled {
             q := "SELECT 1 FROM ag_catalog.cypher('rbc_graph', $$ RETURN 1 $$) as (x ag_catalog.agtype) LIMIT 1"
             if err := db.QueryRow(ctx, q).Scan(new(int)); err == nil {
                 cypherOK = true
+                graphExists = true
             } else {
                 status["cypher_error"] = err.Error()
+                // If error mentions graph not existing, flag as false; otherwise leave as unknown/false
+                if strings.Contains(strings.ToLower(err.Error()), "does not exist") || strings.Contains(strings.ToLower(err.Error()), "graph") {
+                    graphExists = false
+                }
             }
         }
         status["cypher_usable"] = cypherOK
+        status["graph_exists"] = graphExists
 
         // Human summary to stderr
         fmt.Fprintf(os.Stderr, "AGE extension installed: %v\n", extInstalled)
