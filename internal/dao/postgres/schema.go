@@ -462,6 +462,8 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_stickies_blackboard ON stickies(blackboard_id)`,
         `CREATE INDEX IF NOT EXISTS idx_stickies_topic ON stickies(topic_name, topic_role_name)`,
+        // Ensure new optional structured JSONB column exists for stickies
+        `ALTER TABLE stickies ADD COLUMN IF NOT EXISTS structured JSONB`,
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
