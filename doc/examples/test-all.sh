@@ -33,6 +33,11 @@ echo "[2/11] Scaffolding roles, database, privileges, schema, and content index"
 rbc admin db scaffold --all --yes
 tc "db scaffold --all --yes" "$LINENO"
 
+# Ensure AGE extension and rbc_graph are initialized and app role has privileges (idempotent)
+echo "[2.1/11] Initializing AGE graph (if available)" >&2
+rbc admin db age-init --yes || true
+tc "db age-init --yes" "$LINENO"
+
 echo "[3/11] Creating sample workflows and tasks" >&2
 rbc admin workflow set --name ci-test --title "Continuous Integration: Test Suite" --description "Runs unit and integration tests." --notes "CI test workflow"
 rbc admin workflow set --name ci-lint --title "Continuous Integration: Lint & Format" --description "Lints and vets the codebase." --notes "CI lint workflow"
