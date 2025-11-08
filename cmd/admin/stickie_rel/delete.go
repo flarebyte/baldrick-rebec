@@ -41,9 +41,12 @@ var deleteCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg); if err != nil { return err }
         defer db.Close()
         n, err := pgdao.DeleteStickieEdge(ctx, db, flagRelDelFrom, flagRelDelTo, flagRelDelType)
-        if err != nil { return err }
-        fmt.Fprintf(os.Stderr, "relations deleted: %d\n", n)
-        out := map[string]any{"status":"deleted","from":flagRelDelFrom,"to":flagRelDelTo,"type":flagRelDelType,"deleted":n}
+        if err != nil { fmt.Fprintf(os.Stderr, "warn: graph delete failed: %v; continuing with SQL mirror\n", err) }
+        // Delete SQL mirror too
+        sn, serr := pgdao.DeleteStickieRelation(ctx, db, flagRelDelFrom, flagRelDelTo, strings.ToUpper(flagRelDelType))
+        if serr != nil { return serr }
+        fmt.Fprintf(os.Stderr, "relations deleted: graph=%d sql=%d\n", n, sn)
+        out := map[string]any{"status":"deleted","from":flagRelDelFrom,"to":flagRelDelTo,"type":flagRelDelType,"deleted_graph":n,"deleted_sql":sn}
         enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
     },
 }
@@ -55,4 +58,3 @@ func init() {
     deleteCmd.Flags().StringVar(&flagRelDelType, "type", "", "Relation type: includes|causes|uses|represents|contrasts_with")
     deleteCmd.Flags().BoolVar(&flagRelDelForce, "force", false, "Skip confirmation prompt")
 }
-

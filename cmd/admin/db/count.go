@@ -12,6 +12,8 @@ import (
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
     "github.com/spf13/cobra"
+    "strconv"
+    "strings"
 )
 
 var (
@@ -56,10 +58,15 @@ var countCmd = &cobra.Command{
         // Try to include AGE graph edge counts (best-effort)
         edgeTypes := []string{"INCLUDES","CAUSES","USES","REPRESENTS","CONTRASTS_WITH"}
         for _, et := range edgeTypes {
-            q := fmt.Sprintf("SELECT count(1) FROM ag_catalog.cypher('rbc_graph', $$ MATCH ()-[:%s]->() RETURN 1 $$) as (x ag_catalog.agtype)", et)
-            var en int64
-            if err := db.QueryRow(ctx, q).Scan(&en); err == nil {
-                counts["graph_edges_"+et] = en
+            // Ask cypher to return count(*) as a single column
+            q := fmt.Sprintf("SELECT cnt::text FROM ag_catalog.cypher('rbc_graph', $$ MATCH ()-[:%s]->() RETURN count(*) $$) as (cnt ag_catalog.agtype)", et)
+            var s string
+            if err := db.QueryRow(ctx, q).Scan(&s); err == nil {
+                // agtype returns quoted numeric; trim quotes and parse
+                s = strings.Trim(s, "\"")
+                if n, perr := strconv.ParseInt(s, 10, 64); perr == nil {
+                    counts["graph_edges_"+et] = n
+                }
             }
         }
 

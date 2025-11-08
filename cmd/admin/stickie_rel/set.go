@@ -33,7 +33,21 @@ var setCmd = &cobra.Command{
         defer db.Close()
         // normalize labels: allow comma-separated in a single flag
         labels := splitCSV(flagRelLabels)
-        if err := pgdao.CreateStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType, labels); err != nil { return err }
+        // Try graph first; if it fails, fall back to SQL mirror
+        if err := pgdao.CreateStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType, labels); err != nil {
+            fmt.Fprintf(os.Stderr, "warn: graph edge creation failed: %v; falling back to SQL mirror\n", err)
+        }
+        // Mirror in SQL for reliability
+        if err := pgdao.UpsertStickieRelation(ctx, db, pgdao.StickieRelation{FromID: flagRelFrom, ToID: flagRelTo, RelType: strings.ToUpper(flagRelType), Labels: labels}); err != nil {
+            return fmt.Errorf("sql mirror upsert failed: %w", err)
+        }
+        // Prefer graph verification; if it errors, verify via SQL
+        if rel, err := pgdao.GetStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType); err != nil || rel == nil {
+            if _, gerr := pgdao.GetStickieRelation(ctx, db, flagRelFrom, flagRelTo, strings.ToUpper(flagRelType)); gerr != nil {
+                if err != nil { return fmt.Errorf("graph verify failed (%v) and sql verify failed (%v)", err, gerr) }
+                return fmt.Errorf("relation not found after creation (graph empty; sql not found)")
+            }
+        }
         fmt.Fprintf(os.Stderr, "stickie relation set from=%s to=%s type=%s\n", flagRelFrom, flagRelTo, flagRelType)
         fmt.Fprintf(os.Stdout, "{\n  \"status\": \"upserted\", \"from\": \"%s\", \"to\": \"%s\", \"type\": \"%s\"\n}\n", flagRelFrom, flagRelTo, flagRelType)
         return nil
@@ -58,4 +72,3 @@ func splitCSV(items []string) []string {
     }
     return out
 }
-

@@ -33,7 +33,23 @@ var listCmd = &cobra.Command{
         defer db.Close()
         types := splitCSV(flagRelListTypes)
         rows, err := pgdao.ListStickieEdges(ctx, db, flagRelListID, flagRelListDir, types)
-        if err != nil { return err }
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "warn: graph list failed: %v; falling back to SQL mirror\n", err)
+            rows = nil
+        }
+        // Fallback to SQL mirror if graph returns nothing
+        if len(rows) == 0 {
+            srows, serr := pgdao.ListStickieRelations(ctx, db, flagRelListID, flagRelListDir)
+            if serr == nil {
+                // map to StickieEdge-like struct for output
+                tmp := make([]pgdao.StickieEdge, 0, len(srows))
+                for _, r := range srows {
+                    tmp = append(tmp, pgdao.StickieEdge{FromID: r.FromID, ToID: r.ToID, Type: r.RelType, Labels: r.Labels})
+                }
+                // assign back
+                rows = tmp
+            }
+        }
         fmt.Fprintf(os.Stderr, "relations: %d\n", len(rows))
         if strings.ToLower(strings.TrimSpace(flagRelListOutput)) == "json" {
             arr := make([]map[string]any, 0, len(rows))
@@ -56,4 +72,3 @@ func init() {
     listCmd.Flags().StringSliceVar(&flagRelListTypes, "types", nil, "Filter by relation types (comma or repeat)")
     listCmd.Flags().StringVar(&flagRelListOutput, "output", "table", "Output: table|json")
 }
-

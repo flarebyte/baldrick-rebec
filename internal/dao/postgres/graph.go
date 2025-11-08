@@ -41,9 +41,7 @@ func EnsureTaskVertex(ctx context.Context, db *pgxpool.Pool, id, variant, comman
         SET t.variant = '%s', t.command = '%s'
     $$) as (v ag_catalog.agtype)`, graphName, escapeCypherString(id), variant, command)
     _, err := db.Exec(ctx, q)
-    if err != nil && (strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied")) {
-        return nil
-    }
+    // For stickie graph ops, surface errors so callers can diagnose
     return err
 }
 
@@ -191,43 +189,63 @@ type StickieEdge struct {
     Labels []string
 }
 
+type vertexJSON struct {
+    ID        any               `json:"id"`
+    Label     string            `json:"label"`
+    Properties map[string]any   `json:"properties"`
+}
+
 // ListStickieEdges lists edges touching a node id with optional direction and type filter.
 // dir: out|in|both
 func ListStickieEdges(ctx context.Context, db *pgxpool.Pool, id, dir string, relTypes []string) ([]StickieEdge, error) {
     EnsureStickieGraphSchema(ctx, db)
     if strings.TrimSpace(id) == "" { return nil, nil }
-    rtFilter := ""
+    // Build cypher returning full vertices; filter client-side on properties.id to avoid operator mismatches
+    typeFilter := ""
     if len(relTypes) > 0 {
         ups := make([]string, 0, len(relTypes))
         for _, t := range relTypes { if v := normalizeStickieRelType(t); v != "" { ups = append(ups, "'"+v+"'") } }
-        if len(ups) > 0 { rtFilter = " WHERE type(r) IN (" + strings.Join(ups, ",") + ")" }
+        if len(ups) > 0 { typeFilter = " WHERE type(r) IN (" + strings.Join(ups, ",") + ")" }
     }
-    pattern := "(a:Stickie {id: '%s'})-[r]->(b:Stickie)"
-    if d := strings.ToLower(strings.TrimSpace(dir)); d == "in" {
-        pattern = "(a:Stickie)-[r]->(b:Stickie {id: '%s'})"
-    } else if d == "both" {
-        pattern = "(a:Stickie)-[r]-(b:Stickie {id: '%s'})"
+    var cypher string
+    switch strings.ToLower(strings.TrimSpace(dir)) {
+    case "in":
+        cypher = fmt.Sprintf(`MATCH (a:Stickie)-[r]->(b:Stickie)%s RETURN a, type(r), r.labels, b`, typeFilter)
+    case "both":
+        cypher = fmt.Sprintf(`MATCH (a:Stickie)-[r]->(b:Stickie)%s RETURN a, type(r), r.labels, b`, typeFilter)
+    default: // out
+        cypher = fmt.Sprintf(`MATCH (a:Stickie)-[r]->(b:Stickie)%s RETURN a, type(r), r.labels, b`, typeFilter)
     }
-    q := fmt.Sprintf(`SELECT fr::text, typ::text, lab::text, toid::text FROM ag_catalog.cypher('%s', $$
-        MATCH %s
+    q := fmt.Sprintf(`SELECT av::text, typ::text, lab::text, bv::text FROM ag_catalog.cypher('%s', $$
         %s
-        RETURN a.id, type(r), r.labels, b.id
-    $$) as (fr ag_catalog.agtype, typ ag_catalog.agtype, lab ag_catalog.agtype, toid ag_catalog.agtype)`, graphName, fmt.Sprintf(pattern, escapeCypherString(id)), rtFilter)
+    $$) as (av ag_catalog.agtype, typ ag_catalog.agtype, lab ag_catalog.agtype, bv ag_catalog.agtype)`, graphName, cypher)
     rows, err := db.Query(ctx, q)
     if err != nil {
-        if strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied") {
-            return nil, nil
-        }
         return nil, err
     }
     defer rows.Close()
     var out []StickieEdge
     for rows.Next() {
-        var fr, typ, lab, to string
-        if err := rows.Scan(&fr, &typ, &lab, &to); err != nil { return nil, err }
-        fr = strings.Trim(fr, `"`)
+        var av, typ, lab, bv string
+        if err := rows.Scan(&av, &typ, &lab, &bv); err != nil { return nil, err }
         typ = strings.Trim(typ, `"`)
-        to = strings.Trim(to, `"`)
+        // Decode vertices to obtain properties.id
+        var aV, bV vertexJSON
+        if err := json.Unmarshal([]byte(av), &aV); err != nil { continue }
+        if err := json.Unmarshal([]byte(bv), &bV); err != nil { continue }
+        from := ""; to := ""
+        if v, ok := aV.Properties["id"].(string); ok { from = v }
+        if v, ok := bV.Properties["id"].(string); ok { to = v }
+        if from == "" || to == "" { continue }
+        // Directional filtering
+        switch strings.ToLower(strings.TrimSpace(dir)) {
+        case "in":
+            if to != id { continue }
+        case "both":
+            if from != id && to != id { continue }
+        default:
+            if from != id { continue }
+        }
         // lab may be a JSON-like string; try to parse into []string
         labels := []string{}
         l := strings.TrimSpace(lab)
@@ -240,12 +258,7 @@ func ListStickieEdges(ctx context.Context, db *pgxpool.Pool, id, dir string, rel
                 if err := json.Unmarshal([]byte(l), &arr); err == nil { labels = arr }
             }
         }
-        // direction normalization: the query returns a,b matched as written; adjust From/To for 'in'
-        if strings.ToLower(strings.TrimSpace(dir)) == "in" {
-            out = append(out, StickieEdge{FromID: to, ToID: fr, Type: typ, Labels: labels})
-        } else {
-            out = append(out, StickieEdge{FromID: fr, ToID: to, Type: typ, Labels: labels})
-        }
+        out = append(out, StickieEdge{FromID: from, ToID: to, Type: typ, Labels: labels})
     }
     return out, rows.Err()
 }
@@ -255,25 +268,35 @@ func GetStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relType
     EnsureStickieGraphSchema(ctx, db)
     rt := normalizeStickieRelType(relType)
     if rt == "" { return nil, fmt.Errorf("invalid relation type: %s", relType) }
-    q := fmt.Sprintf(`SELECT fr::text, lab::text FROM ag_catalog.cypher('%s', $$
-        MATCH (a:Stickie {id: '%s'})-[r:%s]->(b:Stickie {id: '%s'})
-        RETURN a.id, r.labels
-        LIMIT 1
-    $$) as (fr ag_catalog.agtype, lab ag_catalog.agtype)`, graphName, escapeCypherString(fromID), rt, escapeCypherString(toID))
-    var fr, lab string
-    if err := db.QueryRow(ctx, q).Scan(&fr, &lab); err != nil {
-        if strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied") {
-            return nil, nil
+    q := fmt.Sprintf(`SELECT av::text, lab::text, bv::text FROM ag_catalog.cypher('%s', $$
+        MATCH (a:Stickie)-[r:%s]->(b:Stickie)
+        RETURN a, r.labels, b
+        LIMIT 200
+    $$) as (av ag_catalog.agtype, lab ag_catalog.agtype, bv ag_catalog.agtype)`, graphName, rt)
+    rows, err := db.Query(ctx, q)
+    if err != nil { return nil, err }
+    defer rows.Close()
+    for rows.Next() {
+        var av, lab, bv string
+        if err := rows.Scan(&av, &lab, &bv); err != nil { return nil, err }
+        var aV, bV vertexJSON
+        if err := json.Unmarshal([]byte(av), &aV); err != nil { continue }
+        if err := json.Unmarshal([]byte(bv), &bV); err != nil { continue }
+        var fromProp, toProp string
+        if v, ok := aV.Properties["id"].(string); ok { fromProp = v }
+        if v, ok := bV.Properties["id"].(string); ok { toProp = v }
+        if fromProp == fromID && toProp == toID {
+            // parse labels
+            labels := []string{}
+            l := strings.TrimSpace(lab)
+            if len(l) > 0 {
+                if strings.HasPrefix(l, "\"") && strings.HasSuffix(l, "\"") { l = strings.Trim(l, "\"") }
+                if strings.HasPrefix(l, "[") { _ = json.Unmarshal([]byte(l), &labels) }
+            }
+            return &StickieEdge{FromID: fromID, ToID: toID, Type: rt, Labels: labels}, nil
         }
-        return nil, err
     }
-    labels := []string{}
-    l := strings.TrimSpace(lab)
-    if len(l) > 0 {
-        if strings.HasPrefix(l, "\"") && strings.HasSuffix(l, "\"") { l = strings.Trim(l, "\"") }
-        if strings.HasPrefix(l, "[") { _ = json.Unmarshal([]byte(l), &labels) }
-    }
-    return &StickieEdge{FromID: fromID, ToID: toID, Type: rt, Labels: labels}, nil
+    return nil, nil
 }
 
 // DeleteStickieEdge deletes edges of a type between two stickies and returns affected count.
@@ -289,9 +312,6 @@ func DeleteStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relT
     $$) as (cnt ag_catalog.agtype)`, graphName, escapeCypherString(fromID), rt, escapeCypherString(toID))
     var ag string
     if err := db.QueryRow(ctx, q).Scan(&ag); err != nil {
-        if strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied") {
-            return 0, nil
-        }
         return 0, err
     }
     return 1, nil

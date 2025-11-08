@@ -464,6 +464,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         `CREATE INDEX IF NOT EXISTS idx_stickies_topic ON stickies(topic_name, topic_role_name)`,
         // Ensure new optional structured JSONB column exists for stickies
         `ALTER TABLE stickies ADD COLUMN IF NOT EXISTS structured JSONB`,
+        // Fallback store for stickie relationships when AGE is unavailable
+        `CREATE TABLE IF NOT EXISTS stickie_relations (
+            from_id UUID NOT NULL REFERENCES stickies(id) ON DELETE CASCADE,
+            to_id   UUID NOT NULL REFERENCES stickies(id) ON DELETE CASCADE,
+            rel_type TEXT NOT NULL CHECK (rel_type IN ('INCLUDES','CAUSES','USES','REPRESENTS','CONTRASTS_WITH')),
+            labels TEXT[] DEFAULT ARRAY[]::text[],
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            PRIMARY KEY (from_id, to_id, rel_type)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_stickie_relations_from ON stickie_relations(from_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_stickie_relations_to ON stickie_relations(to_id)`,
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
