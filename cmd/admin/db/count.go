@@ -53,6 +53,16 @@ var countCmd = &cobra.Command{
             counts[t] = n
         }
 
+        // Try to include AGE graph edge counts (best-effort)
+        edgeTypes := []string{"INCLUDES","CAUSES","USES","REPRESENTS","CONTRASTS_WITH"}
+        for _, et := range edgeTypes {
+            q := fmt.Sprintf("SELECT count(1) FROM ag_catalog.cypher('rbc_graph', $$ MATCH ()-[:%s]->() RETURN 1 $$) as (x ag_catalog.agtype)", et)
+            var en int64
+            if err := db.QueryRow(ctx, q).Scan(&en); err == nil {
+                counts["graph_edges_"+et] = en
+            }
+        }
+
         // Human-readable to stderr
         keys := make([]string, 0, len(counts))
         for k := range counts { keys = append(keys, k) }
@@ -72,4 +82,3 @@ func init() {
     DBCmd.AddCommand(countCmd)
     countCmd.Flags().BoolVar(&flagCountJSON, "json", false, "Pretty-print JSON output")
 }
-
