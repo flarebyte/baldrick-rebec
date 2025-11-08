@@ -18,6 +18,62 @@ json_get_id() {
   fi
 }
 
+# Helper: check if jq is available
+has_jq() { command -v jq >/dev/null 2>&1; }
+
+# Helper: require AGE/cypher usable; try to initialize if not
+require_age_ready() {
+  echo "[AGE] Checking AGE status" >&2
+  local status_json
+  status_json=$(rbc admin db age-status 2>/dev/null || true)
+  if has_jq; then
+    local ok
+    ok=$(printf "%s" "$status_json" | jq -r '.cypher_usable // false')
+    if [ "$ok" != "true" ]; then
+      echo "[AGE] cypher unusable; attempting init..." >&2
+      rbc admin db age-init --yes || true
+      status_json=$(rbc admin db age-status 2>/dev/null || true)
+      ok=$(printf "%s" "$status_json" | jq -r '.cypher_usable // false')
+      if [ "$ok" != "true" ]; then
+        echo "[AGE] ERROR: cypher still unusable after init. Diagnostics:" >&2
+        echo "$status_json" | sed 's/^/[AGE] /' >&2
+        echo "[AGE] Please run 'rbc admin db age-init --yes' as admin and re-run." >&2
+        exit 1
+      fi
+    fi
+  else
+    # Without jq, just attempt init and continue best-effort
+    rbc admin db age-init --yes || true
+  fi
+}
+
+# Helper: assert at least one outgoing relation exists for a stickie id
+assert_relations_out() {
+  local sid="$1"
+  echo "[TEST] Checking relations for stickie $sid (out)" >&2
+  local rel_json
+  rel_json=$(rbc admin stickie-rel list --id "$sid" --direction out --output json 2>/dev/null || true)
+  if has_jq; then
+    local n
+    n=$(printf "%s" "$rel_json" | jq 'length')
+    if [ "${n:-0}" -lt 1 ]; then
+      echo "[TEST][FAIL] Expected at least 1 relation from $sid; got $n" >&2
+      echo "[TEST] Debug: age-status:" >&2
+      rbc admin db age-status >&2 || true
+      echo "[TEST] Debug: relations JSON:" >&2
+      echo "$rel_json" >&2
+      echo "[TEST] Debug: counts:" >&2
+      rbc admin db count --json >&2 || true
+      exit 1
+    fi
+  else
+    # Fallback check: JSON not an empty array
+    if printf "%s" "$rel_json" | grep -q '^[[:space:]]*\[\][[:space:]]*$'; then
+      echo "[TEST][WARN] Could not verify relations (jq not installed); observed empty list" >&2
+    fi
+  fi
+}
+
 # Helper: create a testcase documenting a step
 tc() {
   local title="$1"; shift
@@ -37,6 +93,7 @@ tc "db scaffold --all --yes" "$LINENO"
 echo "[2.1/11] Initializing AGE graph (if available)" >&2
 rbc admin db age-init --yes || true
 tc "db age-init --yes" "$LINENO"
+require_age_ready
 
 echo "[3/11] Creating sample workflows and tasks" >&2
 rbc admin workflow set --name ci-test --title "Continuous Integration: Test Suite" --description "Runs unit and integration tests." --notes "CI test workflow"
@@ -182,6 +239,9 @@ rbc admin stickie-rel set --from "$st2" --to "$st3" --type includes --labels bac
 tc "stickie-rel set includes (st2 -> st3)" "$LINENO"
 rbc admin stickie-rel set --from "$st1" --to "$st3" --type contrasts_with --labels tradeoff
 tc "stickie-rel set contrasts_with (st1 -> st3)" "$LINENO"
+
+# Validate relations created (regression guard)
+assert_relations_out "$st1"
 
 echo "[8/11] Creating workspaces" >&2
 rbc admin workspace set --role user --project acme/build-system \
