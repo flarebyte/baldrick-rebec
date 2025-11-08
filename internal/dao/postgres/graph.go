@@ -13,6 +13,24 @@ const graphName = "rbc_graph"
 
 func escapeCypherString(s string) string { return strings.ReplaceAll(s, "'", "''") }
 
+// EnsureStickieGraphSchema creates required vertex/edge labels if missing.
+func EnsureStickieGraphSchema(ctx context.Context, db *pgxpool.Pool) {
+    // Best-effort: ignore errors if AGE unavailable or labels already exist
+    stmts := []string{
+        fmt.Sprintf("SELECT ag_catalog.create_vlabel('%s','Stickie')", graphName),
+        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','INCLUDES')", graphName),
+        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','CAUSES')", graphName),
+        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','USES')", graphName),
+        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','REPRESENTS')", graphName),
+        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','CONTRASTS_WITH')", graphName),
+    }
+    for _, q := range stmts {
+        if _, err := db.Exec(ctx, q); err != nil {
+            _ = err // ignore
+        }
+    }
+}
+
 // EnsureTaskVertex creates or merges a Task vertex in the AGE graph with minimal properties.
 func EnsureTaskVertex(ctx context.Context, db *pgxpool.Pool, id, variant, command string) error {
     if strings.TrimSpace(id) == "" { return nil }
@@ -142,6 +160,7 @@ func normalizeStickieRelType(t string) string {
 
 // CreateStickieEdge creates or overwrites labels on an edge of the given type between two stickies.
 func CreateStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relType string, labels []string) error {
+    EnsureStickieGraphSchema(ctx, db)
     rt := normalizeStickieRelType(relType)
     if rt == "" { return fmt.Errorf("invalid relation type: %s", relType) }
     if strings.TrimSpace(fromID) == "" || strings.TrimSpace(toID) == "" { return fmt.Errorf("from/to ids required") }
@@ -175,6 +194,7 @@ type StickieEdge struct {
 // ListStickieEdges lists edges touching a node id with optional direction and type filter.
 // dir: out|in|both
 func ListStickieEdges(ctx context.Context, db *pgxpool.Pool, id, dir string, relTypes []string) ([]StickieEdge, error) {
+    EnsureStickieGraphSchema(ctx, db)
     if strings.TrimSpace(id) == "" { return nil, nil }
     rtFilter := ""
     if len(relTypes) > 0 {
@@ -232,6 +252,7 @@ func ListStickieEdges(ctx context.Context, db *pgxpool.Pool, id, dir string, rel
 
 // GetStickieEdge returns a single relation between exact from/to/type.
 func GetStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relType string) (*StickieEdge, error) {
+    EnsureStickieGraphSchema(ctx, db)
     rt := normalizeStickieRelType(relType)
     if rt == "" { return nil, fmt.Errorf("invalid relation type: %s", relType) }
     q := fmt.Sprintf(`SELECT fr::text, lab::text FROM ag_catalog.cypher('%s', $$
@@ -257,6 +278,7 @@ func GetStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relType
 
 // DeleteStickieEdge deletes edges of a type between two stickies and returns affected count.
 func DeleteStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relType string) (int64, error) {
+    EnsureStickieGraphSchema(ctx, db)
     rt := normalizeStickieRelType(relType)
     if rt == "" { return 0, fmt.Errorf("invalid relation type: %s", relType) }
     q := fmt.Sprintf(`SELECT cnt::text FROM ag_catalog.cypher('%s', $$

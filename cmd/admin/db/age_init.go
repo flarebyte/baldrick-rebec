@@ -47,6 +47,15 @@ var ageInitCmd = &cobra.Command{
             fmt.Fprintf(os.Stderr, "age-init: warn: grant AGE privileges: %v\n", err)
         }
 
+        // Create required labels (best-effort)
+        fmt.Fprintln(os.Stderr, "age-init: creating labels (Task, Stickie and edges)...")
+        _ , _ = db.Exec(ctx, "SELECT ag_catalog.create_vlabel('rbc_graph','Task')")
+        _ , _ = db.Exec(ctx, "SELECT ag_catalog.create_elabel('rbc_graph','REPLACES')")
+        _ , _ = db.Exec(ctx, "SELECT ag_catalog.create_vlabel('rbc_graph','Stickie')")
+        for _, e := range []string{"INCLUDES","CAUSES","USES","REPRESENTS","CONTRASTS_WITH"} {
+            _, _ = db.Exec(ctx, fmt.Sprintf("SELECT ag_catalog.create_elabel('rbc_graph','%s')", e))
+        }
+
         fmt.Fprintln(os.Stderr, "age-init: done")
         return nil
     },
@@ -56,4 +65,3 @@ func init() {
     DBCmd.AddCommand(ageInitCmd)
     ageInitCmd.Flags().BoolVar(&flagAgeInitYes, "yes", false, "Confirm making changes to AGE (create extension/graph and grant privs)")
 }
-
