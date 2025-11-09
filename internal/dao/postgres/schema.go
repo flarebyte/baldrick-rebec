@@ -11,8 +11,13 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
     stmts := []string{
         // Enable pgcrypto for gen_random_uuid()
         `CREATE EXTENSION IF NOT EXISTS pgcrypto`,
-        // Enable pgvector (vector) extension for vector similarity
-        `CREATE EXTENSION IF NOT EXISTS vector`,
+        // Enable pgvector (vector) extension for vector similarity (best-effort; ignore if not installed)
+        `DO $$
+        BEGIN
+            EXECUTE 'CREATE EXTENSION IF NOT EXISTS vector';
+        EXCEPTION WHEN others THEN
+            NULL;
+        END$$;`,
         // Enable AGE graph extension (if available). Ignore errors downstream.
         `CREATE EXTENSION IF NOT EXISTS age`,
         // Create a default graph for relationships if not present (dynamic SQL; ignore errors)

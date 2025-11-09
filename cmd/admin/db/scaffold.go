@@ -94,6 +94,14 @@ var scaffoldCmd = &cobra.Command{
             return err
         }
 
+        // Re-grant runtime privileges after schema creation to cover new tables
+        if effGrantPrivs {
+            fmt.Fprintln(os.Stderr, "db:scaffold - re-granting runtime privileges to app role (post-schema)...")
+            if err := pgdao.GrantRuntimePrivileges(ctx, db, cfg.Postgres.App.User); err != nil {
+                return err
+            }
+        }
+
         // Grant AGE privileges to app role (best-effort)
         if err := pgdao.GrantAGEPrivileges(ctx, db, cfg.Postgres.App.User); err != nil {
             fmt.Fprintf(os.Stderr, "db:scaffold - warn: grant AGE privileges: %v\n", err)

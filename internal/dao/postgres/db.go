@@ -7,6 +7,7 @@ import (
     "time"
 
     "github.com/flarebyte/baldrick-rebec/internal/config"
+    "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/pgconn"
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -58,6 +59,15 @@ func openPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
     cfg.MinConns = 1
     cfg.MaxConnLifetime = 30 * time.Minute
     cfg.MaxConnIdleTime = 5 * time.Minute
+
+    // Session bootstrap: best-effort LOAD AGE and set search_path so AGE operators are available
+    cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+        // Some AGE builds require explicit LOAD and making ag_catalog visible for operator resolution
+        // Keep public ahead of ag_catalog to ensure unqualified DDL/DML targets public schema.
+        _, _ = conn.Exec(ctx, `LOAD 'age'`)
+        _, _ = conn.Exec(ctx, `SET search_path = "$user", public, ag_catalog`)
+        return nil
+    }
 
     // Create pool
     pool, err := pgxpool.NewWithConfig(ctx, cfg)

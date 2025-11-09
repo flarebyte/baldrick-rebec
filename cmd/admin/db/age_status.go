@@ -24,12 +24,16 @@ var ageStatusCmd = &cobra.Command{
 
         status := map[string]any{}
 
-        // Which DB/user
+        // Which DB/user and versions
         status["db"] = cfg.Postgres.DBName
-        // Attempt to get current_user
         var currentUser string
         _ = db.QueryRow(ctx, "SELECT current_user").Scan(&currentUser)
         status["user"] = currentUser
+        var pgver, agever string
+        _ = db.QueryRow(ctx, "SHOW server_version").Scan(&pgver)
+        _ = db.QueryRow(ctx, "SELECT extversion FROM pg_extension WHERE extname='age'").Scan(&agever)
+        status["postgres_version"] = pgver
+        status["age_version"] = agever
 
         // Check extension installed
         var extInstalled bool
@@ -64,12 +68,28 @@ var ageStatusCmd = &cobra.Command{
         status["cypher_usable"] = cypherOK
         status["graph_exists"] = graphExists
 
+        // Operator presence checks in ag_catalog (best-effort)
+        var hasAgtypeContains bool
+        var hasGraphidEq bool
+        if extInstalled {
+            // @> operator in ag_catalog (any signature)
+            _ = db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_operator WHERE oprnamespace='ag_catalog'::regnamespace AND oprname='@>')").Scan(&hasAgtypeContains)
+            // graphid equals operator
+            _ = db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_operator WHERE oprnamespace='ag_catalog'::regnamespace AND oprname='=' AND oprleft='ag_catalog.graphid'::regtype AND oprright='ag_catalog.graphid'::regtype)").Scan(&hasGraphidEq)
+        }
+        status["agtype_contains_operator"] = hasAgtypeContains
+        status["graphid_eq_operator"] = hasGraphidEq
+
         // Human summary to stderr
         fmt.Fprintf(os.Stderr, "AGE extension installed: %v\n", extInstalled)
         fmt.Fprintf(os.Stderr, "Graph rbc_graph exists: %v\n", graphExists)
         fmt.Fprintf(os.Stderr, "ag_catalog USAGE: %v\n", hasAgUsage)
         fmt.Fprintf(os.Stderr, "rbc_graph USAGE: %v\n", hasGraphUsage)
         fmt.Fprintf(os.Stderr, "Cypher usable: %v\n", cypherOK)
+        if agever != "" || pgver != "" {
+            fmt.Fprintf(os.Stderr, "Versions: Postgres=%s AGE=%s\n", pgver, agever)
+        }
+        fmt.Fprintf(os.Stderr, "Operators: agtype @> present=%v, graphid = present=%v\n", hasAgtypeContains, hasGraphidEq)
 
         enc := json.NewEncoder(os.Stdout)
         enc.SetIndent("", "  ")

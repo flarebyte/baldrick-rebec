@@ -32,14 +32,22 @@ var getCmd = &cobra.Command{
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second); defer cancel()
         db, err := pgdao.OpenApp(ctx, cfg); if err != nil { return err }
         defer db.Close()
+        allowFallback := cfg.Graph.AllowFallback
         rel, err := pgdao.GetStickieEdge(ctx, db, flagRelGetFrom, flagRelGetTo, flagRelGetType)
-        if err != nil { fmt.Fprintf(os.Stderr, "warn: graph get failed: %v; trying SQL mirror\n", err) }
-        if rel == nil {
+        if err != nil {
+            if allowFallback {
+                fmt.Fprintf(os.Stderr, "warn: graph get failed: %v; trying SQL mirror\n", err)
+            } else {
+                return err
+            }
+        }
+        if rel == nil && allowFallback {
             if srel, serr := pgdao.GetStickieRelation(ctx, db, flagRelGetFrom, flagRelGetTo, strings.ToUpper(flagRelGetType)); serr == nil && srel != nil {
-                // emit from SQL mirror
                 out := map[string]any{"from": srel.FromID, "to": srel.ToID, "type": srel.RelType, "labels": srel.Labels}
                 enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
             }
+        }
+        if rel == nil {
             if flagRelGetIgnoreMissing {
                 out := map[string]any{"status":"not_found","from":flagRelGetFrom,"to":flagRelGetTo,"type":flagRelGetType}
                 enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)

@@ -40,13 +40,27 @@ var deleteCmd = &cobra.Command{
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second); defer cancel()
         db, err := pgdao.OpenApp(ctx, cfg); if err != nil { return err }
         defer db.Close()
+        allowFallback := cfg.Graph.AllowFallback
         n, err := pgdao.DeleteStickieEdge(ctx, db, flagRelDelFrom, flagRelDelTo, flagRelDelType)
-        if err != nil { fmt.Fprintf(os.Stderr, "warn: graph delete failed: %v; continuing with SQL mirror\n", err) }
-        // Delete SQL mirror too
-        sn, serr := pgdao.DeleteStickieRelation(ctx, db, flagRelDelFrom, flagRelDelTo, strings.ToUpper(flagRelDelType))
-        if serr != nil { return serr }
-        fmt.Fprintf(os.Stderr, "relations deleted: graph=%d sql=%d\n", n, sn)
-        out := map[string]any{"status":"deleted","from":flagRelDelFrom,"to":flagRelDelTo,"type":flagRelDelType,"deleted_graph":n,"deleted_sql":sn}
+        if err != nil && allowFallback {
+            fmt.Fprintf(os.Stderr, "warn: graph delete failed: %v; continuing with SQL mirror\n", err)
+        } else if err != nil {
+            return err
+        }
+        // Delete SQL mirror too if fallback enabled
+        var sn int64
+        if allowFallback {
+            s, serr := pgdao.DeleteStickieRelation(ctx, db, flagRelDelFrom, flagRelDelTo, strings.ToUpper(flagRelDelType))
+            if serr != nil { return serr }
+            sn = s
+        }
+        if allowFallback {
+            fmt.Fprintf(os.Stderr, "relations deleted: graph=%d sql=%d\n", n, sn)
+        } else {
+            fmt.Fprintf(os.Stderr, "relations deleted: graph=%d\n", n)
+        }
+        out := map[string]any{"status":"deleted","from":flagRelDelFrom,"to":flagRelDelTo,"type":flagRelDelType,"deleted_graph":n}
+        if allowFallback { out["deleted_sql"] = sn }
         enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
     },
 }
