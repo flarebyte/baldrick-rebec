@@ -150,6 +150,15 @@ func showAsTables(ctx context.Context, db *pgxpool.Pool, schema string, tables [
         table.Render()
         if i < len(tables)-1 { fmt.Fprintln(os.Stdout) }
     }
+    // Relationships summary table
+    fmt.Fprintln(os.Stdout)
+    fmt.Fprintln(os.Stdout, "RELATIONSHIPS:")
+    table := tablewriter.NewWriter(os.Stdout)
+    table.SetHeader([]string{"FROM", "RELATION", "TO", "NATURE"})
+    for _, r := range relationships() {
+        table.Append([]string{r.From, r.Rel, r.To, r.Nature})
+    }
+    table.Render()
     return nil
 }
 
@@ -175,5 +184,47 @@ func showAsMarkdown(ctx context.Context, db *pgxpool.Pool, schema string, tables
         }
         fmt.Fprintln(os.Stdout)
     }
+    // Relationships summary
+    fmt.Fprintln(os.Stdout, "## Relationships")
+    fmt.Fprintln(os.Stdout, "| From | Relation | To | Nature |")
+    fmt.Fprintln(os.Stdout, "|---|---|---|---|")
+    for _, r := range relationships() {
+        fmt.Fprintf(os.Stdout, "| %s | %s | %s | %s |\n", r.From, r.Rel, r.To, r.Nature)
+    }
+    fmt.Fprintln(os.Stdout)
     return nil
+}
+
+type relRow struct{ From, Rel, To, Nature string }
+
+// relationships returns a curated list of relational FKs and graph edges.
+func relationships() []relRow {
+    return []relRow{
+        // Relational FKs
+        {"experiments.conversation_id", "->", "conversations.id", "rel"},
+        {"messages.content_id", "->", "messages_content.id", "rel"},
+        {"messages.from_task_id", "->", "tasks.id", "rel"},
+        {"messages.experiment_id", "->", "experiments.id", "rel"},
+        {"packages.role_name", "->", "roles.name", "rel"},
+        {"packages.task_id", "->", "tasks.id", "rel"},
+        {"queues.task_id", "->", "tasks.id", "rel"},
+        {"queues.inbound_message", "->", "messages.id", "rel"},
+        {"queues.target_workspace_id", "->", "workspaces.id", "rel"},
+        {"tasks.run_script_id", "->", "scripts.id", "rel"},
+        {"tasks.tool_workspace_id", "->", "workspaces.id", "rel"},
+        {"testcases.experiment_id", "->", "experiments.id", "rel"},
+        {"workspaces.build_script_id", "->", "scripts.id", "rel"},
+        {"workspaces.project_name,role_name", "->", "projects.name,role_name", "rel"},
+        {"blackboards.store_id", "->", "stores.id", "rel"},
+        {"blackboards.conversation_id", "->", "conversations.id", "rel"},
+        {"blackboards.task_id", "->", "tasks.id", "rel"},
+        {"blackboards.project_name,role_name", "->", "projects.name,role_name", "rel"},
+        {"stickies.blackboard_id", "->", "blackboards.id", "rel"},
+        {"stickies.created_by_task_id", "->", "tasks.id", "rel"},
+        {"stickies.topic_name,topic_role_name", "->", "topics.name,role_name", "rel"},
+        {"stickie_relations.from_id,to_id", "->", "stickies.id", "rel (mirror)"},
+        // Graph edges
+        {"Task", "REPLACES", "Task", "graph"},
+        {"Stickie", "INCLUDES|CAUSES|USES|REPRESENTS|CONTRASTS_WITH", "Stickie", "graph"},
+    }
 }
