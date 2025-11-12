@@ -10,6 +10,13 @@ import (
     dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
+// IMPORTANT: AGE parameter placeholders ($param) are not supported via ag_catalog.cypher
+// in our current deployment (AGE 1.6.0 reports "a name constant is expected").
+// As a result, DO NOT use parameterized Cypher here. Always build Cypher with
+// safely escaped literals using escapeCypherString and call the 2-argument form:
+//   SELECT * FROM ag_catalog.cypher(graph, cypher)
+// SQL-side parameters to Postgres are still allowed/encouraged, but the Cypher
+// string itself must not contain $param placeholders.
 const graphName = "rbc_graph"
 
 func escapeCypherString(s string) string { return strings.ReplaceAll(s, "'", "''") }
@@ -128,8 +135,8 @@ func FindLatestFrom(ctx context.Context, db *pgxpool.Pool, currentID string) (st
 
 func EnsureStickieVertex(ctx context.Context, db *pgxpool.Pool, id string) error {
     if strings.TrimSpace(id) == "" { return nil }
-    cy, p := cypherArgs(`MERGE (s:Stickie {id: $id})`, map[string]any{"id": id})
-    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2,$3) as (v agtype)", graphName, cy, string(p))
+    cy := fmt.Sprintf("MERGE (s:Stickie {id: '%s'})", escapeCypherString(id))
+    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2) as (v agtype)", graphName, cy)
     if err != nil && (strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied")) {
         return nil
     }
@@ -153,21 +160,18 @@ func CreateStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relT
     rt := normalizeStickieRelType(relType)
     if rt == "" { return fmt.Errorf("invalid relation type: %s", relType) }
     if strings.TrimSpace(fromID) == "" || strings.TrimSpace(toID) == "" { return fmt.Errorf("from/to ids required") }
-    var cyStr string
-    switch rt {
-    case "INCLUDES":
-        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:INCLUDES]->(b) SET r.labels = $labels`
-    case "CAUSES":
-        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:CAUSES]->(b) SET r.labels = $labels`
-    case "USES":
-        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:USES]->(b) SET r.labels = $labels`
-    case "REPRESENTS":
-        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:REPRESENTS]->(b) SET r.labels = $labels`
-    case "CONTRASTS_WITH":
-        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:CONTRASTS_WITH]->(b) SET r.labels = $labels`
+    // Build labels list literal: ['a','b']
+    list := "[]"
+    if len(labels) > 0 {
+        esc := make([]string, 0, len(labels))
+        for _, s := range labels { esc = append(esc, fmt.Sprintf("'%s'", escapeCypherString(s))) }
+        list = "[" + strings.Join(esc, ",") + "]"
     }
-    cy, p := cypherArgs(cyStr, map[string]any{"from": fromID, "to": toID, "labels": labels})
-    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2,$3) as (v agtype)", graphName, cy, p)
+    cy := fmt.Sprintf(
+        "MERGE (a:Stickie {id: '%s'}) MERGE (b:Stickie {id: '%s'}) MERGE (a)-[r:%s]->(b) SET r.labels = %s",
+        escapeCypherString(fromID), escapeCypherString(toID), rt, list,
+    )
+    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2) as (v agtype)", graphName, cy)
     if err != nil && (strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied")) {
         return nil
     }
@@ -192,17 +196,40 @@ type vertexJSON struct {
 func ListStickieEdges(ctx context.Context, db *pgxpool.Pool, id, dir string, relTypes []string) ([]StickieEdge, error) {
     EnsureStickieGraphSchema(ctx, db)
     if strings.TrimSpace(id) == "" { return nil, nil }
-    // Build cypher returning full vertices; filter client-side on properties.id to avoid operator mismatches
+    // Build cypher with escaped literals and optional filters
+    escapedID := escapeCypherString(id)
     d := strings.ToLower(strings.TrimSpace(dir))
-    cy := `MATCH (a:Stickie)-[r]->(b:Stickie)
-           WHERE ($dir = 'out'  AND a.id = $id)
-              OR ($dir = 'in'   AND b.id = $id)
-              OR ($dir = 'both' AND (a.id = $id OR b.id = $id))
-           AND ($types = [] OR type(r) IN $types)
-           RETURN a, type(r), r.labels, b`
-    params := map[string]any{"id": id, "dir": d, "types": relTypes}
-    cy, p := cypherArgs(cy, params)
-    rows, err := db.Query(ctx, "SELECT av::text, typ::text, lab::text, bv::text FROM ag_catalog.cypher($1,$2,$3) as (av agtype, typ agtype, lab agtype, bv agtype)", graphName, cy, string(p))
+    var match string
+    switch d {
+    case "in":
+        match = fmt.Sprintf("MATCH (a:Stickie)-[r]->(b:Stickie {id: '%s'})", escapedID)
+    case "out":
+        match = fmt.Sprintf("MATCH (a:Stickie {id: '%s'})-[r]->(b:Stickie)", escapedID)
+    default: // both
+        match = fmt.Sprintf("MATCH (a:Stickie)-[r]->(b:Stickie) WHERE a.id = '%s' OR b.id = '%s'", escapedID, escapedID)
+    }
+    // Normalize and include relationship type filter if provided
+    var typeFilter string
+    if len(relTypes) > 0 {
+        allowed := []string{}
+        for _, t := range relTypes {
+            if nt := normalizeStickieRelType(t); nt != "" { allowed = append(allowed, nt) }
+        }
+        if len(allowed) > 0 {
+            // type(r) returns a string; compare against string list
+            lits := make([]string, 0, len(allowed))
+            for _, t := range allowed { lits = append(lits, fmt.Sprintf("'%s'", t)) }
+            typeFilter = " AND type(r) IN [" + strings.Join(lits, ",") + "]"
+        }
+    }
+    cy := match + " RETURN a, type(r), r.labels, b"
+    if strings.Contains(match, " WHERE ") {
+        // WHERE already present (both)
+        if typeFilter != "" { cy = strings.Replace(cy, " RETURN", typeFilter+" RETURN", 1) }
+    } else {
+        if typeFilter != "" { cy = strings.Replace(cy, " RETURN", " WHERE true"+typeFilter+" RETURN", 1) }
+    }
+    rows, err := db.Query(ctx, "SELECT av::text, typ::text, lab::text, bv::text FROM ag_catalog.cypher($1,$2) as (av agtype, typ agtype, lab agtype, bv agtype)", graphName, cy)
     if err != nil {
         return nil, err
     }
@@ -251,31 +278,26 @@ func GetStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relType
     EnsureStickieGraphSchema(ctx, db)
     rt := normalizeStickieRelType(relType)
     if rt == "" { return nil, fmt.Errorf("invalid relation type: %s", relType) }
-    cy, p := cypherArgs(`MATCH (a:Stickie)-[r]->(b:Stickie) WHERE type(r)=$rtype RETURN a, r.labels, b LIMIT 200`, map[string]any{"rtype": rt})
-    rows, err := db.Query(ctx, "SELECT av::text, lab::text, bv::text FROM ag_catalog.cypher($1,$2,$3) as (av agtype, lab agtype, bv agtype)", graphName, cy, string(p))
+    cy := fmt.Sprintf(
+        "MATCH (a:Stickie {id: '%s'})-[r:%s]->(b:Stickie {id: '%s'}) RETURN a, r.labels, b LIMIT 1",
+        escapeCypherString(fromID), rt, escapeCypherString(toID),
+    )
+    rows, err := db.Query(ctx, "SELECT av::text, lab::text, bv::text FROM ag_catalog.cypher($1,$2) as (av agtype, lab agtype, bv agtype)", graphName, cy)
     if err != nil { return nil, err }
     defer rows.Close()
-    for rows.Next() {
+    if rows.Next() {
         var av, lab, bv string
         if err := rows.Scan(&av, &lab, &bv); err != nil { return nil, err }
-        var aV, bV vertexJSON
-        if err := json.Unmarshal([]byte(av), &aV); err != nil { continue }
-        if err := json.Unmarshal([]byte(bv), &bV); err != nil { continue }
-        var fromProp, toProp string
-        if v, ok := aV.Properties["id"].(string); ok { fromProp = v }
-        if v, ok := bV.Properties["id"].(string); ok { toProp = v }
-        if fromProp == fromID && toProp == toID {
-            // parse labels
-            labels := []string{}
-            l := strings.TrimSpace(lab)
-            if len(l) > 0 {
-                if strings.HasPrefix(l, "\"") && strings.HasSuffix(l, "\"") { l = strings.Trim(l, "\"") }
-                if strings.HasPrefix(l, "[") { _ = json.Unmarshal([]byte(l), &labels) }
-            }
-            return &StickieEdge{FromID: fromID, ToID: toID, Type: rt, Labels: labels}, nil
+        // parse labels
+        labels := []string{}
+        l := strings.TrimSpace(lab)
+        if len(l) > 0 {
+            if strings.HasPrefix(l, "\"") && strings.HasSuffix(l, "\"") { l = strings.Trim(l, "\"") }
+            if strings.HasPrefix(l, "[") { _ = json.Unmarshal([]byte(l), &labels) }
         }
+        return &StickieEdge{FromID: fromID, ToID: toID, Type: rt, Labels: labels}, nil
     }
-    return nil, nil
+    return nil, rows.Err()
 }
 
 // DeleteStickieEdge deletes edges of a type between two stickies and returns affected count.
