@@ -10,6 +10,19 @@ import (
     "strings"
 )
 
+// NOTE ON DDL AND IDENTIFIERS
+// ----------------------------
+// Many functions below execute DDL (CREATE ROLE, GRANT, ALTER DEFAULT PRIVILEGES, etc.)
+// which must reference SQL identifiers (roles, schemas, databases) directly in the
+// statement text. PostgreSQL parameters ($1, $2, …) only bind data values — they cannot
+// be used for identifiers, keywords, or object names. For this reason we interpolate
+// identifiers using fmt.Sprintf. To keep this safe:
+// - We validate every identifier via safeIdent (^[A-Za-z_][A-Za-z0-9_]*$) before use.
+// - For literal data (e.g., passwords), we use quoteLiteral to escape single quotes.
+// - Where possible (SELECT EXISTS, etc.), we continue to use parameterized queries.
+// If in doubt, prefer server-side dynamic SQL with EXECUTE and format('%I', ident)
+// inside DO blocks, but the approach here keeps things simple and safe for our needs.
+
 var identRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func safeIdent(name string) (string, error) {

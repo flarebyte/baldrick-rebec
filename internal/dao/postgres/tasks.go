@@ -107,9 +107,9 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
     t.ID = id
     t.Created = created
     // Ensure a Task vertex exists/updated in AGE graph
-    if err := EnsureTaskVertex(ctx, db, t.ID, t.Variant, t.Command); err != nil {
-        return fmt.Errorf("upsert task: graph ensure failed: %w; %s", err, summarize(t))
-    }
+    // Best-effort: AGE graph writes are optional in this deployment. Avoid failing the upsert
+    // if the graph is unavailable or lacks privileges; diagnostics are available via age-status.
+    _ = EnsureTaskVertex(ctx, db, t.ID, t.Variant, t.Command)
     return nil
 }
 
