@@ -102,10 +102,7 @@ var scaffoldCmd = &cobra.Command{
             }
         }
 
-        // Grant AGE privileges to app role (best-effort)
-        if err := pgdao.GrantAGEPrivileges(ctx, db, cfg.Postgres.App.User); err != nil {
-            fmt.Fprintf(os.Stderr, "db:scaffold - warn: grant AGE privileges: %v\n", err)
-        }
+        // Graph features now use SQL tables; no AGE privileges required.
 
         // If --all is set, also ensure content table and FTS (same as db init)
         if flagAll {

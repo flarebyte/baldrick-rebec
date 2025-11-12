@@ -60,12 +60,9 @@ func openPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
     cfg.MaxConnLifetime = 30 * time.Minute
     cfg.MaxConnIdleTime = 5 * time.Minute
 
-    // Session bootstrap: best-effort LOAD AGE and set search_path so AGE operators are available
+    // Session bootstrap: set a sane search_path for application schemas
     cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-        // Some AGE builds require explicit LOAD and making ag_catalog visible for operator resolution
-        // Keep public ahead of ag_catalog to ensure unqualified DDL/DML targets public schema.
-        _, _ = conn.Exec(ctx, `LOAD 'age'`)
-        _, _ = conn.Exec(ctx, `SET search_path = "$user", public, ag_catalog`)
+        _, _ = conn.Exec(ctx, `SET search_path = "$user", public`)
         return nil
     }
 

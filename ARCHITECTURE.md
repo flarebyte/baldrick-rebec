@@ -17,7 +17,7 @@ This codebase provides a CLI-first admin and data-manipulation workflow on top o
     - `SET search_path = "$user", public, ag_catalog` (public first, AGE operators visible)
   - `internal/dao/postgres/schema.go` creates/maintains relational schema, triggers, indexes, and best‑effort extension/graph setup.
   - Entity DAOs are in dedicated files (e.g., `projects.go`, `workspaces.go`, `scripts.go`, `tasks.go`, ...).
-  - Graph helpers live in `graph.go` with AGE-specific logic, all using parameterized `ag_catalog.cypher($graph,$cypher,$params)`.
+- Graph features migrated to SQL tables. No AGE dependency; see `task_replaces` and `stickie_relations` tables and DAO helpers in `graph.go`.
   - Stickie relations also have a SQL mirror (`stickie_relations` table) implemented in `stickie_relations.go` (used when fallback is allowed).
 
 - Server (gRPC scaffold)
@@ -32,7 +32,7 @@ This codebase provides a CLI-first admin and data-manipulation workflow on top o
 6) Command prints a concise line on stderr (status) and a JSON object/array on stdout.
 
 For graph operations (AGE):
-- Commands build a cypher string and a params JSON map. DAOs call `ag_catalog.cypher($1,$2,$3)` with graph name, cypher, params, and parse results.
+- Graph operations are plain SQL: inserts/queries over `task_replaces` and `stickie_relations`.
 - All graph queries are parameterized and include enriched error messages on failure (cypher text for task graph finders and command context for stickie-rel).
 - stickie-rel can optionally fall back to the SQL mirror (`graph.allow_fallback: true`), but defaults to pure-graph behavior so issues surface during regression.
 

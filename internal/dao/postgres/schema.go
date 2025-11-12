@@ -18,24 +18,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         EXCEPTION WHEN others THEN
             NULL;
         END$$;`,
-        // Enable AGE graph extension (if available). Ignore errors downstream.
-        `CREATE EXTENSION IF NOT EXISTS age`,
-        // Create a default graph for relationships if not present (dynamic SQL; ignore errors)
-        `DO $$
-        BEGIN
-            EXECUTE 'SELECT ag_catalog.create_graph(''rbc_graph'')';
-        EXCEPTION WHEN others THEN
-            NULL;
-        END$$;`,
-        // Grant usage on ag_catalog and execute on its functions to current_user (best effort)
-        `DO $$
-        DECLARE usr text := current_user; BEGIN
-            EXECUTE 'GRANT USAGE ON SCHEMA ag_catalog TO ' || quote_ident(usr);
-        EXCEPTION WHEN others THEN NULL; END$$;`,
-        `DO $$
-        DECLARE usr text := current_user; BEGIN
-            EXECUTE 'GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ag_catalog TO ' || quote_ident(usr);
-        EXCEPTION WHEN others THEN NULL; END$$;`,
+        // AGE extension intentionally not required; graph features use SQL tables now.
         // Roles table (name as unique identifier)
         `CREATE TABLE IF NOT EXISTS roles (
             name TEXT PRIMARY KEY,
@@ -268,6 +251,17 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_variant ON tasks(variant)`,
+        // Task replacement relations (SQL graph): new_task REPLACES old_task
+        `CREATE TABLE IF NOT EXISTS task_replaces (
+            new_task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            old_task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            level TEXT NOT NULL CHECK (level IN ('patch','minor','major')),
+            comment TEXT,
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            PRIMARY KEY (new_task_id, old_task_id)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_task_replaces_old ON task_replaces(old_task_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_task_replaces_new ON task_replaces(new_task_id)`,
         // Content table for message bodies (text + optional parsed JSON); UUID id
         `CREATE TABLE IF NOT EXISTS messages_content (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

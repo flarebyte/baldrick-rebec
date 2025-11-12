@@ -225,10 +225,8 @@ func relationships() []relRow {
         {"stickies.blackboard_id", "->", "blackboards.id", "rel"},
         {"stickies.created_by_task_id", "->", "tasks.id", "rel"},
         {"stickies.topic_name,topic_role_name", "->", "topics.name,role_name", "rel"},
-        {"stickie_relations.from_id,to_id", "->", "stickies.id", "rel (mirror)"},
-        // Graph edges
-        {"Task", "REPLACES", "Task", "graph"},
-        {"Stickie", "INCLUDES|CAUSES|USES|REPRESENTS|CONTRASTS_WITH", "Stickie", "graph"},
+        {"stickie_relations.from_id,to_id", "->", "stickies.id", "rel (graph-sql)"},
+        {"task_replaces.new_task_id,old_task_id", "->", "tasks.id", "rel (graph-sql)"},
     }
 }
 

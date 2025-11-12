@@ -70,7 +70,10 @@ var setCmd = &cobra.Command{
             level := strings.ToLower(strings.TrimSpace(flagTaskReplaceLevel))
             if level == "" { level = "minor" }
             if level != "patch" && level != "minor" && level != "major" { return fmt.Errorf("--replace-level must be patch|minor|major") }
-            if err := pgdao.CreateTaskReplacesEdge(ctx, db, t.ID, flagTaskReplaces, level, flagTaskReplaceComment, strings.TrimSpace(flagTaskReplaceCreated)); err != nil { return err }
+            if err := pgdao.CreateTaskReplacesEdge(ctx, db, t.ID, flagTaskReplaces, level, flagTaskReplaceComment, strings.TrimSpace(flagTaskReplaceCreated)); err != nil {
+                // Non-fatal: print a warning and proceed
+                fmt.Fprintf(os.Stderr, "warn: graph REPLACES edge not created: %v\n", err)
+            }
         }
         // Human
         fmt.Fprintf(os.Stderr, "task upserted workflow=%q command=%q variant=%q id=%s\n", t.WorkflowID, t.Command, t.Variant, t.ID)
