@@ -8,6 +8,7 @@ import (
     "strings"
 
     "github.com/jackc/pgx/v5/pgxpool"
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
 type Task struct {
@@ -30,6 +31,9 @@ type Task struct {
 
 // UpsertTask inserts or updates a task identified by (workflow_id, name, version).
 func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
+    // Prepare a privacy-safe summary for error context
+    summarize := func(tk *Task) string { return taskSummary(tk) }
+
     // Normalize variant: accept either full selector (command/...)
     // or suffix to be prefixed with command; if empty, use command
     v := strings.TrimSpace(t.Variant)
@@ -60,11 +64,11 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
     // Ensure registry binding for the selector to its owning workflow
     if strings.TrimSpace(t.WorkflowID) != "" && strings.TrimSpace(t.Variant) != "" {
         if _, err := db.Exec(ctx, `INSERT INTO task_variants (variant, workflow_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, t.Variant, t.WorkflowID); err != nil {
-            return err
+            return fmt.Errorf("upsert task: ensure variant owner failed: %w; %s", err, summarize(t))
         }
         var owner string
         if err := db.QueryRow(ctx, `SELECT workflow_id FROM task_variants WHERE variant=$1`, t.Variant).Scan(&owner); err != nil {
-            return err
+            return fmt.Errorf("upsert task: check variant owner failed: %w; %s", err, summarize(t))
         }
         if owner != t.WorkflowID {
             return fmt.Errorf("variant %q already owned by workflow %q (requested %q)", t.Variant, owner, t.WorkflowID)
@@ -98,12 +102,14 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
         t.Command, t.Variant, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation),
         stringOrEmpty(t.Notes), stringOrEmpty(t.Shell), stringOrEmpty(t.RunScriptID), stringOrEmpty(t.Timeout), stringOrEmpty(t.ToolWorkspaceID), tagsJSON, stringOrEmpty(t.Level),
     ).Scan(&id, &created); err != nil {
-        return err
+        return fmt.Errorf("upsert task: write failed: %w; %s", err, summarize(t))
     }
     t.ID = id
     t.Created = created
     // Ensure a Task vertex exists/updated in AGE graph
-    _ = EnsureTaskVertex(ctx, db, t.ID, t.Variant, t.Command)
+    if err := EnsureTaskVertex(ctx, db, t.ID, t.Variant, t.Command); err != nil {
+        return fmt.Errorf("upsert task: graph ensure failed: %w; %s", err, summarize(t))
+    }
     return nil
 }
 
@@ -199,3 +205,25 @@ func DeleteTaskByKey(ctx context.Context, db *pgxpool.Pool, variant, _ string) (
 // helpers
 type pgxRows interface{ Next() bool; Scan(...any) error; Close(); Err() error }
 func stringsTrim(s string) string { return strings.TrimSpace(s) }
+
+// taskSummary builds a privacy-conscious summary of a Task for error context.
+func taskSummary(t *Task) string {
+    if t == nil { return "task=null" }
+    parts := []string{
+        dbutil.ParamSummary("command", t.Command),
+        dbutil.ParamSummary("variant", t.Variant),
+        dbutil.ParamSummary("workflow_id", t.WorkflowID),
+        dbutil.ParamSummary("title", t.Title),
+        dbutil.ParamSummary("description", t.Description),
+        dbutil.ParamSummary("motivation", t.Motivation),
+        dbutil.ParamSummary("notes", t.Notes),
+        dbutil.ParamSummary("shell", t.Shell),
+        dbutil.ParamSummary("run_script_id", t.RunScriptID),
+        dbutil.ParamSummary("timeout", t.Timeout),
+        dbutil.ParamSummary("tool_workspace_id", t.ToolWorkspaceID),
+        dbutil.ParamSummary("level", t.Level),
+    }
+    // Tags: show size only to avoid leaking keys/values
+    if t.Tags == nil { parts = append(parts, "tags=null") } else { parts = append(parts, fmt.Sprintf("tags=len=%d", len(t.Tags))) }
+    return "task{" + strings.Join(parts, ",") + "}"
+}

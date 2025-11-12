@@ -42,9 +42,9 @@ var nextCmd = &cobra.Command{
         default:
             return errors.New("--level must be one of: patch|minor|major|latest")
         }
-        if err != nil { return err }
+        if err != nil { return fmt.Errorf("cmd=task next params={id:%s,level:%s}: %w", flagTaskNextFromID, lvl, err) }
         if strings.TrimSpace(id) == "" {
-            return errors.New("no next task found for the requested level")
+            return fmt.Errorf("cmd=task next no result params={id:%s,level:%s}", flagTaskNextFromID, lvl)
         }
         t, err := pgdao.GetTaskByID(ctx, db, id)
         if err != nil { return err }

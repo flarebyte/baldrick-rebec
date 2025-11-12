@@ -29,6 +29,10 @@ var ageStatusCmd = &cobra.Command{
         var currentUser string
         _ = db.QueryRow(ctx, "SELECT current_user").Scan(&currentUser)
         status["user"] = currentUser
+        // connection search_path
+        var searchPath string
+        _ = db.QueryRow(ctx, "SHOW search_path").Scan(&searchPath)
+        status["search_path"] = searchPath
         var pgver, agever string
         _ = db.QueryRow(ctx, "SHOW server_version").Scan(&pgver)
         _ = db.QueryRow(ctx, "SELECT extversion FROM pg_extension WHERE extname='age'").Scan(&agever)
@@ -79,6 +83,33 @@ var ageStatusCmd = &cobra.Command{
         }
         status["agtype_contains_operator"] = hasAgtypeContains
         status["graphid_eq_operator"] = hasGraphidEq
+
+        // Probes: label and edge matches (non-counting) to detect planner/operator issues
+        // 1) MATCH any vertex
+        var probeAny string
+        if err := db.QueryRow(ctx, "SELECT 1 FROM ag_catalog.cypher('rbc_graph', $$ MATCH (n) RETURN 1 $$) as (x ag_catalog.agtype) LIMIT 1").Scan(new(int)); err != nil {
+            probeAny = err.Error()
+        } else { probeAny = "ok" }
+        status["probe_match_any"] = probeAny
+        // 2) MATCH Stickie vertex
+        var probeStickie string
+        if err := db.QueryRow(ctx, "SELECT 1 FROM ag_catalog.cypher('rbc_graph', $$ MATCH (n:Stickie) RETURN 1 $$) as (x ag_catalog.agtype) LIMIT 1").Scan(new(int)); err != nil {
+            probeStickie = err.Error()
+        } else { probeStickie = "ok" }
+        status["probe_match_stickie"] = probeStickie
+        // 3) MATCH edges by type but return 1 (avoid count())
+        edgeTypes := []string{"REPLACES","INCLUDES","CAUSES","USES","REPRESENTS","CONTRASTS_WITH"}
+        edgeProbe := map[string]string{}
+        for _, et := range edgeTypes {
+            cy := "MATCH ()-[r]->() WHERE type(r)=$etype RETURN 1"
+            var x int
+            if err := db.QueryRow(ctx, "SELECT 1 FROM ag_catalog.cypher($1,$2,$3::json) as (x ag_catalog.agtype) LIMIT 1", "rbc_graph", cy, fmt.Sprintf("{\"etype\":\"%s\"}", et)).Scan(&x); err != nil {
+                edgeProbe[et] = err.Error()
+            } else {
+                edgeProbe[et] = "ok"
+            }
+        }
+        status["edge_probe"] = edgeProbe
 
         // Human summary to stderr
         fmt.Fprintf(os.Stderr, "AGE extension installed: %v\n", extInstalled)

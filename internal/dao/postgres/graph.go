@@ -7,42 +7,45 @@ import (
     "strings"
 
     "github.com/jackc/pgx/v5/pgxpool"
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
 const graphName = "rbc_graph"
 
 func escapeCypherString(s string) string { return strings.ReplaceAll(s, "'", "''") }
 
+func cypherArgs(query string, params map[string]any) (string, []byte) {
+    b, _ := json.Marshal(params)
+    return query, b
+}
+
 // EnsureStickieGraphSchema creates required vertex/edge labels if missing.
 func EnsureStickieGraphSchema(ctx context.Context, db *pgxpool.Pool) {
     // Best-effort: ignore errors if AGE unavailable or labels already exist
-    stmts := []string{
-        fmt.Sprintf("SELECT ag_catalog.create_vlabel('%s','Stickie')", graphName),
-        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','INCLUDES')", graphName),
-        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','CAUSES')", graphName),
-        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','USES')", graphName),
-        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','REPRESENTS')", graphName),
-        fmt.Sprintf("SELECT ag_catalog.create_elabel('%s','CONTRASTS_WITH')", graphName),
-    }
-    for _, q := range stmts {
-        if _, err := db.Exec(ctx, q); err != nil {
-            _ = err // ignore
-        }
-    }
+    labels := []string{"Stickie"}
+    for _, l := range labels { _, _ = db.Exec(ctx, "SELECT ag_catalog.create_vlabel($1,$2)", graphName, l) }
+    edges := []string{"INCLUDES","CAUSES","USES","REPRESENTS","CONTRASTS_WITH"}
+    for _, e := range edges { _, _ = db.Exec(ctx, "SELECT ag_catalog.create_elabel($1,$2)", graphName, e) }
 }
 
 // EnsureTaskVertex creates or merges a Task vertex in the AGE graph with minimal properties.
 func EnsureTaskVertex(ctx context.Context, db *pgxpool.Pool, id, variant, command string) error {
     if strings.TrimSpace(id) == "" { return nil }
-    variant = escapeCypherString(variant)
-    command = escapeCypherString(command)
-    q := fmt.Sprintf(`SELECT * FROM ag_catalog.cypher('%s', $$
-        MERGE (t:Task {id: '%s'})
-        SET t.variant = '%s', t.command = '%s'
-    $$) as (v ag_catalog.agtype)`, graphName, escapeCypherString(id), variant, command)
-    _, err := db.Exec(ctx, q)
-    // For stickie graph ops, surface errors so callers can diagnose
-    return err
+    cy, p := cypherArgs(`
+        MERGE (t:Task {id: $id})
+        SET t.variant = $variant, t.command = $command
+    `, map[string]any{"id": id, "variant": variant, "command": command})
+    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2,$3::json) as (v agtype)", graphName, cy, string(p))
+    if err != nil {
+        sum := strings.Join([]string{
+            dbutil.ParamSummary("id", id),
+            dbutil.ParamSummary("variant", variant),
+            dbutil.ParamSummary("command", command),
+        }, ",")
+        // Include cypher text (parameterized) but not values
+        return fmt.Errorf("AGE ensure Task vertex failed: %w; cypher=MERGE (t:Task {id: $id}) SET t.variant=$variant, t.command=$command; %s", err, sum)
+    }
+    return nil
 }
 
 // CreateTaskReplacesEdge creates a REPLACES edge from newTaskID to oldTaskID with properties.
@@ -55,78 +58,73 @@ func CreateTaskReplacesEdge(ctx context.Context, db *pgxpool.Pool, newTaskID, ol
     default:
         lvl = "minor"
     }
-    props := fmt.Sprintf("level: '%s'", escapeCypherString(lvl))
-    if strings.TrimSpace(comment) != "" { props += ", comment: '" + escapeCypherString(comment) + "'" }
-    if strings.TrimSpace(createdISO) != "" { props += ", created: '" + escapeCypherString(createdISO) + "'" }
-    q := fmt.Sprintf(`SELECT * FROM ag_catalog.cypher('%s', $$
-        MERGE (n:Task {id: '%s'})
-        MERGE (o:Task {id: '%s'})
-        CREATE (n)-[:REPLACES {%s}]->(o)
-    $$) as (v ag_catalog.agtype)`, graphName, escapeCypherString(newTaskID), escapeCypherString(oldTaskID), props)
-    _, err := db.Exec(ctx, q)
-    if err != nil && (strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied")) {
-        return nil
+    cy, p := cypherArgs(`
+        MERGE (n:Task {id: $new})
+        MERGE (o:Task {id: $old})
+        CREATE (n)-[:REPLACES {level: $level, comment: $comment, created: $created}]->(o)
+    `, map[string]any{"new": newTaskID, "old": oldTaskID, "level": lvl, "comment": comment, "created": createdISO})
+    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2,$3::json) as (v agtype)", graphName, cy, string(p))
+    if err != nil {
+        sum := strings.Join([]string{
+            dbutil.ParamSummary("new", newTaskID),
+            dbutil.ParamSummary("old", oldTaskID),
+            dbutil.ParamSummary("level", lvl),
+            dbutil.ParamSummary("comment", comment),
+            dbutil.ParamSummary("created", createdISO),
+        }, ",")
+        return fmt.Errorf("AGE create REPLACES failed: %w; cypher=MERGE (n:Task)... CREATE (n)-[:REPLACES {...}]->(o); %s", err, sum)
     }
-    return err
+    return nil
 }
 
 // FindLatestTaskIDByVariant returns the Task ID with no incoming REPLACES for a variant.
 func FindLatestTaskIDByVariant(ctx context.Context, db *pgxpool.Pool, variant string) (string, error) {
-    v := escapeCypherString(variant)
-    q := fmt.Sprintf(`SELECT id::text FROM ag_catalog.cypher('%s', $$
-        MATCH (t:Task {variant: '%s'})
+    cy, p := cypherArgs(`
+        MATCH (t:Task {variant: $variant})
         WHERE NOT (:Task)-[:REPLACES]->(t)
         RETURN t.id
         ORDER BY t.id
         LIMIT 1
-    $$) as (id ag_catalog.agtype)`, graphName, v)
+    `, map[string]any{"variant": variant})
+    q := "SELECT id::text FROM ag_catalog.cypher($1,$2,$3::json) as (id agtype)"
     var ag string
-    if err := db.QueryRow(ctx, q).Scan(&ag); err != nil {
-        if strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied") {
-            return "", nil
-        }
-        return "", err
+    if err := db.QueryRow(ctx, q, graphName, cy, string(p)).Scan(&ag); err != nil {
+        return "", fmt.Errorf("AGE cypher failed: %v\ncypher=%s", err, cy)
     }
     return strings.Trim(ag, `"`), nil
 }
 
 // FindNextByLevel returns the next Task ID that directly REPLACES current with given level.
 func FindNextByLevel(ctx context.Context, db *pgxpool.Pool, currentID, level string) (string, error) {
-    cur := escapeCypherString(currentID)
     lvl := strings.ToLower(strings.TrimSpace(level))
     if lvl != "patch" && lvl != "minor" && lvl != "major" { return "", fmt.Errorf("invalid level: %s", level) }
-    q := fmt.Sprintf(`SELECT id::text FROM ag_catalog.cypher('%s', $$
-        MATCH (n:Task)-[r:REPLACES]->(o:Task {id: '%s'})
-        WHERE r.level = '%s'
+    cy, p := cypherArgs(`
+        MATCH (n:Task)-[r:REPLACES]->(o:Task {id: $id})
+        WHERE r.level = $level
         RETURN n.id, r.created
         ORDER BY COALESCE(r.created,'') DESC
         LIMIT 1
-    $$) as (id ag_catalog.agtype, created ag_catalog.agtype)`, graphName, cur, lvl)
+    `, map[string]any{"id": currentID, "level": lvl})
+    q := "SELECT id::text FROM ag_catalog.cypher($1,$2,$3::json) as (id agtype, created agtype)"
     var ag string
-    if err := db.QueryRow(ctx, q).Scan(&ag, new(string)); err != nil {
-        if strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied") {
-            return "", nil
-        }
-        return "", err
+    if err := db.QueryRow(ctx, q, graphName, cy, string(p)).Scan(&ag, new(string)); err != nil {
+        return "", fmt.Errorf("AGE cypher failed: %v\ncypher=%s", err, cy)
     }
     return strings.Trim(ag, `"`), nil
 }
 
 // FindLatestFrom returns the latest Task ID reachable by REPLACES edges from current.
 func FindLatestFrom(ctx context.Context, db *pgxpool.Pool, currentID string) (string, error) {
-    cur := escapeCypherString(currentID)
-    q := fmt.Sprintf(`SELECT id::text FROM ag_catalog.cypher('%s', $$
-        MATCH (n:Task), (c:Task {id: '%s'}), p=(n)-[:REPLACES*]->(c)
+    cy, p := cypherArgs(`
+        MATCH (n:Task), (c:Task {id: $id}), p=(n)-[:REPLACES*]->(c)
         WHERE NOT (:Task)-[:REPLACES]->(n)
         RETURN n.id
         LIMIT 1
-    $$) as (id ag_catalog.agtype)`, graphName, cur)
+    `, map[string]any{"id": currentID})
+    q := "SELECT id::text FROM ag_catalog.cypher($1,$2,$3::json) as (id agtype)"
     var ag string
-    if err := db.QueryRow(ctx, q).Scan(&ag); err != nil {
-        if strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied") {
-            return "", nil
-        }
-        return "", err
+    if err := db.QueryRow(ctx, q, graphName, cy, string(p)).Scan(&ag); err != nil {
+        return "", fmt.Errorf("AGE cypher failed: %v\ncypher=%s", err, cy)
     }
     return strings.Trim(ag, `"`), nil
 }
@@ -135,10 +133,8 @@ func FindLatestFrom(ctx context.Context, db *pgxpool.Pool, currentID string) (st
 
 func EnsureStickieVertex(ctx context.Context, db *pgxpool.Pool, id string) error {
     if strings.TrimSpace(id) == "" { return nil }
-    q := fmt.Sprintf(`SELECT * FROM ag_catalog.cypher('%s', $$
-        MERGE (s:Stickie {id: '%s'})
-    $$) as (v ag_catalog.agtype)`, graphName, escapeCypherString(id))
-    _, err := db.Exec(ctx, q)
+    cy, p := cypherArgs(`MERGE (s:Stickie {id: $id})`, map[string]any{"id": id})
+    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2,$3::json) as (v agtype)", graphName, cy, string(p))
     if err != nil && (strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied")) {
         return nil
     }
@@ -162,20 +158,21 @@ func CreateStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relT
     rt := normalizeStickieRelType(relType)
     if rt == "" { return fmt.Errorf("invalid relation type: %s", relType) }
     if strings.TrimSpace(fromID) == "" || strings.TrimSpace(toID) == "" { return fmt.Errorf("from/to ids required") }
-    // build labels array literal
-    arr := "[]"
-    if len(labels) > 0 {
-        parts := make([]string, 0, len(labels))
-        for _, v := range labels { parts = append(parts, fmt.Sprintf("'%s'", escapeCypherString(v))) }
-        arr = "[" + strings.Join(parts, ",") + "]"
+    var cyStr string
+    switch rt {
+    case "INCLUDES":
+        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:INCLUDES]->(b) SET r.labels = $labels`
+    case "CAUSES":
+        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:CAUSES]->(b) SET r.labels = $labels`
+    case "USES":
+        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:USES]->(b) SET r.labels = $labels`
+    case "REPRESENTS":
+        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:REPRESENTS]->(b) SET r.labels = $labels`
+    case "CONTRASTS_WITH":
+        cyStr = `MERGE (a:Stickie {id: $from}) MERGE (b:Stickie {id: $to}) MERGE (a)-[r:CONTRASTS_WITH]->(b) SET r.labels = $labels`
     }
-    q := fmt.Sprintf(`SELECT * FROM ag_catalog.cypher('%s', $$
-        MERGE (a:Stickie {id: '%s'})
-        MERGE (b:Stickie {id: '%s'})
-        MERGE (a)-[r:%s]->(b)
-        SET r.labels = %s
-    $$) as (v ag_catalog.agtype)`, graphName, escapeCypherString(fromID), escapeCypherString(toID), rt, arr)
-    _, err := db.Exec(ctx, q)
+    cy, p := cypherArgs(cyStr, map[string]any{"from": fromID, "to": toID, "labels": labels})
+    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2,$3) as (v agtype)", graphName, cy, p)
     if err != nil && (strings.Contains(err.Error(), "ag_catalog") || strings.Contains(err.Error(), "cypher") || strings.Contains(err.Error(), "permission denied")) {
         return nil
     }
@@ -201,25 +198,16 @@ func ListStickieEdges(ctx context.Context, db *pgxpool.Pool, id, dir string, rel
     EnsureStickieGraphSchema(ctx, db)
     if strings.TrimSpace(id) == "" { return nil, nil }
     // Build cypher returning full vertices; filter client-side on properties.id to avoid operator mismatches
-    typeFilter := ""
-    if len(relTypes) > 0 {
-        ups := make([]string, 0, len(relTypes))
-        for _, t := range relTypes { if v := normalizeStickieRelType(t); v != "" { ups = append(ups, "'"+v+"'") } }
-        if len(ups) > 0 { typeFilter = " WHERE type(r) IN (" + strings.Join(ups, ",") + ")" }
-    }
-    var cypher string
-    switch strings.ToLower(strings.TrimSpace(dir)) {
-    case "in":
-        cypher = fmt.Sprintf(`MATCH (a:Stickie)-[r]->(b:Stickie)%s RETURN a, type(r), r.labels, b`, typeFilter)
-    case "both":
-        cypher = fmt.Sprintf(`MATCH (a:Stickie)-[r]->(b:Stickie)%s RETURN a, type(r), r.labels, b`, typeFilter)
-    default: // out
-        cypher = fmt.Sprintf(`MATCH (a:Stickie)-[r]->(b:Stickie)%s RETURN a, type(r), r.labels, b`, typeFilter)
-    }
-    q := fmt.Sprintf(`SELECT av::text, typ::text, lab::text, bv::text FROM ag_catalog.cypher('%s', $$
-        %s
-    $$) as (av ag_catalog.agtype, typ ag_catalog.agtype, lab ag_catalog.agtype, bv ag_catalog.agtype)`, graphName, cypher)
-    rows, err := db.Query(ctx, q)
+    d := strings.ToLower(strings.TrimSpace(dir))
+    cy := `MATCH (a:Stickie)-[r]->(b:Stickie)
+           WHERE ($dir = 'out'  AND a.id = $id)
+              OR ($dir = 'in'   AND b.id = $id)
+              OR ($dir = 'both' AND (a.id = $id OR b.id = $id))
+           AND ($types = [] OR type(r) IN $types)
+           RETURN a, type(r), r.labels, b`
+    params := map[string]any{"id": id, "dir": d, "types": relTypes}
+    cy, p := cypherArgs(cy, params)
+    rows, err := db.Query(ctx, "SELECT av::text, typ::text, lab::text, bv::text FROM ag_catalog.cypher($1,$2,$3::json) as (av agtype, typ agtype, lab agtype, bv agtype)", graphName, cy, string(p))
     if err != nil {
         return nil, err
     }
@@ -268,12 +256,8 @@ func GetStickieEdge(ctx context.Context, db *pgxpool.Pool, fromID, toID, relType
     EnsureStickieGraphSchema(ctx, db)
     rt := normalizeStickieRelType(relType)
     if rt == "" { return nil, fmt.Errorf("invalid relation type: %s", relType) }
-    q := fmt.Sprintf(`SELECT av::text, lab::text, bv::text FROM ag_catalog.cypher('%s', $$
-        MATCH (a:Stickie)-[r:%s]->(b:Stickie)
-        RETURN a, r.labels, b
-        LIMIT 200
-    $$) as (av ag_catalog.agtype, lab ag_catalog.agtype, bv ag_catalog.agtype)`, graphName, rt)
-    rows, err := db.Query(ctx, q)
+    cy, p := cypherArgs(`MATCH (a:Stickie)-[r]->(b:Stickie) WHERE type(r)=$rtype RETURN a, r.labels, b LIMIT 200`, map[string]any{"rtype": rt})
+    rows, err := db.Query(ctx, "SELECT av::text, lab::text, bv::text FROM ag_catalog.cypher($1,$2,$3::json) as (av agtype, lab agtype, bv agtype)", graphName, cy, string(p))
     if err != nil { return nil, err }
     defer rows.Close()
     for rows.Next() {

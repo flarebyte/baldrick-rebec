@@ -43,18 +43,22 @@ var setCmd = &cobra.Command{
                 return err
             }
         }
-        // Mirror in SQL only if fallback allowed or graph failed to verify
-        needMirror := allowFallback
-        // Prefer graph verification
-        if rel, err := pgdao.GetStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType); err != nil || rel == nil {
-            needMirror = true
-        }
-        if needMirror {
-            if err := pgdao.UpsertStickieRelation(ctx, db, pgdao.StickieRelation{FromID: flagRelFrom, ToID: flagRelTo, RelType: strings.ToUpper(flagRelType), Labels: labels}); err != nil {
-                return fmt.Errorf("sql mirror upsert failed: %w", err)
+        // If fallback is disabled, require graph verification to succeed
+        if !allowFallback {
+            if rel, err := pgdao.GetStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType); err != nil {
+                return fmt.Errorf("graph verify failed: %w", err)
+            } else if rel == nil {
+                return fmt.Errorf("graph relation not found after creation (from=%s to=%s type=%s)", flagRelFrom, flagRelTo, flagRelType)
             }
-            if _, gerr := pgdao.GetStickieRelation(ctx, db, flagRelFrom, flagRelTo, strings.ToUpper(flagRelType)); gerr != nil {
-                return fmt.Errorf("relation not found after creation in SQL mirror: %w", gerr)
+        } else {
+            // Fallback allowed: if graph missing, mirror into SQL
+            if rel, err := pgdao.GetStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType); err != nil || rel == nil {
+                if err := pgdao.UpsertStickieRelation(ctx, db, pgdao.StickieRelation{FromID: flagRelFrom, ToID: flagRelTo, RelType: strings.ToUpper(flagRelType), Labels: labels}); err != nil {
+                    return fmt.Errorf("sql mirror upsert failed: %w", err)
+                }
+                if _, gerr := pgdao.GetStickieRelation(ctx, db, flagRelFrom, flagRelTo, strings.ToUpper(flagRelType)); gerr != nil {
+                    return fmt.Errorf("relation not found after creation in SQL mirror: %w", gerr)
+                }
             }
         }
         fmt.Fprintf(os.Stderr, "stickie relation set from=%s to=%s type=%s\n", flagRelFrom, flagRelTo, flagRelType)

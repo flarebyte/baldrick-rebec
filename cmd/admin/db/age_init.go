@@ -13,7 +13,8 @@ import (
 )
 
 var (
-    flagAgeInitYes bool
+    flagAgeInitYes   bool
+    flagAgeInitQuiet bool
 )
 
 var ageInitCmd = &cobra.Command{
@@ -31,24 +32,20 @@ var ageInitCmd = &cobra.Command{
         db, err := pgdao.OpenAdmin(ctx, cfg); if err != nil { return err }
         defer db.Close()
 
-        fmt.Fprintln(os.Stderr, "age-init: ensuring EXTENSION age...")
+        if !flagAgeInitQuiet { fmt.Fprintln(os.Stderr, "age-init: ensuring EXTENSION age...") }
         if _, err := db.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS age"); err != nil { return err }
 
-        fmt.Fprintln(os.Stderr, "age-init: ensuring rbc_graph exists...")
-        if _, err := db.Exec(ctx, "SELECT ag_catalog.create_graph('rbc_graph')"); err != nil {
-            // If it already exists, the function should error; ignore duplicate graph errors
-            // Otherwise, return the error
-            // Many AGE builds raise error if graph exists; we continue regardless.
-            fmt.Fprintf(os.Stderr, "age-init: note: create_graph returned: %v (continuing)\n", err)
-        }
-
-        fmt.Fprintln(os.Stderr, "age-init: granting AGE privileges to app role...")
-        if err := pgdao.GrantAGEPrivileges(ctx, db, cfg.Postgres.App.User); err != nil {
-            fmt.Fprintf(os.Stderr, "age-init: warn: grant AGE privileges: %v\n", err)
-        }
+        if !flagAgeInitQuiet { fmt.Fprintln(os.Stderr, "age-init: ensuring rbc_graph exists...") }
+        // Use anonymous DO block to ignore 'already exists' and other benign errors
+        _, _ = db.Exec(ctx, `DO $$
+        BEGIN
+            PERFORM ag_catalog.create_graph('rbc_graph');
+        EXCEPTION WHEN others THEN
+            NULL;
+        END$$;`)
 
         // Create required labels (best-effort)
-        fmt.Fprintln(os.Stderr, "age-init: creating labels (Task, Stickie and edges)...")
+        if !flagAgeInitQuiet { fmt.Fprintln(os.Stderr, "age-init: creating labels (Task, Stickie and edges)...") }
         _ , _ = db.Exec(ctx, "SELECT ag_catalog.create_vlabel('rbc_graph','Task')")
         _ , _ = db.Exec(ctx, "SELECT ag_catalog.create_elabel('rbc_graph','REPLACES')")
         _ , _ = db.Exec(ctx, "SELECT ag_catalog.create_vlabel('rbc_graph','Stickie')")
@@ -56,7 +53,13 @@ var ageInitCmd = &cobra.Command{
             _, _ = db.Exec(ctx, fmt.Sprintf("SELECT ag_catalog.create_elabel('rbc_graph','%s')", e))
         }
 
-        fmt.Fprintln(os.Stderr, "age-init: done")
+        // Grant privileges after labels exist (covers current labels and defaults for future ones)
+        if !flagAgeInitQuiet { fmt.Fprintln(os.Stderr, "age-init: granting AGE privileges to app role...") }
+        if err := pgdao.GrantAGEPrivileges(ctx, db, cfg.Postgres.App.User); err != nil {
+            if !flagAgeInitQuiet { fmt.Fprintf(os.Stderr, "age-init: warn: grant AGE privileges: %v\n", err) }
+        }
+
+        if !flagAgeInitQuiet { fmt.Fprintln(os.Stderr, "age-init: done") }
         return nil
     },
 }
@@ -64,4 +67,5 @@ var ageInitCmd = &cobra.Command{
 func init() {
     DBCmd.AddCommand(ageInitCmd)
     ageInitCmd.Flags().BoolVar(&flagAgeInitYes, "yes", false, "Confirm making changes to AGE (create extension/graph and grant privs)")
+    ageInitCmd.Flags().BoolVar(&flagAgeInitQuiet, "quiet", false, "Reduce logging; suppress benign 'already exists' notes")
 }

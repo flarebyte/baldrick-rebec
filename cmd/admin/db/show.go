@@ -2,6 +2,7 @@ package db
 
 import (
     "context"
+    "encoding/json"
     "errors"
     "fmt"
     "os"
@@ -36,8 +37,8 @@ var showCmd = &cobra.Command{
     RunE: func(cmd *cobra.Command, args []string) error {
         outFmt := strings.ToLower(strings.TrimSpace(flagShowOutput))
         if outFmt == "" { outFmt = "tables" }
-        if outFmt != "tables" && outFmt != "md" {
-            return errors.New("--output must be 'tables' or 'md'")
+        if outFmt != "tables" && outFmt != "md" && outFmt != "json" {
+            return errors.New("--output must be 'tables', 'md' or 'json'")
         }
         schema := flagShowSchema
         if strings.TrimSpace(schema) == "" { schema = "public" }
@@ -82,6 +83,8 @@ var showCmd = &cobra.Command{
             return showAsTables(ctx, db, schema, tables, flagShowConcise)
         case "md":
             return showAsMarkdown(ctx, db, schema, tables, flagShowConcise)
+        case "json":
+            return showAsJSON(ctx, db, schema, tables, flagShowConcise)
         default:
             return nil
         }
@@ -227,4 +230,47 @@ func relationships() []relRow {
         {"Task", "REPLACES", "Task", "graph"},
         {"Stickie", "INCLUDES|CAUSES|USES|REPRESENTS|CONTRASTS_WITH", "Stickie", "graph"},
     }
+}
+
+// JSON output
+type jsonColumn struct {
+    Name     string `json:"name"`
+    Type     string `json:"type"`
+    Nullable string `json:"nullable,omitempty"`
+    Default  string `json:"default,omitempty"`
+    PK       bool   `json:"pk,omitempty"`
+}
+
+type jsonTable struct {
+    Name    string        `json:"name"`
+    Columns []jsonColumn  `json:"columns"`
+}
+
+type jsonOut struct {
+    Schema        string      `json:"schema"`
+    Tables        []jsonTable `json:"tables"`
+    Relationships []relRow    `json:"relationships"`
+}
+
+func showAsJSON(ctx context.Context, db *pgxpool.Pool, schema string, tables []string, concise bool) error {
+    out := jsonOut{Schema: schema}
+    for _, t := range tables {
+        cols, err := fetchColumns(ctx, db, schema, t)
+        if err != nil { return err }
+        jt := jsonTable{Name: t}
+        for _, c := range cols {
+            jc := jsonColumn{Name: c.Name, Type: c.DataType}
+            if !concise {
+                jc.Nullable = strings.ToLower(c.Nullable)
+                jc.Default = c.Default
+                jc.PK = c.PK
+            }
+            jt.Columns = append(jt.Columns, jc)
+        }
+        out.Tables = append(out.Tables, jt)
+    }
+    out.Relationships = relationships()
+    enc := json.NewEncoder(os.Stdout)
+    enc.SetIndent("", "  ")
+    return enc.Encode(out)
 }
