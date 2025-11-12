@@ -2,8 +2,10 @@ package postgres
 
 import (
     "context"
+    "fmt"
 
     "github.com/jackc/pgx/v5/pgxpool"
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
 type Experiment struct {
@@ -18,7 +20,7 @@ func CreateExperiment(ctx context.Context, db *pgxpool.Pool, conversationID stri
     e.ConversationID = conversationID
     var createdTS any
     if err := db.QueryRow(ctx, q, conversationID).Scan(&e.ID, &createdTS); err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("experiment.insert", err, dbutil.ParamSummary("conversation_id", conversationID))
     }
     // pgx encodes time as time.Time; format to RFC3339
     switch t := createdTS.(type) {
@@ -36,7 +38,7 @@ func GetExperimentByID(ctx context.Context, db *pgxpool.Pool, id string) (*Exper
     var e Experiment
     var createdTS any
     if err := db.QueryRow(ctx, q, id).Scan(&e.ID, &e.ConversationID, &createdTS); err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("experiment.get", err, dbutil.ParamSummary("id", id))
     }
     switch t := createdTS.(type) {
     case string:
@@ -55,23 +57,24 @@ func ListExperiments(ctx context.Context, db *pgxpool.Pool, conversationID strin
     } else {
         rows, err = db.Query(ctx, `SELECT id::text, conversation_id::text, created FROM experiments ORDER BY created DESC LIMIT $1 OFFSET $2`, limit, offset)
     }
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("experiment.list", err, dbutil.ParamSummary("conversation_id", conversationID), fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset)) }
     defer rows.Close()
     var out []Experiment
     for rows.Next() {
         var e Experiment
         var createdTS any
         if err := rows.Scan(&e.ID, &e.ConversationID, &createdTS); err != nil {
-            return nil, err
+            return nil, dbutil.ErrWrap("experiment.list.scan", err)
         }
         if s, ok := createdTS.(string); ok { e.Created = s }
         out = append(out, e)
     }
-    return out, rows.Err()
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("experiment.list", err) }
+    return out, nil
 }
 
 func DeleteExperiment(ctx context.Context, db *pgxpool.Pool, id string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM experiments WHERE id=$1::uuid`, id)
-    if err != nil { return 0, err }
+    if err != nil { return 0, dbutil.ErrWrap("experiment.delete", err, dbutil.ParamSummary("id", id)) }
     return ct.RowsAffected(), nil
 }

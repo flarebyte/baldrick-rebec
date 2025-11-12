@@ -126,7 +126,7 @@ func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*Task, error
         &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
         &t.Notes, &t.Shell, &t.RunScriptID, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created,
     ); err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("task.get", err, dbutil.ParamSummary("id", id))
     }
     if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }
     return &t, nil
@@ -145,7 +145,7 @@ func GetTaskByVariant(ctx context.Context, db *pgxpool.Pool, variant string) (*T
         &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
         &t.Notes, &t.Shell, &t.RunScriptID, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created,
     ); err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("task.get", err, dbutil.ParamSummary("variant", variant))
     }
     if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }
     return &t, nil
@@ -172,7 +172,7 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow, roleName string,
                                    WHERE tv.workflow_id=$1 AND t.role_name=$2
                                    ORDER BY t.variant ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
     }
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("task.list", err, dbutil.ParamSummary("workflow", workflow), dbutil.ParamSummary("role", roleName), fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset)) }
     defer rows.Close()
     var out []Task
     for rows.Next() {
@@ -180,25 +180,26 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow, roleName string,
         var tagsJSON []byte
         if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
             &t.Notes, &t.Shell, &t.RunScriptID, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created); err != nil {
-            return nil, err
+            return nil, dbutil.ErrWrap("task.list.scan", err)
         }
         if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }
         out = append(out, t)
     }
-    return out, rows.Err()
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("task.list", err) }
+    return out, nil
 }
 
 // DeleteTaskByID deletes a task by id.
 func DeleteTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM tasks WHERE id=$1::uuid`, id)
-    if err != nil { return 0, err }
+    if err != nil { return 0, dbutil.ErrWrap("task.delete", err, dbutil.ParamSummary("id", id)) }
     return ct.RowsAffected(), nil
 }
 
 // DeleteTaskByKey deletes a task by (workflow_id, name, version).
 func DeleteTaskByKey(ctx context.Context, db *pgxpool.Pool, variant, _ string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM tasks WHERE variant=$1`, variant)
-    if err != nil { return 0, err }
+    if err != nil { return 0, dbutil.ErrWrap("task.delete", err, dbutil.ParamSummary("variant", variant)) }
     return ct.RowsAffected(), nil
 }
 

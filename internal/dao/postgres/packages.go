@@ -3,8 +3,10 @@ package postgres
 import (
     "context"
     "database/sql"
+    "fmt"
 
     "github.com/jackc/pgx/v5/pgxpool"
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
 type Package struct {
@@ -20,7 +22,7 @@ type Package struct {
 func UpsertPackage(ctx context.Context, db *pgxpool.Pool, roleName, variant string) (*Package, error) {
     // Resolve the task id for integrity by variant
     t, err := GetTaskByVariant(ctx, db, variant)
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("package.resolve_task", err, dbutil.ParamSummary("variant", variant)) }
     q := `INSERT INTO packages (role_name, task_id)
           VALUES ($1,$2::uuid)
           ON CONFLICT (role_name, task_id) DO UPDATE SET
@@ -30,7 +32,7 @@ func UpsertPackage(ctx context.Context, db *pgxpool.Pool, roleName, variant stri
     var p Package
     p.RoleName = roleName; p.TaskID = t.ID
     if err := db.QueryRow(ctx, q, roleName, t.ID).Scan(&p.ID, &p.Created, &p.Updated); err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("package.upsert", err, dbutil.ParamSummary("role", roleName), dbutil.ParamSummary("task_id", t.ID))
     }
     return &p, nil
 }
@@ -40,7 +42,7 @@ func GetPackageByID(ctx context.Context, db *pgxpool.Pool, id string) (*Package,
     q := `SELECT id::text, role_name, task_id::text, created, updated FROM packages WHERE id=$1::uuid`
     var p Package
     if err := db.QueryRow(ctx, q, id).Scan(&p.ID, &p.RoleName, &p.TaskID, &p.Created, &p.Updated); err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("package.get", err, dbutil.ParamSummary("id", id))
     }
     return &p, nil
 }
@@ -54,7 +56,7 @@ func GetPackageByKey(ctx context.Context, db *pgxpool.Pool, roleName, variant st
           WHERE p.role_name=$1 AND t.variant=$2`
     var p Package
     if err := db.QueryRow(ctx, q, roleName, variant).Scan(&p.ID, &p.RoleName, &p.TaskID, &p.Created, &p.Updated); err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("package.get", err, dbutil.ParamSummary("role", roleName), dbutil.ParamSummary("variant", variant))
     }
     return &p, nil
 }
@@ -85,29 +87,30 @@ func ListPackages(ctx context.Context, db *pgxpool.Pool, roleName, variant strin
                                     FROM packages p JOIN tasks t ON t.id = p.task_id
                                     ORDER BY t.variant ASC LIMIT $1 OFFSET $2`, limit, offset)
     }
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("package.list", err, dbutil.ParamSummary("role", roleName), dbutil.ParamSummary("variant", variant), fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset)) }
     defer rows.Close()
     var out []Package
     for rows.Next() {
         var p Package
         if err := rows.Scan(&p.ID, &p.RoleName, &p.TaskID, &p.Created, &p.Updated); err != nil {
-            return nil, err
+            return nil, dbutil.ErrWrap("package.list.scan", err)
         }
         out = append(out, p)
     }
-    return out, rows.Err()
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("package.list", err) }
+    return out, nil
 }
 
 // DeleteStarredTaskByID deletes a starred task by id.
 func DeletePackageByID(ctx context.Context, db *pgxpool.Pool, id string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM packages WHERE id=$1::uuid`, id)
-    if err != nil { return 0, err }
+    if err != nil { return 0, dbutil.ErrWrap("package.delete", err, dbutil.ParamSummary("id", id)) }
     return ct.RowsAffected(), nil
 }
 
 // DeleteStarredTaskByKey deletes a starred task by (role, variant).
 func DeletePackageByKey(ctx context.Context, db *pgxpool.Pool, roleName, variant string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM packages p USING tasks t WHERE p.task_id=t.id AND p.role_name=$1 AND t.variant=$2`, roleName, variant)
-    if err != nil { return 0, err }
+    if err != nil { return 0, dbutil.ErrWrap("package.delete", err, dbutil.ParamSummary("role", roleName), dbutil.ParamSummary("variant", variant)) }
     return ct.RowsAffected(), nil
 }
