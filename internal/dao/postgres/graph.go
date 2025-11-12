@@ -31,6 +31,8 @@ func EnsureStickieGraphSchema(ctx context.Context, db *pgxpool.Pool) {
 // EnsureTaskVertex creates or merges a Task vertex in the AGE graph with minimal properties.
 func EnsureTaskVertex(ctx context.Context, db *pgxpool.Pool, id, variant, command string) error {
     if strings.TrimSpace(id) == "" { return nil }
+    // Best-effort ensure Task label exists to reduce cryptic errors on older AGE
+    _, _ = db.Exec(ctx, "SELECT ag_catalog.create_vlabel($1,$2)", graphName, "Task")
     cy, p := cypherArgs(`
         MERGE (t:Task {id: $id})
         SET t.variant = $variant, t.command = $command

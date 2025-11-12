@@ -72,6 +72,22 @@ var ageStatusCmd = &cobra.Command{
         status["cypher_usable"] = cypherOK
         status["graph_exists"] = graphExists
 
+        // Parameter probes: ensure AGE accepts $params from third argument
+        // Probe 1: simple RETURN $x
+        var probeParamReturn string
+        if err := db.QueryRow(ctx, "SELECT x::text FROM ag_catalog.cypher($1,$2,$3) as (x ag_catalog.agtype) LIMIT 1", "rbc_graph", "RETURN $x", `{"x":"ok"}`).Scan(&probeParamReturn); err != nil {
+            status["probe_param_return"] = fmt.Sprintf("error: %v", err)
+        } else {
+            status["probe_param_return"] = probeParamReturn
+        }
+        // Probe 2: MERGE with param property
+        var probeParamMerge string
+        if err := db.QueryRow(ctx, "SELECT x::text FROM ag_catalog.cypher($1,$2,$3) as (x ag_catalog.agtype) LIMIT 1", "rbc_graph", "MERGE (t:Task {id: $id}) RETURN 'ok'", `{"id":"probe"}`).Scan(&probeParamMerge); err != nil {
+            status["probe_param_merge"] = fmt.Sprintf("error: %v", err)
+        } else {
+            status["probe_param_merge"] = probeParamMerge
+        }
+
         // Operator presence checks in ag_catalog (best-effort)
         var hasAgtypeContains bool
         var hasGraphidEq bool
