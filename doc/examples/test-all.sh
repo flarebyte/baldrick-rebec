@@ -89,11 +89,7 @@ echo "[2/11] Scaffolding roles, database, privileges, schema, and content index"
 rbc admin db scaffold --all --yes
 tc "db scaffold --all --yes" "$LINENO"
 
-# Ensure AGE extension and rbc_graph are initialized and app role has privileges (idempotent)
-echo "[2.1/11] Initializing AGE graph (if available)" >&2
-rbc admin db age-init --yes || true
-tc "db age-init --yes" "$LINENO"
-require_age_ready
+# Graph features now use SQL tables; no AGE initialization required.
 
 echo "[3/11] Creating sample workflows and tasks" >&2
 rbc admin workflow set --name ci-test --title "Continuous Integration: Test Suite" --description "Runs unit and integration tests." --notes "CI test workflow"
@@ -148,7 +144,7 @@ rbc admin task set --workflow ci-lint --command lint --variant go-major1 \
   --title "Lint & Vet (Strict)" --description "Major: stricter lint rules" --shell bash --run-script "$sid_lint_major" \
   --replaces "$t_lint_id" --replace-level major --replace-comment "Enable all linters"
 
-# Demonstrate graph queries (best-effort if AGE is available)
+# Demonstrate SQL-backed task relations (latest/next)
 echo "-- Task graph queries (latest/next) --" >&2
 echo "Latest by variant (unit/go):" >&2
 rbc admin task latest --variant unit/go || true

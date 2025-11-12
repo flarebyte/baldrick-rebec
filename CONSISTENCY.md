@@ -17,7 +17,7 @@ This document summarizes shared conventions across the `rbc admin` CLI: common c
   - `db init` (content/FTS), `db status [--json]`, `db show --output tables|md|json [--concise] [--schema public]`
   - `db backup --output <file>` / `db restore --input <file> [--delete-existing] [--upsert]`
   - `db count [--json]`
-  - `db age-status` (diagnostics), `db age-init --yes [--quiet]`
+  - (removed) `db age-status`, `db age-init` — graph now SQL-backed
 - Queues
   - `queue add|peek|size|take`
 
@@ -35,8 +35,7 @@ This document summarizes shared conventions across the `rbc admin` CLI: common c
   - `--tags k=v[,k2=v2]` (repeatable or comma-separated); plain keys map to boolean true
 - Safety
   - `--force` – skip confirmation (delete)
-  - `--yes` – confirm destructive/privileged operations (db scaffold/init/age-init)
-  - `--quiet` – reduce non-critical logs (age-init)
+  - `--yes` – confirm destructive/privileged operations (db scaffold/init)
 - Task/graph specific
   - `task latest --variant <v>` or `--from-id <uuid>`
   - `task next --id <uuid> --level patch|minor|major|latest`
@@ -100,10 +99,9 @@ High-level view of common fields (not exhaustive).
   - blackboards.store_id → stores.id, blackboards.conversation_id → conversations.id, blackboards.task_id → tasks.id
   - stickies.blackboard_id → blackboards.id, stickies.created_by_task_id → tasks.id
   - stickies.(topic_name,topic_role_name) → topics
-- Graph (AGE)
-  - Task —[REPLACES {level,comment,created}]→ Task
-  - Stickie —[INCLUDES|CAUSES|USES|REPRESENTS|CONTRASTS_WITH {labels}]→ Stickie
-  - Mirror (SQL) can be toggled via config (see below).
+- Graph (SQL)
+  - task_replaces(new_task_id, old_task_id, level, comment, created)
+  - stickie_relations(from_id, to_id, rel_type, labels, created)
 
 ## Config Conventions
 - File: `~/.baldrick-rebec/config.yaml` (loaded/merged with defaults)

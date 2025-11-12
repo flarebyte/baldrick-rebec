@@ -1,31 +1,26 @@
-# Current Situation: AGE Graph + CLI Regression Debug
+# Current Situation: Graph Migration to SQL
 
 This note bootstraps a new contributor to investigate the remaining graph issues quickly. It summarizes what is working, what is broken, and the instrumentation already added.
 
 ## Context
-- We are migrating to a Postgres-only stack with optional Apache AGE for graph features (task replacements; stickie relationships).
+- We have migrated to a Postgres-only stack; graph features use SQL tables.
 - Work is on branch `working-branch-2025-11` (created from main to avoid further direct pushes to main).
 - The CLI end-to-end exerciser is `doc/examples/test-all.sh`.
 
 ## Environment & Setup
-- Docker: Postgres service, typically with AGE available. We now avoid custom images; AGE is handled at runtime (CREATE EXTENSION, age-init).
-- Session bootstrap (on every DB connect):
-  - `LOAD 'age'`
-  - `SET search_path = "$user", public, ag_catalog`
-- Graph init: `rbc admin db age-init --yes [--quiet]` creates graph, labels (Task, Stickie, REPLACES/INCLUDES/CAUSES/USES/REPRESENTS/CONTRASTS_WITH), and grants DML on rbc_graph objects to the app role.
+- Docker: Postgres service only. No AGE required.
+- Session bootstrap: `SET search_path = "$user", public`.
+- Graph init: not needed. Relations live in SQL tables (`task_replaces`, `stickie_relations`).
 - Scaffold: `rbc admin db scaffold --all --yes` creates schema and re-grants runtime privileges post-schema.
 
 ## Current Symptoms
 - test-all.sh still fails at the stickie relationship assertion:
   - "[TEST][FAIL] Expected at least 1 relation from <stickie-id>; got 0"
 - Task graph queries (latest/next) previously failed with parser errors; now they include full cypher in error messages for diagnosis.
-- The graph probes in `age-status` currently report no rows (not an error) for MATCH patterns, implying the graph has no vertices/edges in the test run.
+- AGE diagnostics removed; use `db count` and entity lists.
 
 ## What Works
-- AGE extension loads; graph `rbc_graph` exists.
-- Operators exist (agtype @>, graphid =); `cypher_usable=true`.
-- AGE privileges on rbc_graph label tables are granted to the app role.
-- SQL mirror for stickie relations (table `stickie_relations`) is available and integrated (behind a config flag).
+- SQL graph tables power relationships: `task_replaces` (Task REPLACES) and `stickie_relations` (Stickie edges).
 - CLI improvements:
   - All cypher calls are parameterized.
   - Rich error context for task graph commands and stickie-rel get (params echoed).
@@ -38,20 +33,11 @@ This note bootstraps a new contributor to investigate the remaining graph issues
 - Task latest/next previously failed with parser errors; code now prints the exact cypher if it still happens.
 
 ## Instrumentation Added
-- `rbc admin db age-status` (JSON):
-  - postgres_version, age_version
-  - extension_installed, graph_exists, cypher_usable
-  - search_path, agtype_contains_operator, graphid_eq_operator
-  - probe_match_any, probe_match_stickie, edge_probe per type (parameterized)
-- Rich error messages in:
-  - task latest/next: includes `cmd=... params={...}` and cypher
-  - stickie-rel get: includes parameters on error
-- Config flag: `graph.allow_fallback` (default false). When true, stickie-rel falls back to SQL mirror.
+- Rich error messages remain for DAOs; graph errors are gone (SQL-only).
 
 ## Hypotheses
-1) Graph writes are not persisting during test-all.sh (timing, role, or transaction scope?).
-2) A subtle AGE planner quirk is still triggered in stickie set paths on this environment (despite literal type fix).
-3) test-all.sh may be creating stickies but not calling stickie-rel set under the same conditions we expect (IDs, sequence, env), or fallback was implicitly used previously.
+1) Previous AGE-specific issues are moot; graph is SQL-backed.
+2) Ensure scripts remove any `age-init`/`age-status` steps.
 
 ## Next Actions (ordered)
 1) Run test-all.sh with fallback disabled (default) and capture the first failing stickie-rel set call:
@@ -69,8 +55,6 @@ This note bootstraps a new contributor to investigate the remaining graph issues
 - Fresh run:
   - `docker compose up -d`
   - `rbc admin db scaffold --all --yes`
-  - `rbc admin db age-init --yes --quiet`
-  - `rbc admin db age-status` (confirm cypher_usable=true, edge probes ok or no rows)
   - `sh doc/examples/test-all.sh`
 - If failure:
   - Copy the failing command and error (now includes `cmd=... params=...`) into the issue.
@@ -83,24 +67,21 @@ This note bootstraps a new contributor to investigate the remaining graph issues
 
 ## Useful CLI
 - Diagnostics:
-  - `rbc admin db age-status`
   - `rbc admin db show --output json`
-  - `rbc admin db count --json` (includes graph edge counts when cypher can run)
+  - `rbc admin db count --json`
 - Task graph:
   - `rbc admin task latest --variant unit/go`
   - `rbc admin task next --id <task-id> --level patch`
-- Stickie graph (pure):
+- Stickie relations (SQL):
   - `rbc admin stickie-rel set --from <a> --to <b> --type uses --labels x`
   - `rbc admin stickie-rel list --id <a> --direction out --output json`
 
 ## Risks / Alternatives
-- AGEs can differ slightly across environments; session bootstrap (LOAD, search_path) and explicit grants are essential.
-- Mirror fallback ensures UX and data continuity even if AGE misbehaves; we keep it behind a config flag to surface issues by default.
-- If AGE instability persists, consider swapping to SQL-only relationships and keeping the graph as optional enhancement.
+- We removed AGE. Graph features are implemented with SQL tables.
 
 ## Branch & Commit State
 - Current work lives in `working-branch-2025-11`.
-- Major recent changes: parameterized Cypher, literal relationship types, improved error messages, age-status probes, age-init grants sequence, db show relationships.
+- Major recent changes: migrate graph to SQL (`task_replaces`, `stickie_relations`), remove AGE.
 
 ---
 This document should equip a new agent to reproduce, observe, and triage graph failures quickly, with concrete commands and expected signals.
