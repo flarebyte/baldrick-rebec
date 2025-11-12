@@ -103,7 +103,7 @@ var ageStatusCmd = &cobra.Command{
         for _, et := range edgeTypes {
             cy := "MATCH ()-[r]->() WHERE type(r)=$etype RETURN 1"
             var x int
-            if err := db.QueryRow(ctx, "SELECT 1 FROM ag_catalog.cypher($1,$2,$3::json) as (x ag_catalog.agtype) LIMIT 1", "rbc_graph", cy, fmt.Sprintf("{\"etype\":\"%s\"}", et)).Scan(&x); err != nil {
+            if err := db.QueryRow(ctx, "SELECT 1 FROM ag_catalog.cypher($1,$2,$3) as (x ag_catalog.agtype) LIMIT 1", "rbc_graph", cy, fmt.Sprintf("{\"etype\":\"%s\"}", et)).Scan(&x); err != nil {
                 edgeProbe[et] = err.Error()
             } else {
                 edgeProbe[et] = "ok"
