@@ -33,11 +33,13 @@ func EnsureTaskVertex(ctx context.Context, db *pgxpool.Pool, id, variant, comman
     if strings.TrimSpace(id) == "" { return nil }
     // Best-effort ensure Task label exists to reduce cryptic errors on older AGE
     _, _ = db.Exec(ctx, "SELECT ag_catalog.create_vlabel($1,$2)", graphName, "Task")
-    cy, p := cypherArgs(`
-        MERGE (t:Task {id: $id})
-        SET t.variant = $variant, t.command = $command
-    `, map[string]any{"id": id, "variant": variant, "command": command})
-    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2,$3) as (v agtype)", graphName, cy, string(p))
+    // Workaround: AGE 1.6 in this environment rejects parameter placeholders like $id.
+    // Use safely escaped literals in the Cypher string.
+    cy := fmt.Sprintf(
+        "MERGE (t:Task {id: '%s'}) SET t.variant = '%s', t.command = '%s'",
+        escapeCypherString(id), escapeCypherString(variant), escapeCypherString(command),
+    )
+    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2) as (v agtype)", graphName, cy)
     if err != nil {
         sum := strings.Join([]string{
             dbutil.ParamSummary("id", id),
@@ -60,12 +62,11 @@ func CreateTaskReplacesEdge(ctx context.Context, db *pgxpool.Pool, newTaskID, ol
     default:
         lvl = "minor"
     }
-    cy, p := cypherArgs(`
-        MERGE (n:Task {id: $new})
-        MERGE (o:Task {id: $old})
-        CREATE (n)-[:REPLACES {level: $level, comment: $comment, created: $created}]->(o)
-    `, map[string]any{"new": newTaskID, "old": oldTaskID, "level": lvl, "comment": comment, "created": createdISO})
-    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2,$3) as (v agtype)", graphName, cy, string(p))
+    cy := fmt.Sprintf(
+        "MERGE (n:Task {id: '%s'}) MERGE (o:Task {id: '%s'}) CREATE (n)-[:REPLACES {level: '%s', comment: '%s', created: '%s'}]->(o)",
+        escapeCypherString(newTaskID), escapeCypherString(oldTaskID), escapeCypherString(lvl), escapeCypherString(comment), escapeCypherString(createdISO),
+    )
+    _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2) as (v agtype)", graphName, cy)
     if err != nil {
         sum := strings.Join([]string{
             dbutil.ParamSummary("new", newTaskID),
@@ -81,16 +82,13 @@ func CreateTaskReplacesEdge(ctx context.Context, db *pgxpool.Pool, newTaskID, ol
 
 // FindLatestTaskIDByVariant returns the Task ID with no incoming REPLACES for a variant.
 func FindLatestTaskIDByVariant(ctx context.Context, db *pgxpool.Pool, variant string) (string, error) {
-    cy, p := cypherArgs(`
-        MATCH (t:Task {variant: $variant})
-        WHERE NOT (:Task)-[:REPLACES]->(t)
-        RETURN t.id
-        ORDER BY t.id
-        LIMIT 1
-    `, map[string]any{"variant": variant})
-    q := "SELECT id::text FROM ag_catalog.cypher($1,$2,$3) as (id agtype)"
+    cy := fmt.Sprintf(
+        "MATCH (t:Task {variant: '%s'}) WHERE NOT (:Task)-[:REPLACES]->(t) RETURN t.id ORDER BY t.id LIMIT 1",
+        escapeCypherString(variant),
+    )
+    q := "SELECT id::text FROM ag_catalog.cypher($1,$2) as (id agtype)"
     var ag string
-    if err := db.QueryRow(ctx, q, graphName, cy, string(p)).Scan(&ag); err != nil {
+    if err := db.QueryRow(ctx, q, graphName, cy).Scan(&ag); err != nil {
         return "", fmt.Errorf("AGE cypher failed: %v\ncypher=%s", err, cy)
     }
     return strings.Trim(ag, `"`), nil
@@ -100,16 +98,13 @@ func FindLatestTaskIDByVariant(ctx context.Context, db *pgxpool.Pool, variant st
 func FindNextByLevel(ctx context.Context, db *pgxpool.Pool, currentID, level string) (string, error) {
     lvl := strings.ToLower(strings.TrimSpace(level))
     if lvl != "patch" && lvl != "minor" && lvl != "major" { return "", fmt.Errorf("invalid level: %s", level) }
-    cy, p := cypherArgs(`
-        MATCH (n:Task)-[r:REPLACES]->(o:Task {id: $id})
-        WHERE r.level = $level
-        RETURN n.id, r.created
-        ORDER BY COALESCE(r.created,'') DESC
-        LIMIT 1
-    `, map[string]any{"id": currentID, "level": lvl})
-    q := "SELECT id::text FROM ag_catalog.cypher($1,$2,$3) as (id agtype, created agtype)"
+    cy := fmt.Sprintf(
+        "MATCH (n:Task)-[r:REPLACES]->(o:Task {id: '%s'}) WHERE r.level = '%s' RETURN n.id, r.created ORDER BY COALESCE(r.created,'') DESC LIMIT 1",
+        escapeCypherString(currentID), escapeCypherString(lvl),
+    )
+    q := "SELECT id::text FROM ag_catalog.cypher($1,$2) as (id agtype, created agtype)"
     var ag string
-    if err := db.QueryRow(ctx, q, graphName, cy, string(p)).Scan(&ag, new(string)); err != nil {
+    if err := db.QueryRow(ctx, q, graphName, cy).Scan(&ag, new(string)); err != nil {
         return "", fmt.Errorf("AGE cypher failed: %v\ncypher=%s", err, cy)
     }
     return strings.Trim(ag, `"`), nil
@@ -117,15 +112,13 @@ func FindNextByLevel(ctx context.Context, db *pgxpool.Pool, currentID, level str
 
 // FindLatestFrom returns the latest Task ID reachable by REPLACES edges from current.
 func FindLatestFrom(ctx context.Context, db *pgxpool.Pool, currentID string) (string, error) {
-    cy, p := cypherArgs(`
-        MATCH (n:Task), (c:Task {id: $id}), p=(n)-[:REPLACES*]->(c)
-        WHERE NOT (:Task)-[:REPLACES]->(n)
-        RETURN n.id
-        LIMIT 1
-    `, map[string]any{"id": currentID})
-    q := "SELECT id::text FROM ag_catalog.cypher($1,$2,$3) as (id agtype)"
+    cy := fmt.Sprintf(
+        "MATCH (n:Task), (c:Task {id: '%s'}), p=(n)-[:REPLACES*]->(c) WHERE NOT (:Task)-[:REPLACES]->(n) RETURN n.id LIMIT 1",
+        escapeCypherString(currentID),
+    )
+    q := "SELECT id::text FROM ag_catalog.cypher($1,$2) as (id agtype)"
     var ag string
-    if err := db.QueryRow(ctx, q, graphName, cy, string(p)).Scan(&ag); err != nil {
+    if err := db.QueryRow(ctx, q, graphName, cy).Scan(&ag); err != nil {
         return "", fmt.Errorf("AGE cypher failed: %v\ncypher=%s", err, cy)
     }
     return strings.Trim(ag, `"`), nil
