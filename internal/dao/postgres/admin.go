@@ -107,8 +107,11 @@ func GrantAGEPrivileges(ctx context.Context, db *pgxpool.Pool, appRole string) e
         // Allow using the default graph schema (created as 'rbc_graph')
         fmt.Sprintf("GRANT USAGE ON SCHEMA rbc_graph TO %s", ar),
         fmt.Sprintf("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA rbc_graph TO %s", ar),
+        // Sequences are used for label/edge surrogate IDs; grant usage/update
+        fmt.Sprintf("GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA rbc_graph TO %s", ar),
         // Ensure future label tables inherit privileges (default privileges must be set by the owner)
         fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA rbc_graph GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %s", ar),
+        fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA rbc_graph GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %s", ar),
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
