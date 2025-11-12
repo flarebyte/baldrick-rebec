@@ -4,6 +4,7 @@ import (
     "database/sql"
     "fmt"
     "reflect"
+    "strings"
     "time"
 )
 
@@ -97,3 +98,12 @@ func ParamSummary(name string, v any) string {
     }
 }
 
+// ErrWrap returns a formatted error with an operation label and optional summaries.
+// Example: ErrWrap("blackboard.upsert", err, ParamSummary("id", id), ParamSummary("role", role))
+func ErrWrap(op string, err error, parts ...string) error {
+    if err == nil { return nil }
+    if len(parts) == 0 {
+        return fmt.Errorf("%s: %w", op, err)
+    }
+    return fmt.Errorf("%s: %w; %s", op, err, strings.Join(parts, ","))
+}
