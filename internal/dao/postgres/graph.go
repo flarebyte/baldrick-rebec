@@ -42,8 +42,9 @@ func EnsureTaskVertex(ctx context.Context, db *pgxpool.Pool, id, variant, comman
     _, _ = db.Exec(ctx, "SELECT ag_catalog.create_vlabel($1,$2)", graphName, "Task")
     // Workaround: AGE 1.6 in this environment rejects parameter placeholders like $id.
     // Use safely escaped literals in the Cypher string.
+    // Use SET with map update to avoid parser quirks with comma-separated assignments
     cy := fmt.Sprintf(
-        "MERGE (t:Task {id: '%s'}) SET t.variant = '%s', t.command = '%s'",
+        "MERGE (t:Task {id: '%s'}) SET t += {variant: '%s', command: '%s'}",
         escapeCypherString(id), escapeCypherString(variant), escapeCypherString(command),
     )
     _, err := db.Exec(ctx, "SELECT * FROM ag_catalog.cypher($1,$2) as (v agtype)", graphName, cy)
@@ -53,8 +54,8 @@ func EnsureTaskVertex(ctx context.Context, db *pgxpool.Pool, id, variant, comman
             dbutil.ParamSummary("variant", variant),
             dbutil.ParamSummary("command", command),
         }, ",")
-        // Include cypher text (parameterized) but not values
-        return fmt.Errorf("AGE ensure Task vertex failed: %w; cypher=MERGE (t:Task {id: $id}) SET t.variant=$variant, t.command=$command; %s", err, sum)
+        // Keep cypher text generic to avoid leaking values, but clarify it's literal form
+        return fmt.Errorf("AGE ensure Task vertex failed: %w; cypher(literal)=MERGE (t:Task {id: '<redacted>'}) SET t += {variant:'<redacted>',command:'<redacted>'}; %s", err, sum)
     }
     return nil
 }

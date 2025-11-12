@@ -88,6 +88,16 @@ var ageStatusCmd = &cobra.Command{
             status["probe_param_merge"] = probeParamMerge
         }
 
+        // Literal probes for MERGE/SET behavior (no params)
+        var probeMergeLiteral string
+        if err := db.QueryRow(ctx, "SELECT x::text FROM ag_catalog.cypher('rbc_graph', $$ MERGE (t:Task {id: 'probe-literal'}) RETURN 'ok' $$) as (x ag_catalog.agtype) LIMIT 1").Scan(&probeMergeLiteral); err != nil {
+            status["probe_merge_literal"] = fmt.Sprintf("error: %v", err)
+        } else { status["probe_merge_literal"] = probeMergeLiteral }
+        var probeSetLiteral string
+        if err := db.QueryRow(ctx, "SELECT x::text FROM ag_catalog.cypher('rbc_graph', $$ MERGE (t:Task {id: 'probe-set'}) SET t += {variant: 'v', command: 'c'} RETURN 'ok' $$) as (x ag_catalog.agtype) LIMIT 1").Scan(&probeSetLiteral); err != nil {
+            status["probe_set_literal"] = fmt.Sprintf("error: %v", err)
+        } else { status["probe_set_literal"] = probeSetLiteral }
+
         // Operator presence checks in ag_catalog (best-effort)
         var hasAgtypeContains bool
         var hasGraphidEq bool
