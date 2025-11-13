@@ -70,6 +70,7 @@ var statusCmd = &cobra.Command{
             fmt.Fprintf(os.Stderr, "postgres: ok db=%s user=%s\n", dbname, user)
             st.Postgres.AppConnection = pgAppConn{OK:true, DB:dbname, User:user}
             st.Postgres.Version = version
+            fmt.Fprintf(os.Stderr, "postgres: version: %s\n", version)
             // pgvector status (installed and usable?)
             var vecExtVer string
             _ = pgres.QueryRow(ctx, "SELECT extversion FROM pg_extension WHERE extname='vector'").Scan(&vecExtVer)
