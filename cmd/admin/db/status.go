@@ -25,6 +25,12 @@ var statusCmd = &cobra.Command{
         }
         type pgStatus struct {
             AppConnection pgAppConn `json:"app_connection"`
+            Version string `json:"version,omitempty"`
+            Vector struct{
+                Installed bool   `json:"installed"`
+                Usable    bool   `json:"usable"`
+                ExtVersion string `json:"extversion,omitempty"`
+            } `json:"vector"`
             Roles struct{
                 Admin pgRole `json:"admin"`
                 App   pgRole `json:"app"`
@@ -63,6 +69,24 @@ var statusCmd = &cobra.Command{
             _ = pgres.QueryRow(ctx, "select current_database(), current_user, version()").Scan(&dbname, &user, &version)
             fmt.Fprintf(os.Stderr, "postgres: ok db=%s user=%s\n", dbname, user)
             st.Postgres.AppConnection = pgAppConn{OK:true, DB:dbname, User:user}
+            st.Postgres.Version = version
+            // pgvector status (installed and usable?)
+            var vecExtVer string
+            _ = pgres.QueryRow(ctx, "SELECT extversion FROM pg_extension WHERE extname='vector'").Scan(&vecExtVer)
+            st.Postgres.Vector.Installed = vecExtVer != ""
+            st.Postgres.Vector.ExtVersion = vecExtVer
+            if st.Postgres.Vector.Installed {
+                // Try a trivial vector cast to ensure it's usable for app role
+                var x int
+                if err := pgres.QueryRow(ctx, "SELECT 1 WHERE '[1,2,3]'::vector IS NOT NULL").Scan(&x); err == nil {
+                    st.Postgres.Vector.Usable = true
+                    fmt.Fprintf(os.Stderr, "postgres: pgvector installed=%v usable=%v version=%s\n", true, true, vecExtVer)
+                } else {
+                    fmt.Fprintf(os.Stderr, "postgres: pgvector installed=%v usable=%v (error: %v) version=%s\n", true, false, err, vecExtVer)
+                }
+            } else {
+                fmt.Fprintf(os.Stderr, "postgres: pgvector not installed\n")
+            }
         }
 
         // From app connection, sanity-check configured admin role existence/superuser
