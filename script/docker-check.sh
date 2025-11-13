@@ -1,57 +1,113 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+set -a
+source .env
+set +a
 
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-NC="\033[0m" # No Color
+echo "======================================="
+echo " Checking services (strict mode)"
+echo "======================================="
 
-echo "Checking running services..."
 
-############################################
-# Check PostgreSQL
-############################################
-echo -n "PostgreSQL: "
+##############################################
+# Required environment variables (ALL of them)
+##############################################
 
-if podman exec postgres pg_isready > /dev/null 2>&1; then
-    # If pg_isready succeeded, get the actual server version
-    VERSION=$(podman exec postgres psql -U "${POSTGRES_USER:-postgres}" -tAc "SELECT version();" 2>/dev/null | tr -d ' ')
-    echo -e "${GREEN}OK${NC} - ${VERSION}"
-else
-    echo -e "${RED}FAILED${NC}"
+REQUIRED_ENV=(
+  POSTGRES_USER
+  POSTGRES_PASSWORD
+  POSTGRES_DB
+  INFLUXDB_INTERNAL_PORT
+  GRAFANA_INTERNAL_PORT
+)
+
+echo ""
+echo "Validating required environment variables..."
+
+MISSING=()
+
+for VAR in "${REQUIRED_ENV[@]}"; do
+    if [ -z "${!VAR:-}" ]; then
+        MISSING+=("$VAR")
+    fi
+done
+
+if [ "${#MISSING[@]}" -ne 0 ]; then
+    echo "ERROR: The following environment variables are NOT defined:"
+    for VAR in "${MISSING[@]}"; do
+        echo "  - $VAR"
+    done
     exit 1
 fi
 
+echo "All required environment variables are defined."
 
-############################################
-# Check InfluxDB
-############################################
-echo -n "InfluxDB: "
 
-# InfluxDB readiness endpoint (returns 204 when OK)
-if podman exec influxdb curl -sf "http://localhost:${INFLUXDB_INTERNAL_PORT:-8086}/ready" > /dev/null 2>&1; then
-    echo -e "${GREEN}OK${NC}"
-else
-    echo -e "${RED}FAILED${NC}"
+##############################################
+# PostgreSQL
+##############################################
+echo ""
+echo "---------------------------------------"
+echo " PostgreSQL"
+echo "---------------------------------------"
+
+echo "Command: podman exec postgres pg_isready"
+podman exec postgres pg_isready || {
+    echo "PostgreSQL readiness check FAILED"
     exit 1
-fi
+}
 
-
-############################################
-# Check Grafana
-############################################
-echo -n "Grafana: "
-
-if podman exec grafana curl -sf "http://localhost:${GRAFANA_INTERNAL_PORT:-3000}/api/health" > /dev/null 2>&1; then
-    echo -e "${GREEN}OK${NC}"
-else
-    echo -e "${RED}FAILED${NC}"
+echo ""
+echo "Command: podman exec postgres psql -U \"$POSTGRES_USER\" -c \"SHOW server_version;\""
+podman exec postgres psql -U "$POSTGRES_USER" -c "SHOW server_version;" || {
+    echo "PostgreSQL version query FAILED"
     exit 1
-fi
+}
 
 
-############################################
-# All good!
-############################################
-echo -e "\n${GREEN}All services are healthy!${NC}"
+##############################################
+# InfluxDB
+##############################################
+echo ""
+echo "---------------------------------------"
+echo " InfluxDB"
+echo "---------------------------------------"
+
+echo "Command: podman exec influxdb curl http://localhost:${INFLUXDB_INTERNAL_PORT}/ready"
+podman exec influxdb curl "http://localhost:${INFLUXDB_INTERNAL_PORT}/ready" || {
+    echo "InfluxDB readiness check FAILED"
+    exit 1
+}
+
+echo ""
+echo "Command: podman exec influxdb curl http://localhost:${INFLUXDB_INTERNAL_PORT}/health"
+podman exec influxdb curl "http://localhost:${INFLUXDB_INTERNAL_PORT}/health" || {
+    echo "InfluxDB health check FAILED"
+    exit 1
+}
+
+
+##############################################
+# Grafana
+##############################################
+echo ""
+echo "---------------------------------------"
+echo " Grafana"
+echo "---------------------------------------"
+
+echo "Command: podman exec grafana curl http://localhost:${GRAFANA_INTERNAL_PORT}/api/health"
+podman exec grafana curl "http://localhost:${GRAFANA_INTERNAL_PORT}/api/health" || {
+    echo "Grafana health check FAILED"
+    exit 1
+}
+
+
+##############################################
+# Success
+##############################################
+echo ""
+echo "======================================="
+echo " All services healthy"
+echo "======================================="
 exit 0
