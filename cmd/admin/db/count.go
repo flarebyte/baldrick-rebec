@@ -11,11 +11,13 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
+    "github.com/olekukonko/tablewriter"
     "github.com/spf13/cobra"
 )
 
 var (
     flagCountJSON bool
+    flagCountPerRole bool
 )
 
 var countCmd = &cobra.Command{
@@ -58,6 +60,47 @@ var countCmd = &cobra.Command{
         if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM task_replaces").Scan(&n); err == nil { counts["task_replaces"] = n }
         if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM stickie_relations").Scan(&n); err == nil { counts["stickie_relations"] = n }
 
+        if flagCountPerRole && !flagCountJSON {
+            // Build role list (first 10)
+            roleRows, err := db.Query(ctx, `SELECT name FROM roles ORDER BY name ASC LIMIT 10`)
+            if err != nil { return err }
+            roles := []string{}
+            for roleRows.Next() { var rn string; _ = roleRows.Scan(&rn); roles = append(roles, rn) }
+            roleRows.Close()
+            // Determine which tables have role_name column
+            hasRoleCol := map[string]bool{}
+            for _, t := range tables {
+                if !identRe.MatchString(t) { continue }
+                var ok bool
+                if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND column_name='role_name')`, t).Scan(&ok); err != nil { return err }
+                hasRoleCol[t] = ok
+            }
+            // Render table
+            tw := tablewriter.NewWriter(os.Stdout)
+            header := append([]string{"TABLE","TOTAL"}, roles...)
+            tw.SetHeader(header)
+            keys := make([]string, 0, len(counts))
+            for k := range counts { keys = append(keys, k) }
+            sort.Strings(keys)
+            for _, tbl := range keys {
+                row := []string{tbl, fmt.Sprintf("%d", counts[tbl])}
+                if hasRoleCol[tbl] && len(roles) > 0 {
+                    for _, rn := range roles {
+                        var c int64
+                        q := fmt.Sprintf("SELECT COUNT(*) FROM public.%s WHERE role_name=$1", tbl)
+                        if err := db.QueryRow(ctx, q, rn).Scan(&c); err != nil { c = 0 }
+                        row = append(row, fmt.Sprintf("%d", c))
+                    }
+                } else {
+                    // no role column: fill zeros for each role
+                    for range roles { row = append(row, "0") }
+                }
+                tw.Append(row)
+            }
+            tw.Render()
+            return nil
+        }
+
         // Human-readable to stderr
         keys := make([]string, 0, len(counts))
         for k := range counts { keys = append(keys, k) }
@@ -76,4 +119,5 @@ var countCmd = &cobra.Command{
 func init() {
     DBCmd.AddCommand(countCmd)
     countCmd.Flags().BoolVar(&flagCountJSON, "json", false, "Pretty-print JSON output")
+    countCmd.Flags().BoolVar(&flagCountPerRole, "per-role", false, "Display table counts per role (first 10 roles)")
 }
