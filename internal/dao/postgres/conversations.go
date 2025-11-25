@@ -17,6 +17,7 @@ type Conversation struct {
     Description sql.NullString
     Notes       sql.NullString
     Project     sql.NullString
+    RoleName    string
     Tags        map[string]any
     Created     sql.NullTime
     Updated     sql.NullTime
@@ -26,20 +27,20 @@ type Conversation struct {
 func UpsertConversation(ctx context.Context, db *pgxpool.Pool, c *Conversation) error {
     if strings.TrimSpace(c.ID) != "" {
         q := `UPDATE conversations
-              SET title=$2, description=NULLIF($3,''), project=NULLIF($4,''), tags=$5::text[], notes=NULLIF($6,''), updated=now()
+              SET title=$2, description=NULLIF($3,''), project=NULLIF($4,''), role_name=$5, tags=$6::text[], notes=NULLIF($7,''), updated=now()
               WHERE id=$1::uuid RETURNING created, updated`
-        if err := db.QueryRow(ctx, q, c.ID, c.Title, stringOrEmpty(c.Description), stringOrEmpty(c.Project), c.Tags, stringOrEmpty(c.Notes)).Scan(&c.Created, &c.Updated); err != nil {
+        if err := db.QueryRow(ctx, q, c.ID, c.Title, stringOrEmpty(c.Description), stringOrEmpty(c.Project), c.RoleName, c.Tags, stringOrEmpty(c.Notes)).Scan(&c.Created, &c.Updated); err != nil {
             return dbutil.ErrWrap("conversation.upsert.update", err,
                 dbutil.ParamSummary("id", c.ID), dbutil.ParamSummary("title", c.Title))
         }
         return nil
     }
-    q := `INSERT INTO conversations (title, description, project, tags, notes)
-          VALUES ($1, NULLIF($2,''), NULLIF($3,''), COALESCE($4,'{}'::jsonb), NULLIF($5,''))
+    q := `INSERT INTO conversations (title, description, project, role_name, tags, notes)
+          VALUES ($1, NULLIF($2,''), NULLIF($3,''), $4, COALESCE($5,'{}'::jsonb), NULLIF($6,''))
           RETURNING id::text, created, updated`
     var tagsJSON []byte
     if c.Tags != nil { tagsJSON, _ = json.Marshal(c.Tags) }
-    if err := db.QueryRow(ctx, q, c.Title, stringOrEmpty(c.Description), stringOrEmpty(c.Project), tagsJSON, stringOrEmpty(c.Notes)).Scan(&c.ID, &c.Created, &c.Updated); err != nil {
+    if err := db.QueryRow(ctx, q, c.Title, stringOrEmpty(c.Description), stringOrEmpty(c.Project), c.RoleName, tagsJSON, stringOrEmpty(c.Notes)).Scan(&c.ID, &c.Created, &c.Updated); err != nil {
         return dbutil.ErrWrap("conversation.upsert.insert", err, dbutil.ParamSummary("title", c.Title))
     }
     return nil

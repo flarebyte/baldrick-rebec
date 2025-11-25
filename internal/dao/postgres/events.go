@@ -17,6 +17,7 @@ type MessageEvent struct {
     ContentID      string
     FromTaskID     sql.NullString
     ExperimentID   sql.NullString
+    RoleName       string
     Created        time.Time
     Status         string
     ErrorMessage   sql.NullString
@@ -28,11 +29,11 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
         return "", errors.New("nil event")
     }
     q := `INSERT INTO messages (
-            content_id, from_task_id, experiment_id,
+            content_id, from_task_id, experiment_id, role_name,
             status, error_message, tags, created
         ) VALUES (
-            $1::uuid,$2,$3,
-            $4,$5,COALESCE($6,'{}'::jsonb),COALESCE($7, now())
+            $1::uuid,$2,$3,$4,
+            $5,$6,COALESCE($7,'{}'::jsonb),COALESCE($8, now())
         ) RETURNING id::text`
     var id string
     var created any
@@ -40,7 +41,7 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
     var tagsJSON []byte
     if ev.Tags != nil { tagsJSON, _ = json.Marshal(ev.Tags) }
     err := db.QueryRow(ctx, q,
-        ev.ContentID, nullOrUUID(ev.FromTaskID), nullOrUUID(ev.ExperimentID),
+        ev.ContentID, nullOrUUID(ev.FromTaskID), nullOrUUID(ev.ExperimentID), ev.RoleName,
         ev.Status, nullOrString(ev.ErrorMessage), tagsJSON, created,
     ).Scan(&id)
     if err != nil {

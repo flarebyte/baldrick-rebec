@@ -115,11 +115,11 @@ echo "Next major after lint base:" >&2
 rbc admin task next --id "$t_lint_id" --level major || true
 
 echo "[4/11] Creating sample conversations and experiments" >&2
-cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX")
+cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX" --role "$TEST_ROLE_USER")
 cid=$(json_get_id "$cjson")
 tc "conversation set Build System Refresh" "$LINENO"
 
-cjson2=$(rbc admin conversation set --title "Onboarding Improvement" --project "github.com/acme/product" --tags onboarding,docs,dx --description "Improve onboarding artifacts." --notes "Scope: docs, templates, scripts")
+cjson2=$(rbc admin conversation set --title "Onboarding Improvement" --project "github.com/acme/product" --tags onboarding,docs,dx --description "Improve onboarding artifacts." --notes "Scope: docs, templates, scripts" --role "$TEST_ROLE_USER")
 cid2=$(json_get_id "$cjson2")
 tc "conversation set Onboarding Improvement" "$LINENO"
 
@@ -216,9 +216,9 @@ printf "#!/usr/bin/env bash\nset -euo pipefail\necho Cleaning build artifacts...
 tc "script set Deploy Service" "$LINENO"; tc "script set Cleanup Artifacts" "$LINENO"
 
 echo "[11/13] Creating sample messages" >&2
-echo "Hello from user12" | rbc admin message set --experiment "$eid1" --title "Greeting" --tags hello
-echo "Build started" | rbc admin message set --experiment "$eid1" --title "BuildStart" --tags build
-echo "Onboarding checklist updated" | rbc admin message set --experiment "$eid2" --title "DocsUpdate" --tags docs,update
+echo "Hello from user12" | rbc admin message set --experiment "$eid1" --title "Greeting" --tags hello --role "$TEST_ROLE_USER"
+echo "Build started" | rbc admin message set --experiment "$eid1" --title "BuildStart" --tags build --role "$TEST_ROLE_USER"
+echo "Onboarding checklist updated" | rbc admin message set --experiment "$eid2" --title "DocsUpdate" --tags docs,update --role "$TEST_ROLE_USER"
 tc "message set Greeting" "$LINENO"; tc "message set BuildStart" "$LINENO"; tc "message set DocsUpdate" "$LINENO"
 
 echo "[12/13] Creating queues" >&2
