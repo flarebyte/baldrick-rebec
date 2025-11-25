@@ -26,6 +26,7 @@ var (
     flagTaskMotiv string
     flagTaskNotes string
     flagTaskShell string
+    flagTaskRole string
     // removed: run text script
     flagTaskRunScript string
     flagTaskTimeout string
@@ -54,6 +55,7 @@ var setCmd = &cobra.Command{
         if err != nil { return err }
         defer db.Close()
         t := &pgdao.Task{WorkflowID: flagTaskWF, Command: flagTaskCmd, Variant: flagTaskVar}
+        if strings.TrimSpace(flagTaskRole) != "" { t.RoleName = strings.TrimSpace(flagTaskRole) }
         if flagTaskTitle != "" { t.Title = sql.NullString{String: flagTaskTitle, Valid: true} }
         if flagTaskDesc  != "" { t.Description = sql.NullString{String: flagTaskDesc, Valid: true} }
         if flagTaskMotiv != "" { t.Motivation = sql.NullString{String: flagTaskMotiv, Valid: true} }
@@ -99,6 +101,7 @@ func init() {
     setCmd.Flags().StringVar(&flagTaskWF, "workflow", "", "Workflow name (required)")
     setCmd.Flags().StringVar(&flagTaskCmd, "command", "", "Task command (e.g., unit, lint) (required)")
     setCmd.Flags().StringVar(&flagTaskVar, "variant", "", "Task variant (e.g., go, typescript/v5)")
+    setCmd.Flags().StringVar(&flagTaskRole, "role", "", "Role name (optional; defaults to 'user')")
     // removed: --version
     setCmd.Flags().StringVar(&flagTaskTitle, "title", "", "Human-readable title")
     setCmd.Flags().StringVar(&flagTaskDesc, "description", "", "Plain text description")

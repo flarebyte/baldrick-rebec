@@ -16,6 +16,7 @@ type Task struct {
     WorkflowID string
     Command    string
     Variant    string
+    RoleName   string
     Title      sql.NullString
     Description sql.NullString
     Motivation sql.NullString
@@ -75,12 +76,12 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
         }
     }
     q := `INSERT INTO tasks (
-            command, variant, title, description, motivation,
+            command, variant, role_name, title, description, motivation,
             notes, shell, run_script_id, timeout, tool_workspace_id, tags, level
           ) VALUES (
-            $1, $2, NULLIF($3,''), NULLIF($4,''), NULLIF($5,''),
-            NULLIF($6,''), NULLIF($7,''), CASE WHEN $8='' THEN NULL ELSE $8::uuid END, CASE WHEN $9='' THEN NULL ELSE $9::interval END,
-            CASE WHEN $10='' THEN NULL ELSE $10::uuid END, COALESCE($11,'{}'::jsonb), NULLIF($12,'')
+            $1, $2, COALESCE(NULLIF($3,''),'user'), NULLIF($4,''), NULLIF($5,''), NULLIF($6,''),
+            NULLIF($7,''), NULLIF($8,''), CASE WHEN $9='' THEN NULL ELSE $9::uuid END, CASE WHEN $10='' THEN NULL ELSE $10::interval END,
+            CASE WHEN $11='' THEN NULL ELSE $11::uuid END, COALESCE($12,'{}'::jsonb), NULLIF($13,'')
           )
           ON CONFLICT (variant) DO UPDATE SET
             title = EXCLUDED.title,
@@ -92,14 +93,15 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
             timeout = EXCLUDED.timeout,
             tool_workspace_id = EXCLUDED.tool_workspace_id,
             tags = EXCLUDED.tags,
-            level = EXCLUDED.level
+            level = EXCLUDED.level,
+            role_name = EXCLUDED.role_name
           RETURNING id, created`
     var id string
     var created sql.NullTime
     var tagsJSON []byte
     if t.Tags != nil { tagsJSON, _ = json.Marshal(t.Tags) }
     if err := db.QueryRow(ctx, q,
-        t.Command, t.Variant, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation),
+        t.Command, t.Variant, t.RoleName, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation),
         stringOrEmpty(t.Notes), stringOrEmpty(t.Shell), stringOrEmpty(t.RunScriptID), stringOrEmpty(t.Timeout), stringOrEmpty(t.ToolWorkspaceID), tagsJSON, stringOrEmpty(t.Level),
     ).Scan(&id, &created); err != nil {
         return fmt.Errorf("upsert task: write failed: %w; %s", err, summarize(t))

@@ -74,31 +74,31 @@ sid_lint_json=$(printf "go vet ./... && golangci-lint run\n" | rbc admin script 
 sid_lint=$(json_get_id "$sid_lint_json")
 tc "script set Unit: go test" "$LINENO"; tc "script set Integration: compose+test" "$LINENO"; tc "script set Lint & Vet" "$LINENO"
 
-t_unit_json=$(rbc admin task set --workflow ci-test --command unit --variant go \
+t_unit_json=$(rbc admin task set --workflow ci-test --command unit --variant go --role "$TEST_ROLE_USER" \
   --title "Run Unit Tests" --description "Executes unit tests." --shell bash --run-script "$sid_unit" --timeout "10 minutes" --tags unit,fast --level h2)
 t_unit_id=$(json_get_id "$t_unit_json")
 tc "task set ci-test unit/go" "$LINENO"
 
-t_integ_json=$(rbc admin task set --workflow ci-test --command integration --variant "" \
+t_integ_json=$(rbc admin task set --workflow ci-test --command integration --variant "" --role "$TEST_ROLE_USER" \
   --title "Run Integration Tests" --description "Runs integration tests." --shell bash --run-script "$sid_integ" --timeout "30 minutes" --tags integration,slow --level h2)
 t_integ_id=$(json_get_id "$t_integ_json")
 tc "task set ci-test integration" "$LINENO"
 
-t_lint_json=$(rbc admin task set --workflow ci-lint --command lint --variant go \
+t_lint_json=$(rbc admin task set --workflow ci-lint --command lint --variant go --role "$TEST_ROLE_USER" \
   --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run-script "$sid_lint" --timeout "5 minutes" --tags lint,style --level h2)
 t_lint_id=$(json_get_id "$t_lint_json")
 tc "task set ci-lint lint/go" "$LINENO"
 
 # Create replacement tasks with --replaces and levels
-rbc admin task set --workflow ci-test --command unit --variant go-patch1 \
+rbc admin task set --workflow ci-test --command unit --variant go-patch1 --role "$TEST_ROLE_USER" \
   --title "Run Unit Tests (Quick)" --description "Patch: run quick subset" --shell bash --run-script "$sid_unit" \
   --replaces "$t_unit_id" --replace-level patch --replace-comment "Flaky test workaround"
 
-rbc admin task set --workflow ci-test --command unit --variant go-minor1 \
+rbc admin task set --workflow ci-test --command unit --variant go-minor1 --role "$TEST_ROLE_USER" \
   --title "Run Unit Tests (Race)" --description "Minor: enable race detector" --shell bash --run-script "$sid_integ" \
   --replaces "$t_unit_id" --replace-level minor --replace-comment "Add -race"
 
-rbc admin task set --workflow ci-lint --command lint --variant go-major1 \
+rbc admin task set --workflow ci-lint --command lint --variant go-major1 --role "$TEST_ROLE_USER" \
   --title "Lint & Vet (Strict)" --description "Major: stricter lint rules" --shell bash --run-script "$sid_lint" \
   --replaces "$t_lint_id" --replace-level major --replace-comment "Enable all linters"
 
