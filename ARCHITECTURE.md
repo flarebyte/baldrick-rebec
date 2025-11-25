@@ -67,7 +67,7 @@ For graph operations (AGE):
   - Benefits: remote execution, centralized auth/auditing, consistent validations.
 
 ## Test & Examples
-- `doc/examples/test-all.sh` exercises a full setup scenario:
+- `script/test-all.sh` exercises a full setup scenario:
   - Resets DB, scaffolds, initializes AGE, creates entities (workflows, scripts, tasks, projects, workspaces, messages, queues, stores, topics, blackboards, stickies), and validates relationships.
   - Records each step as a testcase via the `testcases` table.
   - Contains guardrails and diagnostics (AGE readiness; graph relation assertions; counts).

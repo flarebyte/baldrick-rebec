@@ -5,7 +5,7 @@ This note bootstraps a new contributor to investigate the remaining graph issues
 ## Context
 - We have migrated to a Postgres-only stack; graph features use SQL tables.
 - Work is on branch `working-branch-2025-11` (created from main to avoid further direct pushes to main).
-- The CLI end-to-end exerciser is `doc/examples/test-all.sh`.
+- The CLI end-to-end exerciser is `script/test-all.sh`.
 
 ## Environment & Setup
 - Docker: Postgres service only. No AGE required.
@@ -55,7 +55,7 @@ This note bootstraps a new contributor to investigate the remaining graph issues
 - Fresh run:
   - `docker compose up -d`
   - `rbc admin db scaffold --all --yes`
-  - `sh doc/examples/test-all.sh`
+  - `sh script/test-all.sh`
 - If failure:
   - Copy the failing command and error (now includes `cmd=... params=...`) into the issue.
 - To enable mirror fallback:
