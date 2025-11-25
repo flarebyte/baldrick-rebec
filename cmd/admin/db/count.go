@@ -92,8 +92,35 @@ var countCmd = &cobra.Command{
                         row = append(row, fmt.Sprintf("%d", c))
                     }
                 } else {
-                    // no role column: fill zeros for each role
-                    for range roles { row = append(row, "0") }
+                    // no direct role column: try deriving via joins for known tables
+                    for _, rn := range roles {
+                        var c int64
+                        var q string
+                        switch tbl {
+                        case "experiments":
+                            q = `SELECT COUNT(*) FROM experiments e JOIN conversations c ON c.id=e.conversation_id WHERE c.role_name=$1`
+                        case "messages_content":
+                            q = `SELECT COUNT(*) FROM messages_content mc WHERE EXISTS (SELECT 1 FROM messages m WHERE m.content_id=mc.id AND m.role_name=$1)`
+                        case "scripts_content":
+                            q = `SELECT COUNT(*) FROM scripts_content sc WHERE EXISTS (SELECT 1 FROM scripts s WHERE s.script_content_id=sc.id AND s.role_name=$1)`
+                        case "stickies":
+                            q = `SELECT COUNT(*) FROM stickies s JOIN blackboards b ON b.id=s.blackboard_id WHERE b.role_name=$1`
+                        case "stickie_relations":
+                            q = `SELECT COUNT(*) FROM stickie_relations r JOIN stickies s ON s.id=r.from_id JOIN blackboards b ON b.id=s.blackboard_id WHERE b.role_name=$1`
+                        case "task_variants":
+                            q = `SELECT COUNT(*) FROM task_variants tv JOIN workflows w ON w.name=tv.workflow_id WHERE w.role_name=$1`
+                        case "task_replaces":
+                            q = `SELECT COUNT(*) FROM task_replaces tr JOIN tasks t ON t.id=tr.new_task_id WHERE t.role_name=$1`
+                        default:
+                            q = ""
+                        }
+                        if q != "" {
+                            if err := db.QueryRow(ctx, q, rn).Scan(&c); err != nil { c = 0 }
+                            row = append(row, fmt.Sprintf("%d", c))
+                        } else {
+                            row = append(row, "0")
+                        }
+                    }
                 }
                 tw.Append(row)
             }
