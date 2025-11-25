@@ -111,6 +111,13 @@ var countCmd = &cobra.Command{
                             q = `SELECT COUNT(*) FROM task_variants tv JOIN workflows w ON w.name=tv.workflow_id WHERE w.role_name=$1`
                         case "task_replaces":
                             q = `SELECT COUNT(*) FROM task_replaces tr JOIN tasks t ON t.id=tr.new_task_id WHERE t.role_name=$1`
+                        case "queues":
+                            q = `SELECT COUNT(*)
+                                 FROM queues q
+                                 LEFT JOIN tasks t ON t.id = q.task_id
+                                 LEFT JOIN messages m ON m.id = q.inbound_message
+                                 LEFT JOIN workspaces w ON w.id = q.target_workspace_id
+                                 WHERE COALESCE(t.role_name, m.role_name, w.role_name) = $1`
                         default:
                             q = ""
                         }
