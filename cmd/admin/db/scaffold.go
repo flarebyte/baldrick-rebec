@@ -80,6 +80,10 @@ var scaffoldCmd = &cobra.Command{
                     if err := pgdao.GrantConnect(ctx, sysdb, cfg.Postgres.DBName, cfg.Postgres.Backup.User); err != nil {
                         return err
                     }
+                    // Also grant CREATE on database so backup role can create the backup schema
+                    if _, err := sysdb.Exec(ctx, fmt.Sprintf("GRANT CREATE ON DATABASE %s TO %s", cfg.Postgres.DBName, cfg.Postgres.Backup.User)); err != nil {
+                        return err
+                    }
                 }
             }
         }
