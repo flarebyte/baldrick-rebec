@@ -278,4 +278,17 @@ echo "-- Table counts --" >&2
 rbc admin db count --per-role
 rbc admin db count --json
 
+echo "[14/14] Snapshot backup smoke test" >&2
+# Create a backup and exercise list/show/restore(delete-dry)/delete
+bkp_json=$(rbc admin snapshot backup --description "rbctest snapshot" --who "$TEST_ROLE_USER" --json)
+bkp_id=$(json_get_id "$bkp_json")
+echo "-- Snapshot list (recent) --" >&2
+rbc admin snapshot list --limit 5 || true
+echo "-- Snapshot show --" >&2
+rbc admin snapshot show "$bkp_id" || true
+echo "-- Snapshot restore (dry-run append) --" >&2
+rbc admin snapshot restore "$bkp_id" --mode append --dry-run || true
+echo "-- Snapshot delete --" >&2
+rbc admin snapshot delete "$bkp_id" --force || true
+
 echo "Done." >&2
