@@ -100,6 +100,8 @@ func EnsureBackupSchemaGrants(ctx context.Context, db *pgxpool.Pool, schema, rol
         fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s", sid, rid),
         // Basic usage
         fmt.Sprintf("GRANT USAGE ON SCHEMA %s TO %s", sid, rid),
+        // Allow creating tables/sequences in the backup schema
+        fmt.Sprintf("GRANT CREATE ON SCHEMA %s TO %s", sid, rid),
         // Table privileges (existing and future)
         fmt.Sprintf("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %s TO %s", sid, rid),
         fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA %s GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %s", sid, rid),

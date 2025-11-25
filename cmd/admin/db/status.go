@@ -52,6 +52,7 @@ var statusCmd = &cobra.Command{
                 SchemaExists bool `json:"schema_exists"`
                 HasDBCreate bool `json:"has_db_create"`
                 HasSchemaUsage bool `json:"has_schema_usage"`
+                HasSchemaCreate bool `json:"has_schema_create"`
             } `json:"backup"`
         }
         type statusOut struct{
@@ -234,13 +235,20 @@ var statusCmd = &cobra.Command{
                 } else {
                     fmt.Fprintln(os.Stderr, "postgres: backup schema 'backup': missing (scaffold --grant-backup) or create via admin")
                 }
-                var hasUsage bool
+                var hasUsage, hasCreate bool
                 _ = db.QueryRow(ctx, `SELECT has_schema_privilege($1, 'backup', 'USAGE')`, bkupRole).Scan(&hasUsage)
+                _ = db.QueryRow(ctx, `SELECT has_schema_privilege($1, 'backup', 'CREATE')`, bkupRole).Scan(&hasCreate)
                 st.Postgres.Backup.HasSchemaUsage = hasUsage
+                st.Postgres.Backup.HasSchemaCreate = hasCreate
                 if hasUsage {
                     fmt.Fprintf(os.Stderr, "postgres: backup role %q has USAGE on schema 'backup': ok\n", bkupRole)
                 } else {
                     fmt.Fprintf(os.Stderr, "postgres: backup role %q lacks USAGE on schema 'backup'\n", bkupRole)
+                }
+                if hasCreate {
+                    fmt.Fprintf(os.Stderr, "postgres: backup role %q has CREATE on schema 'backup': ok\n", bkupRole)
+                } else {
+                    fmt.Fprintf(os.Stderr, "postgres: backup role %q lacks CREATE on schema 'backup' (grant via scaffold --grant-backup)\n", bkupRole)
                 }
             }
         } else {
