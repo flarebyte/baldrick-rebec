@@ -4,6 +4,7 @@ import (
     "context"
     "fmt"
 
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
     "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -78,9 +79,11 @@ func EnsureBackupSchema(ctx context.Context, db *pgxpool.Pool, schema string) er
             applied_at TIMESTAMPTZ NULL
         )`, qual("migrations"), qual("backups")),
     }
-    for _, s := range stmts {
+    for i, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
-            return err
+            return dbutil.ErrWrap("backup.ensure_schema", err,
+                dbutil.ParamSummary("schema", schema),
+                fmt.Sprintf("stmt_index=%d", i))
         }
     }
     return nil
@@ -104,9 +107,11 @@ func EnsureBackupSchemaGrants(ctx context.Context, db *pgxpool.Pool, schema, rol
         fmt.Sprintf("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %s TO %s", sid, rid),
         fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA %s GRANT USAGE, SELECT ON SEQUENCES TO %s", sid, rid),
     }
-    for _, s := range stmts {
+    for i, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
-            return err
+            return dbutil.ErrWrap("backup.ensure_schema_grants", err,
+                dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("role", role),
+                fmt.Sprintf("stmt_index=%d", i))
         }
     }
     return nil

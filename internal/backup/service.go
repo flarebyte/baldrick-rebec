@@ -8,6 +8,7 @@ import (
     "sort"
     "strings"
 
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
     "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/pgxpool"
@@ -28,7 +29,7 @@ func CreateBackup(ctx context.Context, db *pgxpool.Pool, entities []BackupEntity
     schema := opt.Schema
     if schema == "" { schema = "backup" }
     if err := pgdao.EnsureBackupSchema(ctx, db, schema); err != nil {
-        return "", fmt.Errorf("ensure backup schema: %w", err)
+        return "", dbutil.ErrWrap("snapshot.ensure_backup_schema", err, dbutil.ParamSummary("schema", schema))
     }
     var desc *string
     if strings.TrimSpace(opt.Description) != "" {
@@ -38,7 +39,7 @@ func CreateBackup(ctx context.Context, db *pgxpool.Pool, entities []BackupEntity
     var initiatedBy *string
     if strings.TrimSpace(opt.InitiatedBy) != "" { v := opt.InitiatedBy; initiatedBy = &v }
     bID, err := pgdao.InsertBackup(ctx, db, schema, desc, opt.Tags, initiatedBy, nil)
-    if err != nil { return "", fmt.Errorf("insert backup: %w", err) }
+    if err != nil { return "", dbutil.ErrWrap("snapshot.backup.create", err, dbutil.ParamSummary("schema", schema)) }
 
     includeSet := setFromSlice(opt.Include)
     excludeSet := setFromSlice(opt.Exclude)
@@ -54,14 +55,15 @@ func CreateBackup(ctx context.Context, db *pgxpool.Pool, entities []BackupEntity
         if !include { continue }
 
         cols, err := fetchTableColumns(ctx, db, "public", e.TableName)
-        if err != nil { return "", fmt.Errorf("schema %s: %w", e.EntityName, err) }
+        if err != nil { return "", dbutil.ErrWrap("snapshot.fetch_columns", err, dbutil.ParamSummary("entity", e.EntityName), dbutil.ParamSummary("table", e.TableName)) }
         // insert schema rows
         for _, c := range cols {
             def := c.ColumnDefault
             var defp *string
             if def != "" { defp = &def }
             if err := pgdao.InsertEntitySchema(ctx, db, schema, bID, e.EntityName, c.ColumnName, c.DataType, c.IsNullable, defp, nil); err != nil {
-                return "", fmt.Errorf("insert entity_schema %s.%s: %w", e.EntityName, c.ColumnName, err)
+                return "", dbutil.ErrWrap("snapshot.entity_schema.insert", err,
+                    dbutil.ParamSummary("entity", e.EntityName), dbutil.ParamSummary("field", c.ColumnName))
             }
         }
         // build and stream records
@@ -88,22 +90,22 @@ func CreateBackup(ctx context.Context, db *pgxpool.Pool, entities []BackupEntity
             idf.Sanitize(),
         )
         rows, err := db.Query(ctx, q)
-        if err != nil { return "", fmt.Errorf("query %s: %w", e.TableName, err) }
+        if err != nil { return "", dbutil.ErrWrap("snapshot.select_rows", err, dbutil.ParamSummary("table", e.TableName)) }
         for rows.Next() {
             var pkb, rec []byte
             var role *string
             if hasRole {
                 var r string
-                if err := rows.Scan(&pkb, &rec, &r); err != nil { rows.Close(); return "", err }
+                if err := rows.Scan(&pkb, &rec, &r); err != nil { rows.Close(); return "", dbutil.ErrWrap("snapshot.select_rows.scan", err, dbutil.ParamSummary("table", e.TableName)) }
                 role = &r
             } else {
-                if err := rows.Scan(&pkb, &rec); err != nil { rows.Close(); return "", err }
+                if err := rows.Scan(&pkb, &rec); err != nil { rows.Close(); return "", dbutil.ErrWrap("snapshot.select_rows.scan", err, dbutil.ParamSummary("table", e.TableName)) }
             }
             if err := pgdao.InsertEntityRecord(ctx, db, schema, bID, e.EntityName, pkb, rec, role); err != nil {
-                rows.Close(); return "", err
+                rows.Close(); return "", dbutil.ErrWrap("snapshot.entity_record.insert", err, dbutil.ParamSummary("entity", e.EntityName), dbutil.ParamSummary("schema", schema))
             }
         }
-        if err := rows.Err(); err != nil { rows.Close(); return "", err }
+        if err := rows.Err(); err != nil { rows.Close(); return "", dbutil.ErrWrap("snapshot.select_rows", err, dbutil.ParamSummary("table", e.TableName)) }
         rows.Close()
     }
     return bID, nil
@@ -177,7 +179,7 @@ func RestoreFromBackup(ctx context.Context, db *pgxpool.Pool, entities []BackupE
 
     for _, e := range targets {
         liveCols, err := fetchTableColumns(ctx, db, "public", e.TableName)
-        if err != nil { return fmt.Errorf("live schema %s: %w", e.TableName, err) }
+        if err != nil { return dbutil.ErrWrap("snapshot.restore.fetch_columns", err, dbutil.ParamSummary("table", e.TableName)) }
         // prepare column list excluding generated defaults if desired; include most columns
         // We will map from JSON record to explicit values.
         cols := make([]Column, 0, len(liveCols))
@@ -185,19 +187,19 @@ func RestoreFromBackup(ctx context.Context, db *pgxpool.Pool, entities []BackupE
         // Replace mode: truncate
         if strings.EqualFold(opt.Mode, "replace") && !opt.DryRun {
             idf := pgx.Identifier{"public", e.TableName}
-            if _, err := db.Exec(ctx, "TRUNCATE "+idf.Sanitize()+" RESTART IDENTITY CASCADE"); err != nil { return fmt.Errorf("truncate %s: %w", e.TableName, err) }
+            if _, err := db.Exec(ctx, "TRUNCATE "+idf.Sanitize()+" RESTART IDENTITY CASCADE"); err != nil { return dbutil.ErrWrap("snapshot.restore.truncate", err, dbutil.ParamSummary("table", e.TableName)) }
         }
         // Build INSERT ... SELECT from reading backup.entity_records
         // We'll pull record JSON and unmarshal in Go to map[string]any — then param insert.
         rows, err := db.Query(ctx, `SELECT record FROM `+schema+`.entity_records WHERE backup_id=$1 AND entity_name=$2`, backupID, e.EntityName)
-        if err != nil { return fmt.Errorf("backup read %s: %w", e.EntityName, err) }
+        if err != nil { return dbutil.ErrWrap("snapshot.restore.read_records", err, dbutil.ParamSummary("entity", e.EntityName), dbutil.ParamSummary("schema", schema)) }
         for rows.Next() {
             var recb []byte
-            if err := rows.Scan(&recb); err != nil { rows.Close(); return err }
+            if err := rows.Scan(&recb); err != nil { rows.Close(); return dbutil.ErrWrap("snapshot.restore.read_records.scan", err, dbutil.ParamSummary("entity", e.EntityName)) }
             if opt.DryRun { continue }
             // decode
             var rec map[string]any
-            if err := json.Unmarshal(recb, &rec); err != nil { rows.Close(); return err }
+            if err := json.Unmarshal(recb, &rec); err != nil { rows.Close(); return dbutil.ErrWrap("snapshot.restore.decode", err, dbutil.ParamSummary("entity", e.EntityName)) }
             // Build column list and params present in rec
             var names []string
             var placeholders []string
@@ -239,9 +241,9 @@ func RestoreFromBackup(ctx context.Context, db *pgxpool.Pool, entities []BackupE
                 strings.Join(placeholders, ", "),
                 onConflict,
             )
-            if _, err := db.Exec(ctx, q, args...); err != nil { rows.Close(); return fmt.Errorf("insert %s: %w", e.TableName, err) }
+            if _, err := db.Exec(ctx, q, args...); err != nil { rows.Close(); return dbutil.ErrWrap("snapshot.restore.insert", err, dbutil.ParamSummary("table", e.TableName)) }
         }
-        if err := rows.Err(); err != nil { rows.Close(); return err }
+        if err := rows.Err(); err != nil { rows.Close(); return dbutil.ErrWrap("snapshot.restore.read_records", err, dbutil.ParamSummary("entity", e.EntityName)) }
         rows.Close()
     }
     return nil

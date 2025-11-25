@@ -4,6 +4,7 @@ import (
     "context"
     "time"
 
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
     "github.com/jackc/pgx/v5/pgxpool"
     "strconv"
 )
@@ -30,7 +31,7 @@ func InsertBackup(ctx context.Context, db *pgxpool.Pool, schema string, descript
     q := `INSERT INTO ` + schema + `.backups (description, tags, initiated_by, retention_until)
           VALUES ($1, $2, $3, $4) RETURNING id`
     if err := db.QueryRow(ctx, q, description, tagsJSON, initiatedBy, retention).Scan(&id); err != nil {
-        return "", err
+        return "", dbutil.ErrWrap("backup.insert", err, dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("desc", description))
     }
     return id, nil
 }
@@ -41,7 +42,8 @@ func InsertEntitySchema(ctx context.Context, db *pgxpool.Pool, schema string, ba
     q := `INSERT INTO ` + schema + `.entity_schema (backup_id, entity_name, field_name, field_type, is_nullable, default_value, metadata)
           VALUES ($1, $2, $3, $4, $5, $6, $7)`
     _, err := db.Exec(ctx, q, backupID, entityName, fieldName, fieldType, isNullable, defaultValue, metadata)
-    return err
+    return dbutil.ErrWrap("backup.entity_schema.insert", err,
+        dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("entity", entityName), dbutil.ParamSummary("field", fieldName))
 }
 
 // InsertEntityRecord inserts one entity record snapshot.
@@ -54,7 +56,8 @@ func InsertEntityRecord(ctx context.Context, db *pgxpool.Pool, schema string, ba
     if recordPK != nil { pkS = string(recordPK) }
     if record != nil { recS = string(record) }
     _, err := db.Exec(ctx, q, backupID, entityName, pkS, recS, roleName)
-    return err
+    return dbutil.ErrWrap("backup.entity_record.insert", err,
+        dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("entity", entityName), dbutil.ParamSummary("role", roleName))
 }
 
 // ListBackups returns backups filtered by time range and limited.
@@ -77,7 +80,7 @@ func ListBackups(ctx context.Context, db *pgxpool.Pool, schema string, since, un
         args = append(args, limit)
     }
     rows, err := db.Query(ctx, q, args...)
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("backup.list", err, dbutil.ParamSummary("schema", schema)) }
     defer rows.Close()
     var out []Backup
     for rows.Next() {
@@ -87,7 +90,7 @@ func ListBackups(ctx context.Context, db *pgxpool.Pool, schema string, since, un
         b.Tags = tags
         out = append(out, b)
     }
-    if err := rows.Err(); err != nil { return nil, err }
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("backup.list", err, dbutil.ParamSummary("schema", schema)) }
     return out, nil
 }
 
@@ -95,7 +98,7 @@ func ListBackups(ctx context.Context, db *pgxpool.Pool, schema string, since, un
 func DeleteBackup(ctx context.Context, db *pgxpool.Pool, schema, id string) (int64, error) {
     if schema == "" { schema = "backup" }
     ct, err := db.Exec(ctx, `DELETE FROM `+schema+`.backups WHERE id=$1`, id)
-    if err != nil { return 0, err }
+    if err != nil { return 0, dbutil.ErrWrap("backup.delete", err, dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("id", id)) }
     return ct.RowsAffected(), nil
 }
 
@@ -103,7 +106,7 @@ func DeleteBackup(ctx context.Context, db *pgxpool.Pool, schema, id string) (int
 func CountPerEntity(ctx context.Context, db *pgxpool.Pool, schema, backupID string) (map[string]int64, error) {
     if schema == "" { schema = "backup" }
     rows, err := db.Query(ctx, `SELECT entity_name, COUNT(*) FROM `+schema+`.entity_records WHERE backup_id=$1 GROUP BY entity_name ORDER BY entity_name`, backupID)
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("backup.count_per_entity", err, dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("id", backupID)) }
     defer rows.Close()
     m := map[string]int64{}
     for rows.Next() {
@@ -112,7 +115,8 @@ func CountPerEntity(ctx context.Context, db *pgxpool.Pool, schema, backupID stri
         if err := rows.Scan(&name, &c); err != nil { return nil, err }
         m[name] = c
     }
-    return m, rows.Err()
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("backup.count_per_entity", err, dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("id", backupID)) }
+    return m, nil
 }
 
 // Helper: small int to string without fmt to avoid allocations here.
