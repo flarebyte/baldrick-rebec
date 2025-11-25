@@ -172,11 +172,11 @@ tc "blackboard set for ideas-acme-build ($bb1)" "$LINENO"; tc "blackboard set fo
 
 echo "[8.2/11] Creating stickies" >&2
 st1_json=$(rbc admin stickie set --blackboard "$bb1" \
-  --topic "onboarding" --topic-role "$TEST_ROLE_USER" \
+  --topic-name "onboarding" --topic-role "$TEST_ROLE_USER" \
   --note "Refresh onboarding guide for new hires" --labels onboarding,docs,priority:med --priority should)
 st1=$(json_get_id "$st1_json")
 st2_json=$(rbc admin stickie set --blackboard "$bb1" \
-  --topic "devops" --topic-role "$TEST_ROLE_USER" \
+  --topic-name "devops" --topic-role "$TEST_ROLE_USER" \
   --note "Evaluate GitHub Actions caching for go build" \
   --labels idea,devops --priority could)
 st2=$(json_get_id "$st2_json")
