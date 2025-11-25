@@ -137,9 +137,9 @@ rbc admin role set --name "$TEST_ROLE_QA"   --title "QA"   --description "Qualit
 tc "role set $TEST_ROLE_USER" "$LINENO"; tc "role set $TEST_ROLE_QA" "$LINENO"
 
 echo "[6/11] Creating tags" >&2
-rbc admin tag set --name status  --title "Status"  --description "Common values: draft, active, archived"
-rbc admin tag set --name type    --title "Type"    --description "Common values: unit, integration"
-rbc admin tag set --name project --title "Project" --description "Example values: ci, website, product"
+rbc admin tag set --name status  --title "Status"  --description "Common values: draft, active, archived" --role "$TEST_ROLE_USER"
+rbc admin tag set --name type    --title "Type"    --description "Common values: unit, integration" --role "$TEST_ROLE_USER"
+rbc admin tag set --name project --title "Project" --description "Example values: ci, website, product" --role "$TEST_ROLE_USER"
 tc "tag set status" "$LINENO"; tc "tag set type" "$LINENO"; tc "tag set project" "$LINENO"
 
 echo "[6.5/11] Creating topics" >&2

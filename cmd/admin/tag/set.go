@@ -20,6 +20,7 @@ var (
     flagTagTitle string
     flagTagDesc  string
     flagTagNotes string
+    flagTagRole  string
 )
 
 var setCmd = &cobra.Command{
@@ -38,6 +39,7 @@ var setCmd = &cobra.Command{
         defer db.Close()
 
         t := &pgdao.Tag{ Name: flagTagName, Title: flagTagTitle }
+        if strings.TrimSpace(flagTagRole) != "" { t.RoleName = strings.TrimSpace(flagTagRole) }
         if flagTagDesc != "" { t.Description = sql.NullString{String: flagTagDesc, Valid: true} }
         if flagTagNotes != "" { t.Notes = sql.NullString{String: flagTagNotes, Valid: true} }
         if err := pgdao.UpsertTag(ctx, db, t); err != nil { return err }
@@ -64,5 +66,5 @@ func init() {
     setCmd.Flags().StringVar(&flagTagTitle, "title", "", "Human-readable title (required)")
     setCmd.Flags().StringVar(&flagTagDesc, "description", "", "Plain text description")
     setCmd.Flags().StringVar(&flagTagNotes, "notes", "", "Markdown-formatted notes")
+    setCmd.Flags().StringVar(&flagTagRole, "role", "", "Role name (optional; defaults to 'user')")
 }
-

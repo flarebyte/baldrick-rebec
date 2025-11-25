@@ -13,6 +13,7 @@ type Workflow struct {
     Name        string
     Title       string
     Description sql.NullString
+    RoleName    string
     Notes       sql.NullString
     Created     sql.NullTime
     Updated     sql.NullTime
@@ -20,15 +21,16 @@ type Workflow struct {
 
 // UpsertWorkflow inserts or updates a workflow by name.
 func UpsertWorkflow(ctx context.Context, db *pgxpool.Pool, w *Workflow) error {
-    q := `INSERT INTO workflows (name, title, description, notes)
-          VALUES ($1, $2, NULLIF($3,''), NULLIF($4,''))
+    q := `INSERT INTO workflows (name, title, description, role_name, notes)
+          VALUES ($1, $2, NULLIF($3,''), $4, NULLIF($5,''))
           ON CONFLICT (name) DO UPDATE SET
             title = EXCLUDED.title,
             description = EXCLUDED.description,
+            role_name = EXCLUDED.role_name,
             notes = EXCLUDED.notes,
             updated = now()
           RETURNING created, updated`
-    if err := db.QueryRow(ctx, q, w.Name, w.Title, stringOrEmpty(w.Description), stringOrEmpty(w.Notes)).Scan(&w.Created, &w.Updated); err != nil {
+    if err := db.QueryRow(ctx, q, w.Name, w.Title, stringOrEmpty(w.Description), w.RoleName, stringOrEmpty(w.Notes)).Scan(&w.Created, &w.Updated); err != nil {
         return dbutil.ErrWrap("workflow.upsert", err, dbutil.ParamSummary("name", w.Name))
     }
     return nil

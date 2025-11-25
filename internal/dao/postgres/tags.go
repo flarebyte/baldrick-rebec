@@ -14,21 +14,23 @@ type Tag struct {
     Title       string
     Description sql.NullString
     Notes       sql.NullString
+    RoleName    string
     Created     sql.NullTime
     Updated     sql.NullTime
 }
 
 // UpsertTag inserts or updates a tag by name.
 func UpsertTag(ctx context.Context, db *pgxpool.Pool, t *Tag) error {
-    q := `INSERT INTO tags (name, title, description, notes)
-          VALUES ($1, $2, NULLIF($3,''), NULLIF($4,''))
+    q := `INSERT INTO tags (name, title, description, notes, role_name)
+          VALUES ($1, $2, NULLIF($3,''), NULLIF($4,''), COALESCE(NULLIF($5,''),'user'))
           ON CONFLICT (name) DO UPDATE SET
             title = EXCLUDED.title,
             description = EXCLUDED.description,
             notes = EXCLUDED.notes,
+            role_name = EXCLUDED.role_name,
             updated = now()
           RETURNING created, updated`
-    if err := db.QueryRow(ctx, q, t.Name, t.Title, stringOrEmpty(t.Description), stringOrEmpty(t.Notes)).Scan(&t.Created, &t.Updated); err != nil {
+    if err := db.QueryRow(ctx, q, t.Name, t.Title, stringOrEmpty(t.Description), stringOrEmpty(t.Notes), t.RoleName).Scan(&t.Created, &t.Updated); err != nil {
         return dbutil.ErrWrap("tag.upsert", err, dbutil.ParamSummary("name", t.Name))
     }
     return nil
