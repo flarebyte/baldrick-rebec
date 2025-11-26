@@ -165,7 +165,7 @@ try {
       '--tags',
       'unit,fast',
       '--level',
-      'h2',
+      'h2'
     );
   await runRbcJSON(
       'admin',
@@ -192,7 +192,7 @@ try {
       '--tags',
       'integration,slow',
       '--level',
-      'h2',
+      'h2'
     );
   await runRbcJSON(
       'admin',
@@ -219,9 +219,8 @@ try {
       '--tags',
       'lint,style',
       '--level',
-      'h2',
-    ),
-  );
+      'h2'
+    );
 
   // Replacements
   await runRbc(
