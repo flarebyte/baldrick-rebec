@@ -618,12 +618,16 @@ try {
     'lint/go',
   );
 
-  // 11) Messages & Queue
+  // 11) Conversation, Experiment, Messages & Queue
   step++;
-  logStep(step, TOTAL, 'Creating messages and queue');
-  await $`echo "Hello from user12" | go run main.go admin message set --experiment eid1 --title Greeting --tags hello --role ${TEST_ROLE_USER}`;
-  await $`echo "Build started" | go run main.go admin message set --experiment eid1 --title BuildStart --tags build --role ${TEST_ROLE_USER}`;
-  await $`echo "Onboarding checklist updated" | go run main.go admin message set --experiment eid2 --title DocsUpdate --tags docs,update --role ${TEST_ROLE_USER}`;
+  logStep(step, TOTAL, 'Creating conversation, experiment, messages and queue');
+  const convMeta = await runRbcJSON('admin', 'conversation', 'set', '--title', 'Test Conversation', '--role', TEST_ROLE_USER);
+  const convID = idFrom(convMeta);
+  const expMeta = await runRbcJSON('admin', 'experiment', 'create', '--conversation', convID);
+  const expID = idFrom(expMeta);
+  await $`echo "Hello from user12" | go run main.go admin message set --experiment ${expID} --title Greeting --tags hello --role ${TEST_ROLE_USER}`;
+  await $`echo "Build started" | go run main.go admin message set --experiment ${expID} --title BuildStart --tags build --role ${TEST_ROLE_USER}`;
+  await $`echo "Onboarding checklist updated" | go run main.go admin message set --experiment ${expID} --title DocsUpdate --tags docs,update --role ${TEST_ROLE_USER}`;
 
   const q1 = idFrom(
     await runRbcJSON(
