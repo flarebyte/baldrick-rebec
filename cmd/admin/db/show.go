@@ -162,8 +162,39 @@ func showAsTables(ctx context.Context, db *pgxpool.Pool, schema string, tables [
         table.Append([]string{r.From, r.Rel, r.To, r.Nature})
     }
     table.Render()
+
+    // Access summaries
+    fmt.Fprintln(os.Stdout)
+    fmt.Fprintln(os.Stdout, "ACCESS: ROLES")
+    acc, _ := computeAccess(ctx, db)
+    rt := tablewriter.NewWriter(os.Stdout)
+    rt.SetHeader([]string{"ROLE", "EXISTS", "LOGIN", "SUPERUSER"})
+    for _, r := range acc.Roles {
+        rt.Append([]string{r.Name, boolStr(r.Exists), boolStr(r.CanLogin), boolStr(r.Superuser)})
+    }
+    rt.Render()
+
+    fmt.Fprintln(os.Stdout)
+    fmt.Fprintln(os.Stdout, "ACCESS: DATABASE")
+    dt := tablewriter.NewWriter(os.Stdout)
+    dt.SetHeader([]string{"ROLE", "CONNECT", "CREATE"})
+    for _, d := range acc.DB {
+        dt.Append([]string{d.Role, boolStr(d.CanConnect), boolStr(d.CanCreateDB)})
+    }
+    dt.Render()
+
+    fmt.Fprintln(os.Stdout)
+    fmt.Fprintln(os.Stdout, "ACCESS: SCHEMAS")
+    st := tablewriter.NewWriter(os.Stdout)
+    st.SetHeader([]string{"SCHEMA", "ROLE", "USAGE", "CREATE", "DML_OK"})
+    for _, s := range acc.Schemas {
+        st.Append([]string{s.Schema, s.Role, boolStr(s.Usage), boolStr(s.Create), boolStr(s.DMLOK)})
+    }
+    st.Render()
     return nil
 }
+
+func boolStr(b bool) string { if b { return "yes" }; return "no" }
 
 func showAsMarkdown(ctx context.Context, db *pgxpool.Pool, schema string, tables []string, concise bool) error {
     for _, t := range tables {
@@ -248,6 +279,7 @@ type jsonOut struct {
     Schema        string      `json:"schema"`
     Tables        []jsonTable `json:"tables"`
     Relationships []relRow    `json:"relationships"`
+    Access        jsonAccess  `json:"access"`
 }
 
 func showAsJSON(ctx context.Context, db *pgxpool.Pool, schema string, tables []string, concise bool) error {
@@ -268,7 +300,86 @@ func showAsJSON(ctx context.Context, db *pgxpool.Pool, schema string, tables []s
         out.Tables = append(out.Tables, jt)
     }
     out.Relationships = relationships()
+    // Access
+    acc, _ := computeAccess(ctx, db)
+    out.Access = acc
     enc := json.NewEncoder(os.Stdout)
     enc.SetIndent("", "  ")
     return enc.Encode(out)
+}
+
+// Access reporting
+type jsonRole struct {
+    Name      string `json:"name"`
+    Exists    bool   `json:"exists"`
+    CanLogin  bool   `json:"can_login"`
+    Superuser bool   `json:"superuser"`
+}
+
+type jsonDBPriv struct {
+    Role        string `json:"role"`
+    CanConnect  bool   `json:"can_connect"`
+    CanCreateDB bool   `json:"can_create_db"`
+}
+
+type jsonSchemaPriv struct {
+    Schema  string `json:"schema"`
+    Role    string `json:"role"`
+    Usage   bool   `json:"usage"`
+    Create  bool   `json:"create"`
+    DMLOK   bool   `json:"dml_ok"`
+}
+
+type jsonAccess struct {
+    Roles    []jsonRole      `json:"roles"`
+    DB       []jsonDBPriv    `json:"database"`
+    Schemas  []jsonSchemaPriv `json:"schemas"`
+}
+
+func computeAccess(ctx context.Context, db *pgxpool.Pool) (jsonAccess, error) {
+    // We report for configured roles if present in config: admin, app, backup
+    cfg, _ := cfgpkg.Load()
+    roles := []string{}
+    if cfg.Postgres.Admin.User != "" { roles = append(roles, cfg.Postgres.Admin.User) }
+    if cfg.Postgres.App.User != "" { roles = append(roles, cfg.Postgres.App.User) }
+    if cfg.Postgres.Backup.User != "" { roles = append(roles, cfg.Postgres.Backup.User) }
+    // De-dup while preserving order
+    seen := map[string]struct{}{}
+    var uniq []string
+    for _, r := range roles { if _, ok := seen[r]; !ok { seen[r] = struct{}{}; uniq = append(uniq, r) } }
+    roles = uniq
+
+    acc := jsonAccess{}
+    // Role info
+    for _, r := range roles {
+        var exists, super, login bool
+        // Existence and flags
+        _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)`, r).Scan(&exists)
+        if exists {
+            _ = db.QueryRow(ctx, `SELECT rolsuper, rolcanlogin FROM pg_roles WHERE rolname=$1`, r).Scan(&super, &login)
+        }
+        acc.Roles = append(acc.Roles, jsonRole{Name: r, Exists: exists, Superuser: super, CanLogin: login})
+        // DB privs
+        var canConn, canCreate bool
+        _ = db.QueryRow(ctx, `SELECT has_database_privilege($1, current_database(), 'CONNECT')`, r).Scan(&canConn)
+        _ = db.QueryRow(ctx, `SELECT has_database_privilege($1, current_database(), 'CREATE')`, r).Scan(&canCreate)
+        acc.DB = append(acc.DB, jsonDBPriv{Role: r, CanConnect: canConn, CanCreateDB: canCreate})
+    }
+    // Schemas of interest: public, backup (if exists)
+    schemas := []string{"public"}
+    var backupExists bool
+    _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name='backup')`).Scan(&backupExists)
+    if backupExists { schemas = append(schemas, "backup") }
+    for _, s := range schemas {
+        for _, r := range roles {
+            var usage, create bool
+            _ = db.QueryRow(ctx, `SELECT has_schema_privilege($1, $2, 'USAGE')`, r, s).Scan(&usage)
+            _ = db.QueryRow(ctx, `SELECT has_schema_privilege($1, $2, 'CREATE')`, r, s).Scan(&create)
+            // Aggregate DML check: true if role has full DML across all tables in schema
+            missingDML, _ := pgdao.MissingTableDML(ctx, db, r, s)
+            dmlOK := usage && !missingDML
+            acc.Schemas = append(acc.Schemas, jsonSchemaPriv{Schema: s, Role: r, Usage: usage, Create: create, DMLOK: dmlOK})
+        }
+    }
+    return acc, nil
 }
