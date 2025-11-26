@@ -5,6 +5,7 @@ import (
     "time"
 
     dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
+    "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/pgxpool"
     "strconv"
 )
@@ -117,6 +118,59 @@ func CountPerEntity(ctx context.Context, db *pgxpool.Pool, schema, backupID stri
     }
     if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("backup.count_per_entity", err, dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("id", backupID)) }
     return m, nil
+}
+
+// ListBackupEntities returns the distinct entity names present for a backup.
+func ListBackupEntities(ctx context.Context, db *pgxpool.Pool, schema, backupID string) ([]string, error) {
+    if schema == "" { schema = "backup" }
+    rows, err := db.Query(ctx, `SELECT DISTINCT entity_name FROM `+schema+`.entity_records WHERE backup_id=$1 ORDER BY entity_name`, backupID)
+    if err != nil { return nil, dbutil.ErrWrap("backup.entities", err, dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("id", backupID)) }
+    defer rows.Close()
+    var out []string
+    for rows.Next() {
+        var n string
+        if err := rows.Scan(&n); err != nil { return nil, dbutil.ErrWrap("backup.entities.scan", err) }
+        out = append(out, n)
+    }
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("backup.entities", err) }
+    return out, nil
+}
+
+// CountBackupEntityRecords returns the number of records for an entity in a backup.
+func CountBackupEntityRecords(ctx context.Context, db *pgxpool.Pool, schema, backupID, entity string) (int64, error) {
+    if schema == "" { schema = "backup" }
+    var n int64
+    err := db.QueryRow(ctx, `SELECT COUNT(*) FROM `+schema+`.entity_records WHERE backup_id=$1 AND entity_name=$2`, backupID, entity).Scan(&n)
+    if err != nil { return 0, dbutil.ErrWrap("backup.entity.count", err, dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("entity", entity)) }
+    return n, nil
+}
+
+// CountTable counts rows in a given schema-qualified live table.
+func CountTable(ctx context.Context, db *pgxpool.Pool, schema, table string) (int64, error) {
+    idf := pgx.Identifier{schema, table}
+    var n int64
+    q := "SELECT COUNT(*) FROM " + idf.Sanitize()
+    if err := db.QueryRow(ctx, q).Scan(&n); err != nil {
+        return 0, dbutil.ErrWrap("table.count", err, dbutil.ParamSummary("schema", schema), dbutil.ParamSummary("table", table))
+    }
+    return n, nil
+}
+
+// DeleteBackupsOlderThan deletes backups older than cutoff, respecting retention_until if set in the past.
+func DeleteBackupsOlderThan(ctx context.Context, db *pgxpool.Pool, schema string, cutoff time.Time) (int64, error) {
+    if schema == "" { schema = "backup" }
+    ct, err := db.Exec(ctx, `DELETE FROM `+schema+`.backups WHERE created_at < $1 AND (retention_until IS NULL OR retention_until < now())`, cutoff)
+    if err != nil { return 0, dbutil.ErrWrap("backup.prune", err, dbutil.ParamSummary("schema", schema)) }
+    return ct.RowsAffected(), nil
+}
+
+// CountBackupsOlderThan returns how many backups qualify for pruning at the cutoff, respecting retention_until if set (future or present prevents deletion).
+func CountBackupsOlderThan(ctx context.Context, db *pgxpool.Pool, schema string, cutoff time.Time) (int64, error) {
+    if schema == "" { schema = "backup" }
+    var n int64
+    err := db.QueryRow(ctx, `SELECT COUNT(*) FROM `+schema+`.backups WHERE created_at < $1 AND (retention_until IS NULL OR retention_until < now())`, cutoff).Scan(&n)
+    if err != nil { return 0, dbutil.ErrWrap("backup.prune.count", err, dbutil.ParamSummary("schema", schema)) }
+    return n, nil
 }
 
 // Helper: small int to string without fmt to avoid allocations here.

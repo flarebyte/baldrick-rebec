@@ -22,6 +22,7 @@ var (
     flagBkpTags        []string
     flagBkpWho         string
     flagBkpJSON        bool
+    flagBkpRetention   string
 )
 
 func parseTags(kvs []string) map[string]any {
@@ -60,6 +61,15 @@ var backupCmd = &cobra.Command{
             Include:     include,
             Exclude:     exclude,
         }
+        // retention
+        if strings.TrimSpace(flagBkpRetention) != "" {
+            if d, err := parseHumanDuration(flagBkpRetention); err == nil {
+                // we'll pass retention via description tags for now; service will set retention_until from options in future.
+                if opt.Tags == nil { opt.Tags = map[string]any{} }
+                opt.Tags["retention"] = flagBkpRetention
+                _ = d // retained for future direct support
+            } // if invalid, ignore; prefer explicit prune later
+        }
         id, err := bkp.CreateBackup(ctx, db, bkp.DefaultEntities(), opt)
         if err != nil { return err }
         if flagBkpJSON {
@@ -88,4 +98,5 @@ func init() {
     backupCmd.Flags().StringSliceVar(&flagBkpTags, "tag", nil, "Tags as key=value (repeatable)")
     backupCmd.Flags().StringVar(&flagBkpWho, "who", "", "Initiated by (user/role)")
     backupCmd.Flags().BoolVar(&flagBkpJSON, "json", false, "Output JSON")
+    backupCmd.Flags().StringVar(&flagBkpRetention, "retention", "", "Retention (e.g., 90d, 6mo, 1y); used by prune")
 }
