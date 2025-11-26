@@ -7,6 +7,7 @@ import (
     "time"
 
     "github.com/flarebyte/baldrick-rebec/internal/config"
+    "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/pgconn"
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -48,6 +49,17 @@ func OpenAdminWithDB(ctx context.Context, cfg config.Config, dbName string) (*pg
     return openPool(ctx, dsn)
 }
 
+// OpenBackup opens using backup role credentials if configured.
+func OpenBackup(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
+    user := cfg.Postgres.Backup.User
+    pass := cfg.Postgres.Backup.Password
+    if user == "" {
+        return nil, fmt.Errorf("backup role not configured: set postgres.backup.user/password in ~/.baldrick-rebec/config.yaml and run 'rbc admin db scaffold --grant-backup --yes'")
+    }
+    dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
+    return openPool(ctx, dsn)
+}
+
 func openPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
     cfg, err := pgxpool.ParseConfig(dsn)
     if err != nil {
@@ -58,6 +70,12 @@ func openPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
     cfg.MinConns = 1
     cfg.MaxConnLifetime = 30 * time.Minute
     cfg.MaxConnIdleTime = 5 * time.Minute
+
+    // Session bootstrap: set a sane search_path for application schemas
+    cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+        _, _ = conn.Exec(ctx, `SET search_path = "$user", public`)
+        return nil
+    }
 
     // Create pool
     pool, err := pgxpool.NewWithConfig(ctx, cfg)

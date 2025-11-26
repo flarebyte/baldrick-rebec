@@ -4,8 +4,10 @@ import (
     "context"
     "database/sql"
     "encoding/json"
+    "fmt"
 
     "github.com/jackc/pgx/v5/pgxpool"
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
 type Store struct {
@@ -51,10 +53,13 @@ func UpsertStore(ctx context.Context, db *pgxpool.Pool, s *Store) error {
           RETURNING id::text, created, updated`
     var tagsJSON []byte
     if s.Tags != nil { tagsJSON, _ = json.Marshal(s.Tags) }
-    return db.QueryRow(ctx, q,
+    if err := db.QueryRow(ctx, q,
         s.Name, s.Title, stringOrEmpty(s.Description), stringOrEmpty(s.Motivation), stringOrEmpty(s.Security), stringOrEmpty(s.Privacy),
         s.RoleName, stringOrEmpty(s.Notes), tagsJSON, stringOrEmpty(s.StoreType), stringOrEmpty(s.Scope), stringOrEmpty(s.Lifecycle),
-    ).Scan(&s.ID, &s.Created, &s.Updated)
+    ).Scan(&s.ID, &s.Created, &s.Updated); err != nil {
+        return dbutil.ErrWrap("store.upsert", err, dbutil.ParamSummary("name", s.Name), dbutil.ParamSummary("role", s.RoleName))
+    }
+    return nil
 }
 
 // GetStoreByKey fetches a store by (name, role_name).
@@ -68,7 +73,7 @@ func GetStoreByKey(ctx context.Context, db *pgxpool.Pool, name, roleName string)
         &s.ID, &s.Name, &s.Title, &s.Description, &s.Motivation, &s.Security, &s.Privacy,
         &s.RoleName, &s.Notes, &tagsJSON, &s.StoreType, &s.Scope, &s.Lifecycle, &s.Created, &s.Updated,
     ); err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("store.get", err, dbutil.ParamSummary("name", name), dbutil.ParamSummary("role", roleName))
     }
     if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &s.Tags) }
     return &s, nil
@@ -82,7 +87,7 @@ func ListStores(ctx context.Context, db *pgxpool.Pool, roleName string, limit, o
                  role_name, notes, tags, store_type, scope, lifecycle, created, updated
           FROM stores WHERE role_name=$1 ORDER BY updated DESC, created DESC LIMIT $2 OFFSET $3`
     rows, err := db.Query(ctx, q, roleName, limit, offset)
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("store.list", err, dbutil.ParamSummary("role", roleName), fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset)) }
     defer rows.Close()
     var out []Store
     for rows.Next() {
@@ -92,18 +97,18 @@ func ListStores(ctx context.Context, db *pgxpool.Pool, roleName string, limit, o
             &s.ID, &s.Name, &s.Title, &s.Description, &s.Motivation, &s.Security, &s.Privacy,
             &s.RoleName, &s.Notes, &tagsJSON, &s.StoreType, &s.Scope, &s.Lifecycle, &s.Created, &s.Updated,
         ); err != nil {
-            return nil, err
+            return nil, dbutil.ErrWrap("store.list.scan", err, dbutil.ParamSummary("role", roleName))
         }
         if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &s.Tags) }
         out = append(out, s)
     }
-    return out, rows.Err()
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("store.list", err, dbutil.ParamSummary("role", roleName)) }
+    return out, nil
 }
 
 // DeleteStore removes a store by (name, role_name).
 func DeleteStore(ctx context.Context, db *pgxpool.Pool, name, roleName string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM stores WHERE name=$1 AND role_name=$2`, name, roleName)
-    if err != nil { return 0, err }
+    if err != nil { return 0, dbutil.ErrWrap("store.delete", err, dbutil.ParamSummary("name", name), dbutil.ParamSummary("role", roleName)) }
     return ct.RowsAffected(), nil
 }
-

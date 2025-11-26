@@ -20,6 +20,7 @@ var (
     flagWFTitle string
     flagWFDesc  string
     flagWFNotes string
+    flagWFRole  string
 )
 
 var setCmd = &cobra.Command{
@@ -43,6 +44,7 @@ var setCmd = &cobra.Command{
             Name:  flagWFName,
             Title: flagWFTitle,
         }
+        if strings.TrimSpace(flagWFRole) != "" { w.RoleName = strings.TrimSpace(flagWFRole) }
         if flagWFDesc != "" { w.Description = sql.NullString{String: flagWFDesc, Valid: true} }
         if flagWFNotes != "" { w.Notes = sql.NullString{String: flagWFNotes, Valid: true} }
         if err := pgdao.UpsertWorkflow(ctx, db, w); err != nil { return err }
@@ -69,6 +71,7 @@ func init() {
     setCmd.Flags().StringVar(&flagWFTitle, "title", "", "Human-readable title (required)")
     setCmd.Flags().StringVar(&flagWFDesc, "description", "", "Plain text description")
     setCmd.Flags().StringVar(&flagWFNotes, "notes", "", "Markdown-formatted notes")
+    setCmd.Flags().StringVar(&flagWFRole, "role", "", "Role name (optional; defaults to 'user')")
 }
 
 // no extras

@@ -33,9 +33,10 @@ var scaffoldCmd = &cobra.Command{
         effCreateRoles := flagCreateRoles || flagAll
         effCreateDB := flagCreateDB || flagAll
         effGrantPrivs := flagGrantPrivs || flagAll
+        effGrantBackup := flagGrantBackup || flagAll
 
         // Safety confirmation if making structural changes
-        if (effCreateRoles || effCreateDB || effGrantPrivs) && !flagYes {
+        if (effCreateRoles || effCreateDB || effGrantPrivs || effGrantBackup) && !flagYes {
             return errors.New("refusing to modify roles/databases without --yes; re-run with --yes to confirm")
         }
 
@@ -49,13 +50,18 @@ var scaffoldCmd = &cobra.Command{
             defer sysdb.Close()
 
             if effCreateRoles {
-                fmt.Fprintln(os.Stderr, "db:scaffold - ensuring roles (admin/app)...")
+                fmt.Fprintln(os.Stderr, "db:scaffold - ensuring roles (admin/app/backup)...")
                 if err := pgdao.EnsureRole(ctx, sysdb, cfg.Postgres.Admin.User, cfg.Postgres.Admin.Password); err != nil {
                     return err
                 }
                 // Prefer app password from config if provided
                 if err := pgdao.EnsureRole(ctx, sysdb, cfg.Postgres.App.User, cfg.Postgres.App.Password); err != nil {
                     return err
+                }
+                if cfg.Postgres.Backup.User != "" {
+                    if err := pgdao.EnsureRole(ctx, sysdb, cfg.Postgres.Backup.User, cfg.Postgres.Backup.Password); err != nil {
+                        return err
+                    }
                 }
             }
 
@@ -67,6 +73,15 @@ var scaffoldCmd = &cobra.Command{
                 if effGrantPrivs {
                     // Grant CONNECT on database to app role
                     if err := pgdao.GrantConnect(ctx, sysdb, cfg.Postgres.DBName, cfg.Postgres.App.User); err != nil {
+                        return err
+                    }
+                }
+                if effGrantBackup && cfg.Postgres.Backup.User != "" {
+                    if err := pgdao.GrantConnect(ctx, sysdb, cfg.Postgres.DBName, cfg.Postgres.Backup.User); err != nil {
+                        return err
+                    }
+                    // Also grant CREATE on database so backup role can create the backup schema
+                    if _, err := sysdb.Exec(ctx, fmt.Sprintf("GRANT CREATE ON DATABASE %s TO %s", cfg.Postgres.DBName, cfg.Postgres.Backup.User)); err != nil {
                         return err
                     }
                 }
@@ -94,10 +109,32 @@ var scaffoldCmd = &cobra.Command{
             return err
         }
 
-        // Grant AGE privileges to app role (best-effort)
-        if err := pgdao.GrantAGEPrivileges(ctx, db, cfg.Postgres.App.User); err != nil {
-            fmt.Fprintf(os.Stderr, "db:scaffold - warn: grant AGE privileges: %v\n", err)
+        // Re-grant runtime privileges after schema creation to cover new tables
+        if effGrantPrivs {
+            fmt.Fprintln(os.Stderr, "db:scaffold - re-granting runtime privileges to app role (post-schema)...")
+            if err := pgdao.GrantRuntimePrivileges(ctx, db, cfg.Postgres.App.User); err != nil {
+                return err
+            }
         }
+
+        // Backup role: ensure readonly on public schema (for snapshot to read live tables)
+        if effGrantBackup && cfg.Postgres.Backup.User != "" {
+            fmt.Fprintln(os.Stderr, "db:scaffold - granting public schema read to backup role...")
+            // USAGE on schema public
+            if _, err := db.Exec(ctx, fmt.Sprintf("GRANT USAGE ON SCHEMA public TO %s", cfg.Postgres.Backup.User)); err != nil {
+                return err
+            }
+            // SELECT on existing tables
+            if _, err := db.Exec(ctx, fmt.Sprintf("GRANT SELECT ON ALL TABLES IN SCHEMA public TO %s", cfg.Postgres.Backup.User)); err != nil {
+                return err
+            }
+            // Default SELECT for future tables created by current owner in public
+            if _, err := db.Exec(ctx, fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO %s", cfg.Postgres.Backup.User)); err != nil {
+                return err
+            }
+        }
+
+        // Graph features now use SQL tables; no AGE privileges required.
 
         // If --all is set, also ensure content table and FTS (same as db init)
         if flagAll {
@@ -107,6 +144,12 @@ var scaffoldCmd = &cobra.Command{
             }
             if err := pgdao.EnsureFTSIndex(ctx, db); err != nil {
                 fmt.Fprintf(os.Stderr, "db:scaffold - warn: ensure FTS index: %v\n", err)
+            }
+            // Also ensure backup schema and grants if backup role configured
+            if cfg.Postgres.Backup.User != "" {
+                fmt.Fprintln(os.Stderr, "db:scaffold - ensuring backup schema and grants...")
+                if err := pgdao.EnsureBackupSchema(ctx, db, "backup"); err != nil { return err }
+                if err := pgdao.EnsureBackupSchemaGrants(ctx, db, "backup", cfg.Postgres.Backup.User); err != nil { return err }
             }
         }
 
@@ -123,6 +166,7 @@ var (
     flagCreateRoles bool
     flagCreateDB    bool
     flagGrantPrivs  bool
+    flagGrantBackup bool
     flagYes         bool
     flagAll         bool
 )
@@ -131,6 +175,7 @@ func init() {
     scaffoldCmd.Flags().BoolVar(&flagCreateRoles, "create-roles", false, "Create admin/app roles if missing (requires --yes)")
     scaffoldCmd.Flags().BoolVar(&flagCreateDB, "create-db", false, "Create the target database if missing (requires --yes)")
     scaffoldCmd.Flags().BoolVar(&flagGrantPrivs, "grant-privileges", false, "Grant runtime privileges to app role (requires --yes)")
+    scaffoldCmd.Flags().BoolVar(&flagGrantBackup, "grant-backup", false, "Ensure backup schema and grant privileges to backup role (requires --yes)")
     scaffoldCmd.Flags().BoolVar(&flagYes, "yes", false, "Confirm making structural changes (non-interactive)")
     scaffoldCmd.Flags().BoolVar(&flagAll, "all", false, "Do all: create roles, database, grant privileges, ensure schema + content/FTS")
 }

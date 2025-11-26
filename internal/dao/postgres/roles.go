@@ -4,8 +4,10 @@ import (
     "context"
     "database/sql"
     "encoding/json"
+    "fmt"
 
     "github.com/jackc/pgx/v5/pgxpool"
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
 type Role struct {
@@ -31,9 +33,12 @@ func UpsertRole(ctx context.Context, db *pgxpool.Pool, r *Role) error {
           RETURNING created, updated`
     var tagsJSON []byte
     if r.Tags != nil { tagsJSON, _ = json.Marshal(r.Tags) }
-    return db.QueryRow(ctx, q,
+    if err := db.QueryRow(ctx, q,
         r.Name, r.Title, stringOrEmpty(r.Description), stringOrEmpty(r.Notes), tagsJSON,
-    ).Scan(&r.Created, &r.Updated)
+    ).Scan(&r.Created, &r.Updated); err != nil {
+        return dbutil.ErrWrap("role.upsert", err, dbutil.ParamSummary("name", r.Name))
+    }
+    return nil
 }
 
 // GetRoleByName fetches a role by name.
@@ -42,7 +47,7 @@ func GetRoleByName(ctx context.Context, db *pgxpool.Pool, name string) (*Role, e
     var r Role
     var tagsJSON []byte
     if err := db.QueryRow(ctx, q, name).Scan(&r.Name, &r.Title, &r.Description, &r.Notes, &tagsJSON, &r.Created, &r.Updated); err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("role.get", err, dbutil.ParamSummary("name", name))
     }
     if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &r.Tags) }
     return &r, nil
@@ -54,24 +59,25 @@ func ListRoles(ctx context.Context, db *pgxpool.Pool, limit, offset int) ([]Role
     if offset < 0 { offset = 0 }
     q := `SELECT name, title, description, notes, tags, created, updated FROM roles ORDER BY name LIMIT $1 OFFSET $2`
     rows, err := db.Query(ctx, q, limit, offset)
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("role.list", err, fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset)) }
     defer rows.Close()
     var out []Role
     for rows.Next() {
         var r Role
         var tagsJSON []byte
         if err := rows.Scan(&r.Name, &r.Title, &r.Description, &r.Notes, &tagsJSON, &r.Created, &r.Updated); err != nil {
-            return nil, err
+            return nil, dbutil.ErrWrap("role.list.scan", err)
         }
         if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &r.Tags) }
         out = append(out, r)
     }
-    return out, rows.Err()
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("role.list", err) }
+    return out, nil
 }
 
 // DeleteRole removes a role by name.
 func DeleteRole(ctx context.Context, db *pgxpool.Pool, name string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM roles WHERE name=$1`, name)
-    if err != nil { return 0, err }
+    if err != nil { return 0, dbutil.ErrWrap("role.delete", err, dbutil.ParamSummary("name", name)) }
     return ct.RowsAffected(), nil
 }

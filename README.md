@@ -29,6 +29,51 @@ Then run the scaffold step again.
 
 See DATABASES.md for full workflow and a setup checklist. For ops-focused learning prompts, see LEARNING.md.
 
+## Snapshot Backups
+
+Use the schema-aware snapshot subsystem to capture and restore long‑lived entities into a dedicated Postgres schema (default: `backup`). It stores full JSONB row snapshots plus tracked entity schemas, and supports append/replace restores.
+
+- Create a backup
+  - `rbc admin snapshot backup --description "before schema cleanup" --who your-user --json`
+  - Optional filters:
+    - `--include roles,projects` (overrides defaults) and/or `--exclude stickies`
+    - `--schema backup_alt` for a custom backup schema
+- List backups
+  - `rbc admin snapshot list --limit 20`
+  - JSON: `rbc admin snapshot list --json`
+- Show backup summary
+  - `rbc admin snapshot show <backup-id>`
+- Restore
+  - Append missing rows: `rbc admin snapshot restore <backup-id> --mode append`
+  - Replace table contents: `rbc admin snapshot restore <backup-id> --mode replace`
+  - Limit entities: `--entity roles,projects`
+  - Validate without changes: `--dry-run`
+- Delete backup
+  - `rbc admin snapshot delete <backup-id> --force`
+
+By default, permanent-ish entities like `roles`, `workflows`, `tags`, `projects`, `stores`, `scripts`, `tasks`, `topics`, `workspaces`, `blackboards`, `stickies`, `stickie_relations`, `task_replaces`, `packages`, `task_variants`, and `scripts_content` are included. Ephemeral tables such as `conversations`, `experiments`, `messages`, `messages_content`, `queues`, and `testcases` are excluded unless explicitly included.
+
+Snapshot connections require a dedicated backup role configured in `~/.baldrick-rebec/config.yaml` (no admin fallback):
+
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  dbname: rbc
+  sslmode: disable
+  admin:
+    user: rbc_admin
+    password: pass
+  app:
+    user: rbc_app
+    password: pass
+  backup:
+    user: rbc_backup
+    password: pass
+
+Grant this role permissions to own or write to the backup schema, e.g. (or run `rbc admin db scaffold --grant-backup --yes`):
+- `CREATE SCHEMA IF NOT EXISTS backup AUTHORIZATION rbc_backup;`
+- `GRANT USAGE ON SCHEMA backup TO rbc_backup;`
+
 ## Notes on Postgres admin passwords
 - For initial provisioning (roles/db/privileges/schema), set the Postgres admin password via `--pg-admin-password`.
 - Ensure app credentials are configured for runtime use:

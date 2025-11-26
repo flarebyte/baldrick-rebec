@@ -34,18 +34,31 @@ var setCmd = &cobra.Command{
         // normalize labels: allow comma-separated in a single flag
         labels := splitCSV(flagRelLabels)
         // Try graph first; if it fails, fall back to SQL mirror
+        // Try graph first; control fallback via config
+        allowFallback := cfg.Graph.AllowFallback
         if err := pgdao.CreateStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType, labels); err != nil {
-            fmt.Fprintf(os.Stderr, "warn: graph edge creation failed: %v; falling back to SQL mirror\n", err)
+            if allowFallback {
+                fmt.Fprintf(os.Stderr, "warn: graph edge creation failed: %v; falling back to SQL mirror\n", err)
+            } else {
+                return err
+            }
         }
-        // Mirror in SQL for reliability
-        if err := pgdao.UpsertStickieRelation(ctx, db, pgdao.StickieRelation{FromID: flagRelFrom, ToID: flagRelTo, RelType: strings.ToUpper(flagRelType), Labels: labels}); err != nil {
-            return fmt.Errorf("sql mirror upsert failed: %w", err)
-        }
-        // Prefer graph verification; if it errors, verify via SQL
-        if rel, err := pgdao.GetStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType); err != nil || rel == nil {
-            if _, gerr := pgdao.GetStickieRelation(ctx, db, flagRelFrom, flagRelTo, strings.ToUpper(flagRelType)); gerr != nil {
-                if err != nil { return fmt.Errorf("graph verify failed (%v) and sql verify failed (%v)", err, gerr) }
-                return fmt.Errorf("relation not found after creation (graph empty; sql not found)")
+        // If fallback is disabled, require graph verification to succeed
+        if !allowFallback {
+            if rel, err := pgdao.GetStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType); err != nil {
+                return fmt.Errorf("graph verify failed: %w", err)
+            } else if rel == nil {
+                return fmt.Errorf("graph relation not found after creation (from=%s to=%s type=%s)", flagRelFrom, flagRelTo, flagRelType)
+            }
+        } else {
+            // Fallback allowed: if graph missing, mirror into SQL
+            if rel, err := pgdao.GetStickieEdge(ctx, db, flagRelFrom, flagRelTo, flagRelType); err != nil || rel == nil {
+                if err := pgdao.UpsertStickieRelation(ctx, db, pgdao.StickieRelation{FromID: flagRelFrom, ToID: flagRelTo, RelType: strings.ToUpper(flagRelType), Labels: labels}); err != nil {
+                    return fmt.Errorf("sql mirror upsert failed: %w", err)
+                }
+                if _, gerr := pgdao.GetStickieRelation(ctx, db, flagRelFrom, flagRelTo, strings.ToUpper(flagRelType)); gerr != nil {
+                    return fmt.Errorf("relation not found after creation in SQL mirror: %w", gerr)
+                }
             }
         }
         fmt.Fprintf(os.Stderr, "stickie relation set from=%s to=%s type=%s\n", flagRelFrom, flagRelTo, flagRelType)

@@ -8,6 +8,7 @@ import (
     "strings"
 
     "github.com/jackc/pgx/v5/pgxpool"
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
 // New content API working with messages_content (id BIGSERIAL, text_content, json_content)
@@ -26,7 +27,7 @@ func InsertContent(ctx context.Context, db *pgxpool.Pool, text string, jsonPaylo
     q := `INSERT INTO messages_content (text_content, json_content) VALUES ($1, $2) RETURNING id::text`
     var id string
     if err := db.QueryRow(ctx, q, text, jsonOrNil(jsonPayload)).Scan(&id); err != nil {
-        return "", err
+        return "", dbutil.ErrWrap("content.insert", err, dbutil.ParamSummary("text_len", len(text)))
     }
     return id, nil
 }
@@ -38,7 +39,7 @@ func GetContent(ctx context.Context, db *pgxpool.Pool, id string) (ContentRecord
     q := `SELECT id::text, text_content, COALESCE(json_content,'null'::jsonb) FROM messages_content WHERE id=$1::uuid`
     var jsonb []byte
     if err := db.QueryRow(ctx, q, id).Scan(&out.ID, &out.TextContent, &jsonb); err != nil {
-        return out, err
+        return out, dbutil.ErrWrap("content.get", err, dbutil.ParamSummary("id", id))
     }
     if string(jsonb) != "null" { out.JSONContent = jsonb }
     return out, nil

@@ -25,9 +25,16 @@ var statusCmd = &cobra.Command{
         }
         type pgStatus struct {
             AppConnection pgAppConn `json:"app_connection"`
+            Version string `json:"version,omitempty"`
+            Vector struct{
+                Installed bool   `json:"installed"`
+                Usable    bool   `json:"usable"`
+                ExtVersion string `json:"extversion,omitempty"`
+            } `json:"vector"`
             Roles struct{
                 Admin pgRole `json:"admin"`
                 App   pgRole `json:"app"`
+                Backup pgRole `json:"backup"`
             } `json:"roles"`
             Database struct{ Exists bool `json:"exists"` } `json:"database"`
             Schema struct{
@@ -39,6 +46,14 @@ var statusCmd = &cobra.Command{
                 MissingDML bool `json:"missing_dml"`
                 OK bool `json:"ok"`
             } `json:"privileges"`
+            Backup struct{
+                Role string `json:"role"`
+                Schema string `json:"schema"`
+                SchemaExists bool `json:"schema_exists"`
+                HasDBCreate bool `json:"has_db_create"`
+                HasSchemaUsage bool `json:"has_schema_usage"`
+                HasSchemaCreate bool `json:"has_schema_create"`
+            } `json:"backup"`
         }
         type statusOut struct{
             Postgres pgStatus `json:"postgres"`
@@ -63,6 +78,25 @@ var statusCmd = &cobra.Command{
             _ = pgres.QueryRow(ctx, "select current_database(), current_user, version()").Scan(&dbname, &user, &version)
             fmt.Fprintf(os.Stderr, "postgres: ok db=%s user=%s\n", dbname, user)
             st.Postgres.AppConnection = pgAppConn{OK:true, DB:dbname, User:user}
+            st.Postgres.Version = version
+            fmt.Fprintf(os.Stderr, "postgres: version: %s\n", version)
+            // pgvector status (installed and usable?)
+            var vecExtVer string
+            _ = pgres.QueryRow(ctx, "SELECT extversion FROM pg_extension WHERE extname='vector'").Scan(&vecExtVer)
+            st.Postgres.Vector.Installed = vecExtVer != ""
+            st.Postgres.Vector.ExtVersion = vecExtVer
+            if st.Postgres.Vector.Installed {
+                // Try a trivial vector cast to ensure it's usable for app role
+                var x int
+                if err := pgres.QueryRow(ctx, "SELECT 1 WHERE '[1,2,3]'::vector IS NOT NULL").Scan(&x); err == nil {
+                    st.Postgres.Vector.Usable = true
+                    fmt.Fprintf(os.Stderr, "postgres: pgvector installed=%v usable=%v version=%s\n", true, true, vecExtVer)
+                } else {
+                    fmt.Fprintf(os.Stderr, "postgres: pgvector installed=%v usable=%v (error: %v) version=%s\n", true, false, err, vecExtVer)
+                }
+            } else {
+                fmt.Fprintf(os.Stderr, "postgres: pgvector not installed\n")
+            }
         }
 
         // From app connection, sanity-check configured admin role existence/superuser
@@ -126,7 +160,7 @@ var statusCmd = &cobra.Command{
                 fmt.Fprintf(os.Stderr, "hint: admin role %q exists but superuser=%v can_login=%v; use a superuser with login\n", cfg.Postgres.Admin.User, adminSuper, adminCanLogin)
             }
         }
-        // In target DB: tables and privileges
+        // In target DB: tables, privileges, and backup diagnostics
         if db, err := pgdao.OpenAdmin(ctx, cfg); err == nil {
             defer db.Close()
             // Check presence of all known tables
@@ -167,6 +201,56 @@ var statusCmd = &cobra.Command{
                 fmt.Fprintln(os.Stderr, "postgres: FTS index: ok")
             } else {
                 fmt.Fprintln(os.Stderr, "postgres: FTS index: missing (run 'rbc admin db init')")
+            }
+
+            // Backup role and schema diagnostics
+            bkupRole := cfg.Postgres.Backup.User
+            st.Postgres.Backup.Role = bkupRole
+            st.Postgres.Backup.Schema = "backup"
+            if bkupRole == "" {
+                fmt.Fprintln(os.Stderr, "postgres: backup role: not configured (set postgres.backup in config)")
+            } else {
+                // Role exists?
+                if ok, _ := pgdao.RoleExists(ctx, db, bkupRole); ok {
+                    st.Postgres.Roles.Backup.Exists = true
+                    fmt.Fprintf(os.Stderr, "postgres: role %q: ok\n", bkupRole)
+                } else {
+                    fmt.Fprintf(os.Stderr, "postgres: role %q: missing (scaffold --create-roles)\n", bkupRole)
+                }
+                // DB-level CREATE
+                var hasCreate bool
+                _ = db.QueryRow(ctx, `SELECT has_database_privilege($1, current_database(), 'CREATE')`, bkupRole).Scan(&hasCreate)
+                st.Postgres.Backup.HasDBCreate = hasCreate
+                if hasCreate {
+                    fmt.Fprintf(os.Stderr, "postgres: backup role %q has CREATE on database: ok\n", bkupRole)
+                } else {
+                    fmt.Fprintf(os.Stderr, "postgres: backup role %q lacks CREATE on database (grant via scaffold --grant-backup)\n", bkupRole)
+                }
+                // Schema existence and usage
+                var schemaExists bool
+                _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name=$1)`, "backup").Scan(&schemaExists)
+                st.Postgres.Backup.SchemaExists = schemaExists
+                if schemaExists {
+                    fmt.Fprintln(os.Stderr, "postgres: backup schema 'backup': ok")
+                } else {
+                    fmt.Fprintln(os.Stderr, "postgres: backup schema 'backup': missing (scaffold --grant-backup) or create via admin")
+                }
+                var hasUsage bool
+                var hasSchemaCreate bool
+                _ = db.QueryRow(ctx, `SELECT has_schema_privilege($1, 'backup', 'USAGE')`, bkupRole).Scan(&hasUsage)
+                _ = db.QueryRow(ctx, `SELECT has_schema_privilege($1, 'backup', 'CREATE')`, bkupRole).Scan(&hasSchemaCreate)
+                st.Postgres.Backup.HasSchemaUsage = hasUsage
+                st.Postgres.Backup.HasSchemaCreate = hasSchemaCreate
+                if hasUsage {
+                    fmt.Fprintf(os.Stderr, "postgres: backup role %q has USAGE on schema 'backup': ok\n", bkupRole)
+                } else {
+                    fmt.Fprintf(os.Stderr, "postgres: backup role %q lacks USAGE on schema 'backup'\n", bkupRole)
+                }
+                if hasSchemaCreate {
+                    fmt.Fprintf(os.Stderr, "postgres: backup role %q has CREATE on schema 'backup': ok\n", bkupRole)
+                } else {
+                    fmt.Fprintf(os.Stderr, "postgres: backup role %q lacks CREATE on schema 'backup' (grant via scaffold --grant-backup)\n", bkupRole)
+                }
             }
         } else {
             fmt.Fprintf(os.Stderr, "postgres: admin connect to target DB failed: %v\n", err)

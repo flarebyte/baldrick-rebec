@@ -5,9 +5,11 @@ import (
     "database/sql"
     "encoding/json"
     "errors"
+    "fmt"
     "time"
 
     "github.com/jackc/pgx/v5/pgxpool"
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
 type MessageEvent struct {
@@ -15,6 +17,7 @@ type MessageEvent struct {
     ContentID      string
     FromTaskID     sql.NullString
     ExperimentID   sql.NullString
+    RoleName       string
     Created        time.Time
     Status         string
     ErrorMessage   sql.NullString
@@ -26,11 +29,11 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
         return "", errors.New("nil event")
     }
     q := `INSERT INTO messages (
-            content_id, from_task_id, experiment_id,
+            content_id, from_task_id, experiment_id, role_name,
             status, error_message, tags, created
         ) VALUES (
-            $1::uuid,$2,$3,
-            $4,$5,COALESCE($6,'{}'::jsonb),COALESCE($7, now())
+            $1::uuid,$2,$3,$4,
+            $5,$6,COALESCE($7,'{}'::jsonb),COALESCE($8, now())
         ) RETURNING id::text`
     var id string
     var created any
@@ -38,11 +41,12 @@ func InsertMessageEvent(ctx context.Context, db *pgxpool.Pool, ev *MessageEvent)
     var tagsJSON []byte
     if ev.Tags != nil { tagsJSON, _ = json.Marshal(ev.Tags) }
     err := db.QueryRow(ctx, q,
-        ev.ContentID, nullOrUUID(ev.FromTaskID), nullOrUUID(ev.ExperimentID),
+        ev.ContentID, nullOrUUID(ev.FromTaskID), nullOrUUID(ev.ExperimentID), ev.RoleName,
         ev.Status, nullOrString(ev.ErrorMessage), tagsJSON, created,
     ).Scan(&id)
     if err != nil {
-        return "", err
+        return "", dbutil.ErrWrap("message.insert", err,
+            dbutil.ParamSummary("content_id", ev.ContentID), dbutil.ParamSummary("from_task_id", ev.FromTaskID), dbutil.ParamSummary("experiment_id", ev.ExperimentID), dbutil.ParamSummary("status", ev.Status))
     }
     ev.ID = id
     return id, nil
@@ -88,7 +92,7 @@ func GetMessageEventByID(ctx context.Context, db *pgxpool.Pool, id string) (*Mes
         &out.Created, &out.Status, &out.ErrorMessage, &tagsJSON,
     )
     if err != nil {
-        return nil, err
+        return nil, dbutil.ErrWrap("message.get", err, dbutil.ParamSummary("id", id))
     }
     out.FromTaskID = taskID
     out.ExperimentID = expID
@@ -137,25 +141,26 @@ func ListMessages(ctx context.Context, db *pgxpool.Pool, roleName, experimentID,
         rows, err = db.Query(ctx, `SELECT id::text, content_id::text, from_task_id, experiment_id, created, status, error_message, tags
                                    FROM messages WHERE role_name=$1 ORDER BY created DESC LIMIT $2 OFFSET $3`, roleName, limit, offset)
     }
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("message.list", err, fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset)) }
     defer rows.Close()
     var out []MessageEvent
     for rows.Next() {
         var r MessageEvent
         var tagsJSON []byte
         if err := rows.Scan(&r.ID, &r.ContentID, &r.FromTaskID, &r.ExperimentID, &r.Created, &r.Status, &r.ErrorMessage, &tagsJSON); err != nil {
-            return nil, err
+            return nil, dbutil.ErrWrap("message.list.scan", err)
         }
         if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &r.Tags) }
         out = append(out, r)
     }
-    return out, rows.Err()
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("message.list", err) }
+    return out, nil
 }
 
 // DeleteMessage deletes a message by id.
 func DeleteMessage(ctx context.Context, db *pgxpool.Pool, id string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM messages WHERE id=$1::uuid`, id)
-    if err != nil { return 0, err }
+    if err != nil { return 0, dbutil.ErrWrap("message.delete", err, dbutil.ParamSummary("id", id)) }
     return ct.RowsAffected(), nil
 }
 

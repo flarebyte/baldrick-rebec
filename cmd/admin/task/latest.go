@@ -27,7 +27,7 @@ var latestCmd = &cobra.Command{
             return errors.New("provide --variant or --from-id")
         }
         cfg, err := cfgpkg.Load()
-        if err != nil { return err }
+        if err != nil { return fmt.Errorf("cmd=task latest params={variant:%s,from-id:%s}: %w", flagTaskLatestVariant, flagTaskLatestFromID, err) }
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
         defer cancel()
         db, err := pgdao.OpenApp(ctx, cfg)
@@ -52,7 +52,7 @@ var latestCmd = &cobra.Command{
             }
         }
         if strings.TrimSpace(id) == "" {
-            return errors.New("no latest task found")
+            return fmt.Errorf("cmd=task latest no result params={variant:%s,from-id:%s}", flagTaskLatestVariant, flagTaskLatestFromID)
         }
         t, err := pgdao.GetTaskByID(ctx, db, id)
         if err != nil { return err }

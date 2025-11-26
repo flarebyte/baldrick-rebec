@@ -32,6 +32,7 @@ var (
     flagDescription string
     flagGoal        string
     flagExperiment  string
+    flagMsgRole     string
     flagFromTask    string
     flagFormat      string
 )
@@ -121,6 +122,7 @@ var setCmd = &cobra.Command{
             if insErr != nil { return insErr }
             // Insert event referencing content
             ev := &pgdao.MessageEvent{ ContentID: cid, Status: "ingested", Tags: parseTags(flagTags) }
+            if strings.TrimSpace(flagMsgRole) != "" { ev.RoleName = strings.TrimSpace(flagMsgRole) }
             // Map optional from_task and experiment
             if strings.TrimSpace(flagFromTask) != "" { ev.FromTaskID = sql.NullString{String: flagFromTask, Valid: true} }
             if strings.TrimSpace(flagExperiment) != "" { ev.ExperimentID = sql.NullString{String: flagExperiment, Valid: true} }
@@ -141,6 +143,7 @@ func init() {
     setCmd.Flags().StringVar(&flagDescription, "description", "", "Longer explanation or context")
     setCmd.Flags().StringVar(&flagGoal, "goal", "", "Intended outcome of the message")
     setCmd.Flags().StringVar(&flagExperiment, "experiment", "", "Experiment UUID to link this message to")
+    setCmd.Flags().StringVar(&flagMsgRole, "role", "", "Role name (optional; defaults to 'user')")
     setCmd.Flags().StringVar(&flagFormat, "format", "", "Optional: interpret stdin as json or yaml and save parsed JSON alongside text")
 }
 

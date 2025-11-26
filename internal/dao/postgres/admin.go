@@ -10,6 +10,19 @@ import (
     "strings"
 )
 
+// NOTE ON DDL AND IDENTIFIERS
+// ----------------------------
+// Many functions below execute DDL (CREATE ROLE, GRANT, ALTER DEFAULT PRIVILEGES, etc.)
+// which must reference SQL identifiers (roles, schemas, databases) directly in the
+// statement text. PostgreSQL parameters ($1, $2, …) only bind data values — they cannot
+// be used for identifiers, keywords, or object names. For this reason we interpolate
+// identifiers using fmt.Sprintf. To keep this safe:
+// - We validate every identifier via safeIdent (^[A-Za-z_][A-Za-z0-9_]*$) before use.
+// - For literal data (e.g., passwords), we use quoteLiteral to escape single quotes.
+// - Where possible (SELECT EXISTS, etc.), we continue to use parameterized queries.
+// If in doubt, prefer server-side dynamic SQL with EXECUTE and format('%I', ident)
+// inside DO blocks, but the approach here keeps things simple and safe for our needs.
+
 var identRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func safeIdent(name string) (string, error) {
@@ -31,12 +44,12 @@ func EnsureRole(ctx context.Context, db *pgxpool.Pool, roleName, password string
         "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') THEN CREATE ROLE %s LOGIN; END IF; END $$;",
         rn, rn,
     ))
-    if err != nil { return err }
+    if err != nil { return fmt.Errorf("ensure_role.create: %w; role=%s", err, rn) }
     // Set password if provided
     if password != "" {
         // Safely quote identifier and literal
         stmt := fmt.Sprintf("ALTER ROLE %s WITH LOGIN PASSWORD %s", rn, quoteLiteral(password))
-        if _, err := db.Exec(ctx, stmt); err != nil { return err }
+        if _, err := db.Exec(ctx, stmt); err != nil { return fmt.Errorf("ensure_role.password: %w; role=%s", err, rn) }
     }
     return nil
 }
@@ -53,14 +66,15 @@ func EnsureDatabase(ctx context.Context, db *pgxpool.Pool, dbName, owner string)
     // Check existence
     var exists bool
     if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", dn).Scan(&exists); err != nil {
-        return err
+        return fmt.Errorf("db.exists: %w; db=%s", err, dn)
     }
     if exists { return nil }
     // Create
     stmt := fmt.Sprintf("CREATE DATABASE %s", dn)
     if ow != "" { stmt += fmt.Sprintf(" OWNER %s", ow) }
     _, err = db.Exec(ctx, stmt)
-    return err
+    if err != nil { return fmt.Errorf("db.create: %w; db=%s owner=%s", err, dn, ow) }
+    return nil
 }
 
 // GrantConnect grants CONNECT on database to app role.
@@ -71,7 +85,8 @@ func GrantConnect(ctx context.Context, db *pgxpool.Pool, dbName, appRole string)
     ar, err := safeIdent(appRole)
     if err != nil { return err }
     _, err = db.Exec(ctx, fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dn, ar))
-    return err
+    if err != nil { return fmt.Errorf("grant.connect: %w; db=%s role=%s", err, dn, ar) }
+    return nil
 }
 
 // GrantRuntimePrivileges grants typical privileges for app role inside the connected database.
@@ -88,39 +103,13 @@ func GrantRuntimePrivileges(ctx context.Context, db *pgxpool.Pool, appRole strin
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
-            return err
+            return fmt.Errorf("grant.runtime: %w; stmt=%s", err, s)
         }
     }
     return nil
 }
 
-// GrantAGEPrivileges grants permissions for the AGE extension and the default graph schema to the app role.
-// Best-effort: if AGE or the graph schema are missing, returns nil to avoid hard failures during scaffold.
-func GrantAGEPrivileges(ctx context.Context, db *pgxpool.Pool, appRole string) error {
-    if appRole == "" { return errors.New("empty app role") }
-    ar, err := safeIdent(appRole)
-    if err != nil { return err }
-    stmts := []string{
-        // Allow using AGE functions
-        fmt.Sprintf("GRANT USAGE ON SCHEMA ag_catalog TO %s", ar),
-        fmt.Sprintf("GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ag_catalog TO %s", ar),
-        // Allow using the default graph schema (created as 'rbc_graph')
-        fmt.Sprintf("GRANT USAGE ON SCHEMA rbc_graph TO %s", ar),
-        fmt.Sprintf("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA rbc_graph TO %s", ar),
-    }
-    for _, s := range stmts {
-        if _, err := db.Exec(ctx, s); err != nil {
-            // If schema doesn't exist or AGE is unavailable, ignore
-            if strings.Contains(err.Error(), "schema \"rbc_graph\" does not exist") ||
-               strings.Contains(err.Error(), "schema \"ag_catalog\" does not exist") ||
-               strings.Contains(err.Error(), "age") {
-                continue
-            }
-            return err
-        }
-    }
-    return nil
-}
+// GrantAGEPrivileges removed: graph features now use SQL tables and require no AGE-specific grants.
 
 // RevokeRuntimePrivileges revokes typical runtime privileges for the app role in the connected DB.
 func RevokeRuntimePrivileges(ctx context.Context, db *pgxpool.Pool, appRole string) error {
@@ -136,7 +125,7 @@ func RevokeRuntimePrivileges(ctx context.Context, db *pgxpool.Pool, appRole stri
     }
     for _, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
-            return err
+            return fmt.Errorf("revoke.runtime: %w; stmt=%s", err, s)
         }
     }
     return nil
@@ -147,7 +136,8 @@ func RoleExists(ctx context.Context, db *pgxpool.Pool, roleName string) (bool, e
     if roleName == "" { return false, errors.New("empty role name") }
     var ok bool
     err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", roleName).Scan(&ok)
-    return ok, err
+    if err != nil { return false, fmt.Errorf("role.exists: %w; role=%s", err, roleName) }
+    return ok, nil
 }
 
 // DatabaseExists checks if a database exists.
@@ -155,7 +145,8 @@ func DatabaseExists(ctx context.Context, db *pgxpool.Pool, name string) (bool, e
     if name == "" { return false, errors.New("empty db name") }
     var ok bool
     err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", name).Scan(&ok)
-    return ok, err
+    if err != nil { return false, fmt.Errorf("db.exists: %w; db=%s", err, name) }
+    return ok, nil
 }
 
 // HasSchemaUsage returns true if role has USAGE on schema.
@@ -163,7 +154,8 @@ func HasSchemaUsage(ctx context.Context, db *pgxpool.Pool, role, schema string) 
     if role == "" || schema == "" { return false, errors.New("empty role or schema") }
     var ok bool
     err := db.QueryRow(ctx, "SELECT has_schema_privilege($1, $2, 'USAGE')", role, schema).Scan(&ok)
-    return ok, err
+    if err != nil { return false, fmt.Errorf("schema.usage: %w; role=%s schema=%s", err, role, schema) }
+    return ok, nil
 }
 
 // MissingTableDML returns true if any table in schema lacks DML privileges for role.
@@ -183,7 +175,7 @@ func MissingTableDML(ctx context.Context, db *pgxpool.Pool, role, schema string)
           )`
     var anyMissing bool
     if err := db.QueryRow(ctx, q, schema, role).Scan(&anyMissing); err != nil {
-        return false, err
+        return false, fmt.Errorf("priv.missing: %w; role=%s schema=%s", err, role, schema)
     }
     return anyMissing, nil
 }
@@ -198,7 +190,8 @@ func TerminateConnections(ctx context.Context, sysdb *pgxpool.Pool, dbName strin
     if dbName == "" { return errors.New("empty db name") }
     _, err := sysdb.Exec(ctx, `SELECT pg_terminate_backend(pid)
         FROM pg_stat_activity WHERE datname=$1 AND pid <> pg_backend_pid()`, dbName)
-    return err
+    if err != nil { return fmt.Errorf("db.terminate: %w; db=%s", err, dbName) }
+    return nil
 }
 
 // DropDatabase drops a database if it exists.
@@ -207,7 +200,8 @@ func DropDatabase(ctx context.Context, sysdb *pgxpool.Pool, dbName string) error
     dn, err := safeIdent(dbName)
     if err != nil { return err }
     _, err = sysdb.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s", dn))
-    return err
+    if err != nil { return fmt.Errorf("db.drop: %w; db=%s", err, dn) }
+    return nil
 }
 
 // ResetPublicSchema drops and recreates the public schema in the connected DB.
@@ -220,7 +214,7 @@ func ResetPublicSchema(ctx context.Context, db *pgxpool.Pool) error {
         "GRANT ALL ON SCHEMA public TO PUBLIC",
     }
     for _, s := range stmts {
-        if _, err := db.Exec(ctx, s); err != nil { return err }
+        if _, err := db.Exec(ctx, s); err != nil { return fmt.Errorf("schema.reset: %w; stmt=%s", err, s) }
     }
     return nil
 }
@@ -241,10 +235,11 @@ func DropRole(ctx context.Context, sysdb *pgxpool.Pool, roleName string) error {
     stmts := []string{
         fmt.Sprintf("REASSIGN OWNED BY %s TO CURRENT_USER", rn),
         fmt.Sprintf("DROP OWNED BY %s", rn),
+    // Wrap errors with context
         fmt.Sprintf("DROP ROLE IF EXISTS %s", rn),
     }
     for _, s := range stmts {
-        if _, err := sysdb.Exec(ctx, s); err != nil { return err }
+        if _, err := sysdb.Exec(ctx, s); err != nil { return fmt.Errorf("role.drop: %w; stmt=%s", err, s) }
     }
     return nil
 }

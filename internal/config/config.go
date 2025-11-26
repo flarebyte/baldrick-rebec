@@ -21,13 +21,15 @@ type ServerConfig struct {
 type Config struct {
     Server     ServerConfig     `yaml:"server"`
     Postgres   PostgresConfig   `yaml:"postgres"`
+    Graph      GraphConfig      `yaml:"graph"`
 }
 
 func defaults() Config {
     return Config{
         Server:     ServerConfig{Port: DefaultServerPort},
         Postgres:   PostgresConfig{Host: "127.0.0.1", Port: 5432, DBName: "rbc", SSLMode: "disable",
-            Admin: PGRole{User: "rbc_admin"}, App: PGRole{User: "rbc_app"}},
+            Admin: PGRole{User: "rbc_admin"}, App: PGRole{User: "rbc_app"}, Backup: PGRole{}},
+        Graph:      GraphConfig{AllowFallback: false},
     }
 }
 
@@ -81,6 +83,15 @@ func Load() (Config, error) {
     if fileCfg.Postgres.App.Password != "" {
         cfg.Postgres.App.Password = fileCfg.Postgres.App.Password
     }
+    if fileCfg.Postgres.Backup.User != "" {
+        cfg.Postgres.Backup.User = fileCfg.Postgres.Backup.User
+    }
+    if fileCfg.Postgres.Backup.Password != "" {
+        cfg.Postgres.Backup.Password = fileCfg.Postgres.Backup.Password
+    }
+    // Graph overrides
+    // Booleans default to false; direct assignment is fine.
+    cfg.Graph.AllowFallback = fileCfg.Graph.AllowFallback
     return cfg, nil
 }
 
@@ -91,9 +102,16 @@ type PostgresConfig struct {
     SSLMode string `yaml:"sslmode"` // disable, require, verify-ca, verify-full
     Admin   PGRole `yaml:"admin"`
     App     PGRole `yaml:"app"`
+    Backup  PGRole `yaml:"backup"`
 }
 
 type PGRole struct {
     User         string `yaml:"user"`
     Password     string `yaml:"password,omitempty"`
+}
+
+type GraphConfig struct {
+    // AllowFallback controls whether CLI falls back to SQL mirror when graph (AGE) operations fail.
+    // Default: false (no fallback) so issues are visible.
+    AllowFallback bool `yaml:"allow_fallback"`
 }

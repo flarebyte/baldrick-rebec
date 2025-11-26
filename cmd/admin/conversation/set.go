@@ -22,6 +22,7 @@ var (
     flagConvNotes string
     flagConvProj  string
     flagConvTags  []string
+    flagConvRole  string
 )
 
 var setCmd = &cobra.Command{
@@ -37,6 +38,7 @@ var setCmd = &cobra.Command{
         if err != nil { return err }
         defer db.Close()
         conv := &pgdao.Conversation{ ID: flagConvID, Title: flagConvTitle }
+        if strings.TrimSpace(flagConvRole) != "" { conv.RoleName = strings.TrimSpace(flagConvRole) }
         if flagConvDesc != "" { conv.Description = sql.NullString{String: flagConvDesc, Valid: true} }
         if flagConvNotes != "" { conv.Notes = sql.NullString{String: flagConvNotes, Valid: true} }
         if flagConvProj != "" { conv.Project = sql.NullString{String: flagConvProj, Valid: true} }
@@ -67,6 +69,7 @@ func init() {
     setCmd.Flags().StringVar(&flagConvNotes, "notes", "", "Markdown notes")
     setCmd.Flags().StringVar(&flagConvProj, "project", "", "Project name (e.g. GitHub repo)")
     setCmd.Flags().StringSliceVar(&flagConvTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
+    setCmd.Flags().StringVar(&flagConvRole, "role", "", "Role name (optional; defaults to 'user')")
 }
 
 // parseTags converts k=v pairs (or bare keys) into a map.

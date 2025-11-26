@@ -4,8 +4,10 @@ import (
     "context"
     "database/sql"
     "encoding/json"
+    "fmt"
 
     "github.com/jackc/pgx/v5/pgxpool"
+    dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 )
 
 type Queue struct {
@@ -29,10 +31,13 @@ func AddQueue(ctx context.Context, db *pgxpool.Pool, q *Queue) error {
              RETURNING id::text, inQueueSince`
     var tagsJSON []byte
     if q.Tags != nil { tagsJSON, _ = json.Marshal(q.Tags) }
-    return db.QueryRow(ctx, stmt,
+    if err := db.QueryRow(ctx, stmt,
         stringOrEmpty(q.Description), q.Status, stringOrEmpty(q.Why), tagsJSON,
         stringOrEmpty(q.TaskID), stringOrEmpty(q.InboundMessageID), stringOrEmpty(q.TargetWorkspaceID),
-    ).Scan(&q.ID, &q.InQueueSince)
+    ).Scan(&q.ID, &q.InQueueSince); err != nil {
+        return dbutil.ErrWrap("queue.insert", err, dbutil.ParamSummary("status", q.Status))
+    }
+    return nil
 }
 
 // TakeQueue sets status to 'Running' and returns the row.
@@ -43,7 +48,7 @@ func TakeQueue(ctx context.Context, db *pgxpool.Pool, id string) (*Queue, error)
     var tagsJSON []byte
     if err := db.QueryRow(ctx, q, id).Scan(
         &out.ID, &out.Description, &out.InQueueSince, &out.Status, &out.Why, &tagsJSON, &out.TaskID, &out.InboundMessageID, &out.TargetWorkspaceID,
-    ); err != nil { return nil, err }
+    ); err != nil { return nil, dbutil.ErrWrap("queue.take", err, dbutil.ParamSummary("id", id)) }
     if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &out.Tags) }
     return &out, nil
 }
@@ -60,31 +65,31 @@ func PeekQueues(ctx context.Context, db *pgxpool.Pool, limit int, status string)
         rows, err = db.Query(ctx, `SELECT id::text, description, inQueueSince, status, why, tags, task_id::text, inbound_message::text, target_workspace_id::text
                                    FROM queues ORDER BY inQueueSince ASC LIMIT $1`, limit)
     }
-    if err != nil { return nil, err }
+    if err != nil { return nil, dbutil.ErrWrap("queue.peek", err, dbutil.ParamSummary("status", status), fmt.Sprintf("limit=%d", limit)) }
     defer rows.Close()
     var out []Queue
     for rows.Next() {
         var q Queue
         var tagsJSON []byte
         if stringsTrim(status) != "" {
-            if err := rows.Scan(&q.ID, &q.Description, &q.InQueueSince, &q.Status, &q.Why, &tagsJSON, &q.TaskID, &q.InboundMessageID, &q.TargetWorkspaceID); err != nil { return nil, err }
+            if err := rows.Scan(&q.ID, &q.Description, &q.InQueueSince, &q.Status, &q.Why, &tagsJSON, &q.TaskID, &q.InboundMessageID, &q.TargetWorkspaceID); err != nil { return nil, dbutil.ErrWrap("queue.peek.scan", err) }
         } else {
-            if err := rows.Scan(&q.ID, &q.Description, &q.InQueueSince, &q.Status, &q.Why, &tagsJSON, &q.TaskID, &q.InboundMessageID, &q.TargetWorkspaceID); err != nil { return nil, err }
+            if err := rows.Scan(&q.ID, &q.Description, &q.InQueueSince, &q.Status, &q.Why, &tagsJSON, &q.TaskID, &q.InboundMessageID, &q.TargetWorkspaceID); err != nil { return nil, dbutil.ErrWrap("queue.peek.scan", err) }
         }
         if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &q.Tags) }
         out = append(out, q)
     }
-    return out, rows.Err()
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("queue.peek", err) }
+    return out, nil
 }
 
 func CountQueues(ctx context.Context, db *pgxpool.Pool, status string) (int64, error) {
     if stringsTrim(status) != "" {
         var n int64
-        if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM queues WHERE status=$1`, status).Scan(&n); err != nil { return 0, err }
+        if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM queues WHERE status=$1`, status).Scan(&n); err != nil { return 0, dbutil.ErrWrap("queue.count", err, dbutil.ParamSummary("status", status)) }
         return n, nil
     }
     var n int64
-    if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM queues`).Scan(&n); err != nil { return 0, err }
+    if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM queues`).Scan(&n); err != nil { return 0, dbutil.ErrWrap("queue.count", err) }
     return n, nil
 }
-
