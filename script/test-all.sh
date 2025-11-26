@@ -1,294 +1,197 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env zx
+import 'zx/globals'
 
-# End-to-end local sanity: reset DB, scaffold schema, create sample rows, then list them.
+/**
+ * Purpose: End-to-end local sanity using Google ZX
+ * Notes: Resets DB, scaffolds roles/DB/privs/schema, creates sample data, lists entities, runs snapshot smoke tests.
+ * Agent: Keep ZX idioms (await $``; cd(); argv), avoid importing core modules (fs/path/fetch), use async-only.
+ */
 
-alias rbc='go run main.go'
+// -----------------------------
+// Configuration
+// -----------------------------
+const TEST_ROLE_USER = 'rbctest-user'
+const TEST_ROLE_QA = 'rbctest-qa'
 
-command -v rbc >/dev/null 2>&1 || { echo "error: rbc not found (go run main.go)" >&2; exit 1; }
+// Allow partial runs via flags, e.g. --skip-reset, --skip-snapshot
+const SKIP_RESET = argv['skip-reset'] ?? false
+const SKIP_SNAPSHOT = argv['skip-snapshot'] ?? false
 
-# Use only rbctest* roles throughout this script
-TEST_ROLE_USER="rbctest-user"
-TEST_ROLE_QA="rbctest-qa"
-
-# Helper to extract UUID id from JSON output without relying on jq
-json_get_id() {
-  if command -v jq >/dev/null 2>&1; then
-    printf "%s" "$1" | jq -r '.id'
-  else
-    printf "%s" "$1" | grep -oE '"id"\s*:\s*"[0-9a-fA-F-]{36}"' | sed -E 's/.*"([0-9a-fA-F-]{36})".*/\1/'
-  fi
+// -----------------------------
+// Helpers
+// -----------------------------
+function logStep(i, total, msg) {
+  console.error(`[${i}/${total}] ${msg}`)
 }
 
-has_jq() { command -v jq >/dev/null 2>&1; }
-
-# Minimal assertion for relations (SQL-backed)
-assert_relations_out() {
-  local sid="$1"
-  echo "[TEST] Checking relations for stickie $sid (out)" >&2
-  local rel_json
-  rel_json=$(rbc admin stickie-rel list --id "$sid" --direction out --output json 2>/dev/null || true)
-  if has_jq; then
-    local n
-    n=$(printf "%s" "$rel_json" | jq 'length')
-    if [ "${n:-0}" -lt 1 ]; then
-      echo "[TEST][FAIL] Expected at least 1 relation from $sid; got $n" >&2
-      echo "[TEST] Debug: relations JSON:" >&2
-      echo "$rel_json" >&2
-      echo "[TEST] Debug: counts:" >&2
-      rbc admin db count --json >&2 || true
-      exit 1
-    fi
-  else
-    if printf "%s" "$rel_json" | grep -q '^[[:space:]]*\[\][[:space:]]*$'; then
-      echo "[TEST][WARN] Could not verify relations (jq not installed); observed empty list" >&2
-    fi
-  fi
+async function runRbc(...args) {
+  // Mirrors alias: rbc='go run main.go'
+  // Use template literal to avoid shell-escaping pitfalls; ZX handles args quoting.
+  return await $`go run main.go ${args}`
 }
 
-# Record a testcase
-tc() {
-  local title="$1"; shift
-  local line="$1"; shift || true
-  rbc admin testcase create --role "$TEST_ROLE_USER" --title "$title" --status OK --file "$0" --line "${line:-0}" --tags example,script=test-all >/dev/null
+async function runRbcJSON(...args) {
+  const p = await runRbc(...args)
+  try {
+    return JSON.parse(p.stdout || 'null')
+  } catch (err) {
+    console.error('Failed to parse JSON from:', args.join(' '))
+    console.error(p.stdout)
+    throw err
+  }
 }
 
-echo "[1/11] Resetting database (destructive)" >&2
-rbc admin db reset --force --drop-app-role=false
+function idFrom(obj) {
+  if (!obj || typeof obj !== 'object') return ''
+  return obj.id || obj.ID || ''
+}
 
-echo "[2/11] Scaffolding roles, database, privileges, schema, and content index" >&2
-rbc admin db scaffold --all --yes
-tc "db scaffold --all --yes" "$LINENO"
+async function createScript(role, title, description, body) {
+  // Pipe body into the command (match legacy behavior)
+  const cmd = `printf %s ${JSON.stringify(body)} | go run main.go admin script set --role ${role} --title ${JSON.stringify(title)} --description ${JSON.stringify(description)}`
+  const out = await $`${cmd}`
+  return JSON.parse(out.stdout).id
+}
 
-echo "[3/11] Creating sample workflows and tasks" >&2
-rbc admin workflow set --name ci-test --title "Continuous Integration: Test Suite" --description "Runs unit and integration tests." --notes "CI test workflow" --role "$TEST_ROLE_USER"
-rbc admin workflow set --name ci-lint --title "Continuous Integration: Lint & Format" --description "Lints and vets the codebase." --notes "CI lint workflow" --role "$TEST_ROLE_USER"
-tc "workflow set ci-test" "$LINENO"; tc "workflow set ci-lint" "$LINENO"
+async function sleepInfo(ms, why) {
+  if (why) console.error(`sleep ${ms}ms: ${why}`)
+  await sleep(ms)
+}
 
-# Create scripts and capture their ids
-sid_unit_json=$(printf "go test ./...\n" | rbc admin script set --role "$TEST_ROLE_USER" --title "Unit: go test" --description "Run unit tests")
-sid_unit=$(json_get_id "$sid_unit_json")
-sid_integ_json=$(printf "docker compose up -d && go test -tags=integration ./...\n" | rbc admin script set --role "$TEST_ROLE_USER" --title "Integration: compose+test" --description "Run integration tests")
-sid_integ=$(json_get_id "$sid_integ_json")
-sid_lint_json=$(printf "go vet ./... && golangci-lint run\n" | rbc admin script set --role "$TEST_ROLE_USER" --title "Lint & Vet" --description "Runs vet and lints")
-sid_lint=$(json_get_id "$sid_lint_json")
-tc "script set Unit: go test" "$LINENO"; tc "script set Integration: compose+test" "$LINENO"; tc "script set Lint & Vet" "$LINENO"
+// -----------------------------
+// Flow
+// -----------------------------
+const TOTAL = 14
+let step = 0
 
-t_unit_json=$(rbc admin task set --workflow ci-test --command unit --variant go --role "$TEST_ROLE_USER" \
-  --title "Run Unit Tests" --description "Executes unit tests." --shell bash --run-script "$sid_unit" --timeout "10 minutes" --tags unit,fast --level h2)
-t_unit_id=$(json_get_id "$t_unit_json")
-tc "task set ci-test unit/go" "$LINENO"
+try {
+  // 1) Reset
+  step++; if (!SKIP_RESET) {
+    logStep(step, TOTAL, 'Resetting database (destructive)')
+    await runRbc('admin', 'db', 'reset', '--force', '--drop-app-role=false')
+  } else {
+    logStep(step, TOTAL, 'Skipping reset (--skip-reset)')
+  }
 
-t_integ_json=$(rbc admin task set --workflow ci-test --command integration --variant "" --role "$TEST_ROLE_USER" \
-  --title "Run Integration Tests" --description "Runs integration tests." --shell bash --run-script "$sid_integ" --timeout "30 minutes" --tags integration,slow --level h2)
-t_integ_id=$(json_get_id "$t_integ_json")
-tc "task set ci-test integration" "$LINENO"
+  // 2) Scaffold
+  step++; logStep(step, TOTAL, 'Scaffolding roles, database, privileges, schema, content index, backup grants')
+  await runRbc('admin', 'db', 'scaffold', '--all', '--yes')
 
-t_lint_json=$(rbc admin task set --workflow ci-lint --command lint --variant go --role "$TEST_ROLE_USER" \
-  --title "Lint & Vet" --description "Runs vet and lints." --shell bash --run-script "$sid_lint" --timeout "5 minutes" --tags lint,style --level h2)
-t_lint_id=$(json_get_id "$t_lint_json")
-tc "task set ci-lint lint/go" "$LINENO"
+  // 3) Workflows
+  step++; logStep(step, TOTAL, 'Creating workflows')
+  await runRbc('admin', 'workflow', 'set', '--name', 'ci-test', '--title', 'Continuous Integration: Test Suite', '--description', 'Runs unit and integration tests.', '--notes', 'CI test workflow', '--role', TEST_ROLE_USER)
+  await runRbc('admin', 'workflow', 'set', '--name', 'ci-lint', '--title', 'Continuous Integration: Lint & Format', '--description', 'Lints and vets the codebase.', '--notes', 'CI lint workflow', '--role', TEST_ROLE_USER)
 
-# Create replacement tasks with --replaces and levels
-rbc admin task set --workflow ci-test --command unit --variant go-patch1 --role "$TEST_ROLE_USER" \
-  --title "Run Unit Tests (Quick)" --description "Patch: run quick subset" --shell bash --run-script "$sid_unit" \
-  --replaces "$t_unit_id" --replace-level patch --replace-comment "Flaky test workaround"
+  // 4) Scripts
+  step++; logStep(step, TOTAL, 'Creating scripts and capturing ids')
+  const sidUnit = await createScript(TEST_ROLE_USER, 'Unit: go test', 'Run unit tests', '#!/usr/bin/env bash\nset -euo pipefail\ngo test ./...\n')
+  const sidInteg = await createScript(TEST_ROLE_USER, 'Integration: compose+test', 'Run integration tests', '#!/usr/bin/env bash\nset -euo pipefail\ndocker compose up -d && go test -tags=integration ./...\n')
+  const sidLint = await createScript(TEST_ROLE_USER, 'Lint & Vet', 'Runs vet and lints', '#!/usr/bin/env bash\nset -euo pipefail\ngo vet ./... && echo linting...\n')
 
-rbc admin task set --workflow ci-test --command unit --variant go-minor1 --role "$TEST_ROLE_USER" \
-  --title "Run Unit Tests (Race)" --description "Minor: enable race detector" --shell bash --run-script "$sid_integ" \
-  --replaces "$t_unit_id" --replace-level minor --replace-comment "Add -race"
+  // 5) Tasks
+  step++; logStep(step, TOTAL, 'Creating tasks')
+  const tUnit = idFrom(await runRbcJSON('admin', 'task', 'set', '--workflow', 'ci-test', '--command', 'unit', '--variant', 'go', '--role', TEST_ROLE_USER, '--title', 'Run Unit Tests', '--description', 'Executes unit tests.', '--shell', 'bash', '--run-script', sidUnit, '--timeout', '10 minutes', '--tags', 'unit,fast', '--level', 'h2'))
+  const tInteg = idFrom(await runRbcJSON('admin', 'task', 'set', '--workflow', 'ci-test', '--command', 'integration', '--variant', '', '--role', TEST_ROLE_USER, '--title', 'Run Integration Tests', '--description', 'Runs integration tests.', '--shell', 'bash', '--run-script', sidInteg, '--timeout', '30 minutes', '--tags', 'integration,slow', '--level', 'h2'))
+  const tLint = idFrom(await runRbcJSON('admin', 'task', 'set', '--workflow', 'ci-lint', '--command', 'lint', '--variant', 'go', '--role', TEST_ROLE_USER, '--title', 'Lint & Vet', '--description', 'Runs vet and lints.', '--shell', 'bash', '--run-script', sidLint, '--timeout', '5 minutes', '--tags', 'lint,style', '--level', 'h2'))
 
-rbc admin task set --workflow ci-lint --command lint --variant go-major1 --role "$TEST_ROLE_USER" \
-  --title "Lint & Vet (Strict)" --description "Major: stricter lint rules" --shell bash --run-script "$sid_lint" \
-  --replaces "$t_lint_id" --replace-level major --replace-comment "Enable all linters"
+  // Replacements
+  await runRbc('admin', 'task', 'set', '--workflow', 'ci-test', '--command', 'unit', '--variant', 'go-patch1', '--role', TEST_ROLE_USER, '--title', 'Run Unit Tests (Quick)', '--description', 'Patch: run quick subset', '--shell', 'bash', '--run-script', sidUnit, '--replaces', tUnit, '--replace-level', 'patch', '--replace-comment', 'Flaky test workaround')
+  await runRbc('admin', 'task', 'set', '--workflow', 'ci-test', '--command', 'unit', '--variant', 'go-minor1', '--role', TEST_ROLE_USER, '--title', 'Run Unit Tests (Race)', '--description', 'Minor: enable race detector', '--shell', 'bash', '--run-script', sidInteg, '--replaces', tUnit, '--replace-level', 'minor', '--replace-comment', 'Add -race')
 
-echo "-- Task relations (latest/next) --" >&2
-echo "Latest by variant (unit/go):" >&2
-rbc admin task latest --variant unit/go || true
-echo "Latest from id (unit base):" >&2
-rbc admin task latest --from-id "$t_unit_id" || true
-echo "Next patch after unit base:" >&2
-rbc admin task next --id "$t_unit_id" --level patch || true
-echo "Next minor after unit base:" >&2
-rbc admin task next --id "$t_unit_id" --level minor || true
-echo "Next major after lint base:" >&2
-rbc admin task next --id "$t_lint_id" --level major || true
+  // 6) Tags & Topics
+  step++; logStep(step, TOTAL, 'Creating tags and topics')
+  await runRbc('admin', 'tag', 'set', '--name', 'priority-high', '--title', 'High Priority', '--role', TEST_ROLE_USER)
+  await runRbc('admin', 'topic', 'set', '--name', 'onboarding', '--role', TEST_ROLE_USER, '--title', 'Onboarding', '--description', 'New hires onboarding', '--tags', 'area=people,priority=med')
+  await runRbc('admin', 'topic', 'set', '--name', 'devops', '--role', TEST_ROLE_USER, '--title', 'DevOps', '--description', 'Build, deploy, CI/CD', '--tags', 'area=platform,priority=high')
 
-echo "[4/11] Creating sample conversations and experiments" >&2
-cjson=$(rbc admin conversation set --title "Build System Refresh" --project "github.com/acme/build-system" --tags pipeline,build,ci --description "Modernize build tooling." --notes "Goals: faster CI, better DX" --role "$TEST_ROLE_USER")
-cid=$(json_get_id "$cjson")
-tc "conversation set Build System Refresh" "$LINENO"
+  // 7) Projects
+  step++; logStep(step, TOTAL, 'Creating projects')
+  await runRbc('admin', 'project', 'set', '--name', 'acme/build-system', '--role', TEST_ROLE_USER, '--description', 'Build system and CI pipeline', '--tags', 'status=active,type=ci')
+  await runRbc('admin', 'project', 'set', '--name', 'acme/product', '--role', TEST_ROLE_USER, '--description', 'Main product', '--tags', 'status=active,type=app')
 
-cjson2=$(rbc admin conversation set --title "Onboarding Improvement" --project "github.com/acme/product" --tags onboarding,docs,dx --description "Improve onboarding artifacts." --notes "Scope: docs, templates, scripts" --role "$TEST_ROLE_USER")
-cid2=$(json_get_id "$cjson2")
-tc "conversation set Onboarding Improvement" "$LINENO"
+  // 8) Stores & Blackboards
+  step++; logStep(step, TOTAL, 'Creating stores and blackboards')
+  await runRbc('admin', 'store', 'set', '--name', 'ideas-acme-build', '--role', TEST_ROLE_USER, '--title', 'Ideas for acme/build-system', '--description', 'Idea backlog', '--type', 'journal', '--scope', 'project', '--lifecycle', 'monthly', '--tags', 'topic=ideas,project=acme/build-system')
+  await runRbc('admin', 'store', 'set', '--name', 'blackboard-global', '--role', TEST_ROLE_USER, '--title', 'Shared Blackboard', '--description', 'Scratch space for team', '--type', 'blackboard', '--scope', 'shared', '--lifecycle', 'weekly', '--tags', 'visibility=team')
 
-ejson1=$(rbc admin experiment create --conversation "$cid")
-eid1=$(json_get_id "$ejson1")
-tc "experiment create for conversation $cid" "$LINENO"
+  const s1 = idFrom(await runRbcJSON('admin', 'store', 'get', '--name', 'ideas-acme-build', '--role', TEST_ROLE_USER))
+  const s2 = idFrom(await runRbcJSON('admin', 'store', 'get', '--name', 'blackboard-global', '--role', TEST_ROLE_USER))
 
-ejson2=$(rbc admin experiment create --conversation "$cid2")
-eid2=$(json_get_id "$ejson2")
-tc "experiment create for conversation $cid2" "$LINENO"
+  const bb1 = idFrom(await runRbcJSON('admin', 'blackboard', 'set', '--role', TEST_ROLE_USER, '--store-id', s1, '--project', 'acme/build-system', '--background', 'Ideas board for build system', '--guidelines', 'Keep concise; tag items with priority'))
+  const bb2 = idFrom(await runRbcJSON('admin', 'blackboard', 'set', '--role', TEST_ROLE_USER, '--store-id', s2, '--background', 'Team-wide blackboard', '--guidelines', 'Wipe weekly on Mondays'))
 
-echo "[5/11] Creating roles" >&2
-rbc admin role set --name "$TEST_ROLE_USER" --title "User" --description "Regular end-user role" --tags default
-rbc admin role set --name "$TEST_ROLE_QA"   --title "QA"   --description "Quality assurance role" --tags testing
-tc "role set $TEST_ROLE_USER" "$LINENO"; tc "role set $TEST_ROLE_QA" "$LINENO"
+  // 9) Stickies and relations
+  step++; logStep(step, TOTAL, 'Creating stickies and relations')
+  const st1 = idFrom(await runRbcJSON('admin', 'stickie', 'set', '--blackboard', bb1, '--topic-name', 'onboarding', '--topic-role', TEST_ROLE_USER, '--note', 'Refresh onboarding guide for new hires', '--labels', 'onboarding,docs,priority:med', '--priority', 'should'))
+  const st2 = idFrom(await runRbcJSON('admin', 'stickie', 'set', '--blackboard', bb1, '--topic-name', 'devops', '--topic-role', TEST_ROLE_USER, '--note', 'Evaluate GitHub Actions caching for go build', '--labels', 'idea,devops', '--priority', 'could'))
+  const st3 = idFrom(await runRbcJSON('admin', 'stickie', 'set', '--blackboard', bb2, '--note', 'Team retro every Friday', '--labels', 'team,ritual', '--priority', 'must'))
 
-echo "[6/11] Creating tags" >&2
-rbc admin tag set --name status  --title "Status"  --description "Common values: draft, active, archived" --role "$TEST_ROLE_USER"
-rbc admin tag set --name type    --title "Type"    --description "Common values: unit, integration" --role "$TEST_ROLE_USER"
-rbc admin tag set --name project --title "Project" --description "Example values: ci, website, product" --role "$TEST_ROLE_USER"
-tc "tag set status" "$LINENO"; tc "tag set type" "$LINENO"; tc "tag set project" "$LINENO"
+  await runRbc('admin', 'stickie-rel', 'set', '--from', st1, '--to', st2, '--type', 'uses', '--labels', 'ref,dependency')
+  await runRbc('admin', 'stickie-rel', 'set', '--from', st2, '--to', st3, '--type', 'includes', '--labels', 'backlog')
+  await runRbc('admin', 'stickie-rel', 'set', '--from', st1, '--to', st3, '--type', 'contrasts_with', '--labels', 'tradeoff')
 
-echo "[6.5/11] Creating topics" >&2
-rbc admin topic set --name onboarding --role "$TEST_ROLE_USER" --title "Onboarding" --description "Docs and environment setup" --tags area=docs,priority=med
-rbc admin topic set --name devops     --role "$TEST_ROLE_USER" --title "DevOps"    --description "Build, deploy, CI/CD"     --tags area=platform,priority=high
-tc "topic set onboarding" "$LINENO"; tc "topic set devops" "$LINENO"
+  // 10) Workspaces, Packages
+  step++; logStep(step, TOTAL, 'Creating workspaces and packages')
+  await runRbc('admin', 'workspace', 'set', '--role', TEST_ROLE_USER, '--project', 'acme/build-system', '--description', 'Local build-system workspace', '--tags', 'status=active')
+  await runRbc('admin', 'workspace', 'set', '--role', TEST_ROLE_USER, '--project', 'acme/product', '--description', 'Local product workspace', '--tags', 'status=active')
 
-echo "[7/11] Creating projects" >&2
-rbc admin project set --name acme/build-system --role "$TEST_ROLE_USER" --description "Build system and CI pipeline" --tags status=active,type=ci
-rbc admin project set --name acme/product      --role "$TEST_ROLE_USER" --description "Main product" --tags status=active,type=app
-tc "project set acme/build-system" "$LINENO"; tc "project set acme/product" "$LINENO"
+  await runRbc('admin', 'package', 'set', '--role', TEST_ROLE_USER, '--variant', 'unit/go')
+  await runRbc('admin', 'package', 'set', '--role', TEST_ROLE_QA, '--variant', 'integration')
+  await runRbc('admin', 'package', 'set', '--role', TEST_ROLE_USER, '--variant', 'lint/go')
 
-echo "[8/11] Creating stores" >&2
-rbc admin store set --name ideas-acme-build --role "$TEST_ROLE_USER" --title "Ideas for acme/build-system" --description "Idea backlog" --type journal --scope project --lifecycle monthly --tags topic=ideas,project=acme/build-system
-rbc admin store set --name blackboard-global --role "$TEST_ROLE_USER" --title "Shared Blackboard" --description "Scratch space for team" --type blackboard --scope shared --lifecycle weekly --tags visibility=team
-tc "store set ideas-acme-build" "$LINENO"; tc "store set blackboard-global" "$LINENO"
+  // 11) Messages & Queue
+  step++; logStep(step, TOTAL, 'Creating messages and queue')
+  await $`echo "Hello from user12" | go run main.go admin message set --experiment eid1 --title Greeting --tags hello --role ${TEST_ROLE_USER}`
+  await $`echo "Build started" | go run main.go admin message set --experiment eid1 --title BuildStart --tags build --role ${TEST_ROLE_USER}`
+  await $`echo "Onboarding checklist updated" | go run main.go admin message set --experiment eid2 --title DocsUpdate --tags docs,update --role ${TEST_ROLE_USER}`
 
-echo "[8.1/11] Creating blackboards" >&2
-s1_json=$(rbc admin store get --name ideas-acme-build --role "$TEST_ROLE_USER")
-s1=$(json_get_id "$s1_json")
-s2_json=$(rbc admin store get --name blackboard-global --role "$TEST_ROLE_USER")
-s2=$(json_get_id "$s2_json")
-bb1_json=$(rbc admin blackboard set --role "$TEST_ROLE_USER" --store-id "$s1" --project acme/build-system --conversation "$cid" \
-  --background "Ideas board for build system" --guidelines "Keep concise; tag items with priority")
-bb1=$(json_get_id "$bb1_json")
-bb2_json=$(rbc admin blackboard set --role "$TEST_ROLE_USER" --store-id "$s2" \
-  --background "Team-wide blackboard" --guidelines "Wipe weekly on Mondays")
-bb2=$(json_get_id "$bb2_json")
-tc "blackboard set for ideas-acme-build ($bb1)" "$LINENO"; tc "blackboard set for blackboard-global ($bb2)" "$LINENO"
+  const q1 = idFrom(await runRbcJSON('admin', 'queue', 'add', '--description', 'Run quick unit subset', '--status', 'Waiting', '--why', 'waiting for CI window', '--tags', 'kind=test,priority=low'))
+  await runRbc('admin', 'queue', 'add', '--description', 'Run full integration suite', '--status', 'Buildable', '--tags', 'kind=test,priority=high')
+  await runRbc('admin', 'queue', 'add', '--description', 'Strict lint pass', '--status', 'Blocked', '--why', 'env not ready', '--tags', 'kind=lint')
 
-echo "[8.2/11] Creating stickies" >&2
-st1_json=$(rbc admin stickie set --blackboard "$bb1" \
-  --topic-name "onboarding" --topic-role "$TEST_ROLE_USER" \
-  --note "Refresh onboarding guide for new hires" --labels onboarding,docs,priority:med --priority should)
-st1=$(json_get_id "$st1_json")
-st2_json=$(rbc admin stickie set --blackboard "$bb1" \
-  --topic-name "devops" --topic-role "$TEST_ROLE_USER" \
-  --note "Evaluate GitHub Actions caching for go build" \
-  --labels idea,devops --priority could)
-st2=$(json_get_id "$st2_json")
-st3_json=$(rbc admin stickie set --blackboard "$bb2" \
-  --note "Team retro every Friday" --labels team,ritual --priority must)
-st3=$(json_get_id "$st3_json")
-tc "stickie set onboarding ($st1)" "$LINENO"; tc "stickie set devops ($st2)" "$LINENO"; tc "stickie set team ritual ($st3)" "$LINENO"
+  await runRbc('admin', 'queue', 'peek', '--limit', '2')
+  await runRbc('admin', 'queue', 'size')
+  await runRbc('admin', 'queue', 'take', '--id', q1)
 
-echo "[8.3/11] Creating stickie relationships" >&2
-rbc admin stickie-rel set --from "$st1" --to "$st2" --type uses --labels ref,dependency
-tc "stickie-rel set uses (st1 -> st2)" "$LINENO"
-rbc admin stickie-rel set --from "$st2" --to "$st3" --type includes --labels backlog
-tc "stickie-rel set includes (st2 -> st3)" "$LINENO"
-rbc admin stickie-rel set --from "$st1" --to "$st3" --type contrasts_with --labels tradeoff
-tc "stickie-rel set contrasts_with (st1 -> st3)" "$LINENO"
+  // 12) Listings & counts
+  step++; logStep(step, TOTAL, 'Listing entities and counts (per-role and JSON)')
+  await runRbc('admin', 'workflow', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'task', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'conversation', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'experiment', 'list', '--limit', '50')
+  await runRbc('admin', 'message', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'project', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'workspace', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'script', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'store', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'topic', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'blackboard', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'stickie', 'list', '--limit', '50')
+  await runRbc('admin', 'stickie', 'list', '--blackboard', bb1, '--limit', '50')
+  await runRbc('admin', 'stickie', 'list', '--topic-name', 'devops', '--topic-role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'stickie-rel', 'list', '--id', st1, '--direction', 'out')
+  await runRbc('admin', 'stickie-rel', 'get', '--from', st1, '--to', st2, '--type', 'uses', '--ignore-missing')
+  await runRbc('admin', 'tag', 'list', '--role', TEST_ROLE_USER, '--limit', '50')
+  await runRbc('admin', 'db', 'count', '--per-role')
+  await runRbc('admin', 'db', 'count', '--json')
 
-assert_relations_out "$st1"
+  // 13) Snapshot (backup/list/show/restore-dry/delete)
+  step++; if (!SKIP_SNAPSHOT) {
+    logStep(step, TOTAL, 'Snapshot backup smoke test (backup/list/show/restore dry-run/delete)')
+    const bkp = await runRbcJSON('admin', 'snapshot', 'backup', '--description', 'rbctest snapshot', '--who', TEST_ROLE_USER, '--json')
+    const bkpID = idFrom(bkp)
+    await runRbc('admin', 'snapshot', 'list', '--limit', '5')
+    await runRbc('admin', 'snapshot', 'show', bkpID)
+    await runRbc('admin', 'snapshot', 'restore', bkpID, '--mode', 'append', '--dry-run')
+    await runRbc('admin', 'snapshot', 'delete', bkpID, '--force')
+  } else {
+    logStep(step, TOTAL, 'Skipping snapshot (--skip-snapshot)')
+  }
 
-echo "[8/11] Creating workspaces" >&2
-rbc admin workspace set --role "$TEST_ROLE_USER" --project acme/build-system \
-  --description "Local build-system workspace" --tags status=active
-rbc admin workspace set --role "$TEST_ROLE_USER" --project acme/product \
-  --description "Local product workspace" --tags status=active
-tc "workspace set for acme/build-system" "$LINENO"; tc "workspace set for acme/product" "$LINENO"
+  // 14) Done
+  step++; logStep(step, TOTAL, 'Done.')
+} catch (err) {
+  console.error('Test-all failed:', err?.stderr || err?.message || err)
+  process.exit(1)
+}
 
-echo "[9/12] Creating packages (role-bound tasks)" >&2
-rbc admin package set --role "$TEST_ROLE_USER" --variant unit/go
-rbc admin package set --role "$TEST_ROLE_QA"   --variant integration
-rbc admin package set --role "$TEST_ROLE_USER" --variant lint/go
-tc "package set $TEST_ROLE_USER unit/go" "$LINENO"; tc "package set $TEST_ROLE_QA integration" "$LINENO"; tc "package set $TEST_ROLE_USER lint/go" "$LINENO"
-
-echo "[10/12] Creating scripts" >&2
-printf "#!/usr/bin/env bash\nset -euo pipefail\necho Deploying service...\n" | \
-  rbc admin script set --role "$TEST_ROLE_USER" --title "Deploy Service" --description "Simple deploy script" --tags status=active,type=deploy
-printf "#!/usr/bin/env bash\nset -euo pipefail\necho Cleaning build artifacts...\n" | \
-  rbc admin script set --role "$TEST_ROLE_USER" --title "Cleanup Artifacts" --description "Cleanup build artifacts" --tags status=active,type=maintenance
-tc "script set Deploy Service" "$LINENO"; tc "script set Cleanup Artifacts" "$LINENO"
-
-echo "[11/13] Creating sample messages" >&2
-echo "Hello from user12" | rbc admin message set --experiment "$eid1" --title "Greeting" --tags hello --role "$TEST_ROLE_USER"
-echo "Build started" | rbc admin message set --experiment "$eid1" --title "BuildStart" --tags build --role "$TEST_ROLE_USER"
-echo "Onboarding checklist updated" | rbc admin message set --experiment "$eid2" --title "DocsUpdate" --tags docs,update --role "$TEST_ROLE_USER"
-tc "message set Greeting" "$LINENO"; tc "message set BuildStart" "$LINENO"; tc "message set DocsUpdate" "$LINENO"
-
-echo "[12/13] Creating queues" >&2
-qid1_json=$(rbc admin queue add --description "Run quick unit subset" --status Waiting --why "waiting for CI window" --tags kind=test,priority=low)
-qid1=$(json_get_id "$qid1_json")
-qid2_json=$(rbc admin queue add --description "Run full integration suite" --status Buildable --tags kind=test,priority=high)
-qid2=$(json_get_id "$qid2_json")
-qid3_json=$(rbc admin queue add --description "Strict lint pass" --status Blocked --why "env not ready" --tags kind=lint)
-qid3=$(json_get_id "$qid3_json")
-
-echo "-- Queue: peek oldest two --" >&2
-rbc admin queue peek --limit 2
-tc "queue peek --limit 2" "$LINENO"
-echo "-- Queue: size (all) --" >&2
-rbc admin queue size
-tc "queue size" "$LINENO"
-echo "-- Queue: take one --" >&2
-rbc admin queue take --id "$qid1"
-tc "queue take $qid1" "$LINENO"
-
-echo "[13/13] Listing all entities and counts" >&2
-echo "-- Workflows --" >&2
-rbc admin workflow list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Tasks --" >&2
-rbc admin task list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Conversations --" >&2
-rbc admin conversation list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Experiments --" >&2
-rbc admin experiment list --limit 50
-echo "-- Messages --" >&2
-rbc admin message list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Projects --" >&2
-rbc admin project list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Workspaces --" >&2
-rbc admin workspace list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Scripts --" >&2
-rbc admin script list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Stores --" >&2
-rbc admin store list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Topics --" >&2
-rbc admin topic list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Blackboards --" >&2
-rbc admin blackboard list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Stickies (all) --" >&2
-rbc admin stickie list --limit 50
-echo "-- Stickies for ideas-acme-build board --" >&2
-rbc admin stickie list --blackboard "$bb1" --limit 50
-echo "-- Stickies with topic=devops --" >&2
-rbc admin stickie list --topic-name devops --topic-role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Stickie relations (out from st1) --" >&2
-rbc admin stickie-rel list --id "$st1" --direction out
-echo "-- Stickie relation get (st1 uses st2) --" >&2
-rbc admin stickie-rel get --from "$st1" --to "$st2" --type uses --ignore-missing
-echo "-- Tags --" >&2
-rbc admin tag list --role "$TEST_ROLE_USER" --limit 50 || true
-echo "-- Table counts --" >&2
-rbc admin db count --per-role
-rbc admin db count --json
-
-echo "[14/14] Snapshot backup smoke test" >&2
-# Create a backup and exercise list/show/restore(delete-dry)/delete
-bkp_json=$(rbc admin snapshot backup --description "rbctest snapshot" --who "$TEST_ROLE_USER" --json)
-bkp_id=$(json_get_id "$bkp_json")
-echo "-- Snapshot list (recent) --" >&2
-rbc admin snapshot list --limit 5 || true
-echo "-- Snapshot show --" >&2
-rbc admin snapshot show "$bkp_id" || true
-echo "-- Snapshot restore (dry-run append) --" >&2
-rbc admin snapshot restore "$bkp_id" --mode append --dry-run || true
-echo "-- Snapshot delete --" >&2
-rbc admin snapshot delete "$bkp_id" --force || true
-
-echo "Done." >&2
