@@ -5,7 +5,7 @@
 # - Avoid variables that compute values; keep only stable constants.
 # - Do not add pattern rules, arguments, or conditionals.
 
-.PHONY: biome-check biome-format
+.PHONY: biome-check biome-format test-all
 
 # Tool to run. Keep as a simple constant so humans can override via environment if needed.
 # Use npx to avoid requiring a global install.
@@ -22,6 +22,10 @@ biome-check:
 biome-format:
 	$(BIOME) format $(SCRIPTS_DIR) --write
 
+# Run the end-to-end ZX test script.
+test-all:
+	zx script/test-all.mjs
+
 # --- HUMAN VERSION BELOW ---
 # Goal:
 # Keep the Makefile tiny, predictable, and easy for humans to use.
@@ -30,6 +34,7 @@ biome-format:
 # Targets:
 # - biome-check  : Runs Biome twice via script (rdjson for AI, colored for humans)
 # - biome-format : Applies formatting with Biome to script/*.mjs
+# - test-all     : Runs the ZX end-to-end test script (script/test-all.mjs)
 #
 # Usage:
 #   make biome-check
