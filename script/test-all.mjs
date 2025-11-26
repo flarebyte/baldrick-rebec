@@ -46,9 +46,11 @@ function idFrom(obj) {
 }
 
 async function createScript(role, title, description, body) {
-  // Pipe body into the command (match legacy behavior)
-  const cmd = `printf %s ${JSON.stringify(body)} | go run main.go admin script set --role ${role} --title ${JSON.stringify(title)} --description ${JSON.stringify(description)}`;
-  const out = await $`${cmd}`;
+  // Send script body via stdin to avoid shell quoting pitfalls in ZX.
+  const proc = $`go run main.go admin script set --role ${role} --title ${title} --description ${description}`;
+  proc.stdin.write(body);
+  proc.stdin.end();
+  const out = await proc;
   return JSON.parse(out.stdout).id;
 }
 
