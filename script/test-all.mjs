@@ -166,8 +166,7 @@ try {
       'unit,fast',
       '--level',
       'h2',
-    ),
-  );
+    );
   await runRbcJSON(
       'admin',
       'task',
@@ -194,8 +193,7 @@ try {
       'integration,slow',
       '--level',
       'h2',
-    ),
-  );
+    );
   await runRbcJSON(
       'admin',
       'task',
