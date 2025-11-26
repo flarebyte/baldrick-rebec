@@ -5,7 +5,7 @@
 # - Avoid variables that compute values; keep only stable constants.
 # - Do not add pattern rules, arguments, or conditionals.
 
-.PHONY: biome-check biome-format test-all
+.PHONY: biome-check biome-format test-all help
 
 # Tool to run. Keep as a simple constant so humans can override via environment if needed.
 # Use npx to avoid requiring a global install.
@@ -13,6 +13,7 @@ BIOME := npx @biomejs/biome
 
 # Scope to lint/format. Biome uses biome.json to include only script/*.mjs
 SCRIPTS_DIR := script
+ZX := npx zx
 
 # Run Biome via wrapper script to avoid logic here.
 biome-check:
@@ -24,7 +25,12 @@ biome-format:
 
 # Run the end-to-end ZX test script.
 test-all:
-	zx script/test-all.mjs
+	$(ZX) script/test-all.mjs
+
+# HUMAN: Print a clear list of available Make targets and what they do.
+# AI: Keep this static and explicit; do not auto-parse or add shell logic.
+help:
+	@printf "Make targets:\n  biome-check   Run Biome twice (AI rdjson, then colored human).\n  biome-format  Apply Biome formatting to script/*.mjs.\n  test-all      Run ZX E2E script via npx zx (script/test-all.mjs).\n"
 
 # --- HUMAN VERSION BELOW ---
 # Goal:
