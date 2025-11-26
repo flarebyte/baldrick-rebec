@@ -117,6 +117,23 @@ var scaffoldCmd = &cobra.Command{
             }
         }
 
+        // Backup role: ensure readonly on public schema (for snapshot to read live tables)
+        if effGrantBackup && cfg.Postgres.Backup.User != "" {
+            fmt.Fprintln(os.Stderr, "db:scaffold - granting public schema read to backup role...")
+            // USAGE on schema public
+            if _, err := db.Exec(ctx, fmt.Sprintf("GRANT USAGE ON SCHEMA public TO %s", cfg.Postgres.Backup.User)); err != nil {
+                return err
+            }
+            // SELECT on existing tables
+            if _, err := db.Exec(ctx, fmt.Sprintf("GRANT SELECT ON ALL TABLES IN SCHEMA public TO %s", cfg.Postgres.Backup.User)); err != nil {
+                return err
+            }
+            // Default SELECT for future tables created by current owner in public
+            if _, err := db.Exec(ctx, fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO %s", cfg.Postgres.Backup.User)); err != nil {
+                return err
+            }
+        }
+
         // Graph features now use SQL tables; no AGE privileges required.
 
         // If --all is set, also ensure content table and FTS (same as db init)
