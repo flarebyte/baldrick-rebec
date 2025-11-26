@@ -84,8 +84,24 @@ try {
   // 2.5) Ensure roles exist for package FKs
   step++;
   logStep(step, TOTAL, 'Ensuring roles for test users (FK for packages)');
-  await runRbc('admin', 'role', 'set', '--name', TEST_ROLE_USER, '--title', 'RBCTest User');
-  await runRbc('admin', 'role', 'set', '--name', TEST_ROLE_QA, '--title', 'RBCTest QA');
+  await runRbc(
+    'admin',
+    'role',
+    'set',
+    '--name',
+    TEST_ROLE_USER,
+    '--title',
+    'RBCTest User',
+  );
+  await runRbc(
+    'admin',
+    'role',
+    'set',
+    '--name',
+    TEST_ROLE_QA,
+    '--title',
+    'RBCTest QA',
+  );
 
   // 3) Workflows
   step++;
@@ -621,9 +637,23 @@ try {
   // 11) Conversation, Experiment, Messages & Queue
   step++;
   logStep(step, TOTAL, 'Creating conversation, experiment, messages and queue');
-  const convMeta = await runRbcJSON('admin', 'conversation', 'set', '--title', 'Test Conversation', '--role', TEST_ROLE_USER);
+  const convMeta = await runRbcJSON(
+    'admin',
+    'conversation',
+    'set',
+    '--title',
+    'Test Conversation',
+    '--role',
+    TEST_ROLE_USER,
+  );
   const convID = idFrom(convMeta);
-  const expMeta = await runRbcJSON('admin', 'experiment', 'create', '--conversation', convID);
+  const expMeta = await runRbcJSON(
+    'admin',
+    'experiment',
+    'create',
+    '--conversation',
+    convID,
+  );
   const expID = idFrom(expMeta);
   await $`echo "Hello from user12" | go run main.go admin message set --experiment ${expID} --title Greeting --tags hello --role ${TEST_ROLE_USER}`;
   await $`echo "Build started" | go run main.go admin message set --experiment ${expID} --title BuildStart --tags build --role ${TEST_ROLE_USER}`;
