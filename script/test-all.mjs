@@ -1,5 +1,4 @@
 #!/usr/bin/env zx
-import 'zx/globals';
 
 /**
  * Purpose: End-to-end local sanity using Google ZX
