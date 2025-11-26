@@ -53,7 +53,7 @@ Use the schema-aware snapshot subsystem to capture and restore long‑lived enti
 
 By default, permanent-ish entities like `roles`, `workflows`, `tags`, `projects`, `stores`, `scripts`, `tasks`, `topics`, `workspaces`, `blackboards`, `stickies`, `stickie_relations`, `task_replaces`, `packages`, `task_variants`, and `scripts_content` are included. Ephemeral tables such as `conversations`, `experiments`, `messages`, `messages_content`, `queues`, and `testcases` are excluded unless explicitly included.
 
-Snapshot connections use a dedicated backup role if configured in `~/.baldrick-rebec/config.yaml`:
+Snapshot connections require a dedicated backup role configured in `~/.baldrick-rebec/config.yaml` (no admin fallback):
 
 postgres:
   host: 127.0.0.1
@@ -70,7 +70,7 @@ postgres:
     user: rbc_backup
     password: pass
 
-Grant this role permissions to own or write to the backup schema, e.g.:
+Grant this role permissions to own or write to the backup schema, e.g. (or run `rbc admin db scaffold --grant-backup --yes`):
 - `CREATE SCHEMA IF NOT EXISTS backup AUTHORIZATION rbc_backup;`
 - `GRANT USAGE ON SCHEMA backup TO rbc_backup;`
 

@@ -53,8 +53,8 @@ func OpenAdminWithDB(ctx context.Context, cfg config.Config, dbName string) (*pg
 func OpenBackup(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
     user := cfg.Postgres.Backup.User
     pass := cfg.Postgres.Backup.Password
-    if user == "" { // fallback to admin if no backup role configured
-        return OpenAdmin(ctx, cfg)
+    if user == "" {
+        return nil, fmt.Errorf("backup role not configured: set postgres.backup.user/password in ~/.baldrick-rebec/config.yaml and run 'rbc admin db scaffold --grant-backup --yes'")
     }
     dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", cfg.Postgres.Host, cfg.Postgres.Port, user, pass, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
     return openPool(ctx, dsn)
