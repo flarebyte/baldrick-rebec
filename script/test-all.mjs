@@ -166,7 +166,7 @@ try {
       'unit,fast',
       '--level',
       'h2'
-    );
+    ));
   await runRbcJSON(
       'admin',
       'task',
