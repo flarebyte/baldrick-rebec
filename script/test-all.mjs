@@ -59,7 +59,7 @@ async function createScript(role, title, description, body) {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 14;
+const TOTAL = 15;
 let step = 0;
 
 try {
@@ -80,6 +80,12 @@ try {
     'Scaffolding roles, database, privileges, schema, content index, backup grants',
   );
   await runRbc('admin', 'db', 'scaffold', '--all', '--yes');
+
+  // 2.5) Ensure roles exist for package FKs
+  step++;
+  logStep(step, TOTAL, 'Ensuring roles for test users (FK for packages)');
+  await runRbc('admin', 'role', 'set', '--name', TEST_ROLE_USER, '--title', 'RBCTest User');
+  await runRbc('admin', 'role', 'set', '--name', TEST_ROLE_QA, '--title', 'RBCTest QA');
 
   // 3) Workflows
   step++;
