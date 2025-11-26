@@ -53,10 +53,7 @@ async function createScript(role, title, description, body) {
   return JSON.parse(out.stdout).id;
 }
 
-async function sleepInfo(ms, why) {
-  if (why) console.error(`sleep ${ms}ms: ${why}`);
-  await sleep(ms);
-}
+// Note: sleep helper removed until needed; ZX provides sleep() globally.
 
 // -----------------------------
 // Flow
@@ -171,8 +168,7 @@ try {
       'h2',
     ),
   );
-  const tInteg = idFrom(
-    await runRbcJSON(
+  await runRbcJSON(
       'admin',
       'task',
       'set',
@@ -200,8 +196,7 @@ try {
       'h2',
     ),
   );
-  const tLint = idFrom(
-    await runRbcJSON(
+  await runRbcJSON(
       'admin',
       'task',
       'set',
