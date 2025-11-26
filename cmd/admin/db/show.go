@@ -365,11 +365,9 @@ func computeAccess(ctx context.Context, db *pgxpool.Pool) (jsonAccess, error) {
         _ = db.QueryRow(ctx, `SELECT has_database_privilege($1, current_database(), 'CREATE')`, r).Scan(&canCreate)
         acc.DB = append(acc.DB, jsonDBPriv{Role: r, CanConnect: canConn, CanCreateDB: canCreate})
     }
-    // Schemas of interest: public, backup (if exists)
-    schemas := []string{"public"}
-    var backupExists bool
-    _ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name='backup')`).Scan(&backupExists)
-    if backupExists { schemas = append(schemas, "backup") }
+    // Schemas of interest: always report public and backup
+    // (If 'backup' does not exist, privilege checks will return false, which is informative.)
+    schemas := []string{"public", "backup"}
     for _, s := range schemas {
         for _, r := range roles {
             var usage, create bool
