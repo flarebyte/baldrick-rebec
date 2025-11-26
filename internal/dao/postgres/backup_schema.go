@@ -108,6 +108,15 @@ func EnsureBackupSchemaGrants(ctx context.Context, db *pgxpool.Pool, schema, rol
         // Sequence privileges for BIGSERIAL, etc.
         fmt.Sprintf("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %s TO %s", sid, rid),
         fmt.Sprintf("ALTER DEFAULT PRIVILEGES IN SCHEMA %s GRANT USAGE, SELECT ON SEQUENCES TO %s", sid, rid),
+        // Ensure ownership is consistent so backup role can manage indexes
+        fmt.Sprintf("ALTER SCHEMA %s OWNER TO %s", sid, rid),
+        fmt.Sprintf("ALTER TABLE IF EXISTS %s OWNER TO %s", qual("backups"), rid),
+        fmt.Sprintf("ALTER TABLE IF EXISTS %s OWNER TO %s", qual("entity_schema"), rid),
+        fmt.Sprintf("ALTER TABLE IF EXISTS %s OWNER TO %s", qual("entity_records"), rid),
+        fmt.Sprintf("ALTER TABLE IF EXISTS %s OWNER TO %s", qual("entity_fields"), rid),
+        fmt.Sprintf("ALTER TABLE IF EXISTS %s OWNER TO %s", qual("migrations"), rid),
+        fmt.Sprintf("ALTER SEQUENCE IF EXISTS %s OWNER TO %s", pgx.Identifier{schema, "entity_records_id_seq"}.Sanitize(), rid),
+        fmt.Sprintf("ALTER SEQUENCE IF EXISTS %s OWNER TO %s", pgx.Identifier{schema, "entity_fields_id_seq"}.Sanitize(), rid),
     }
     for i, s := range stmts {
         if _, err := db.Exec(ctx, s); err != nil {
