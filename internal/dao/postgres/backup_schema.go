@@ -95,6 +95,7 @@ func EnsureBackupSchemaGrants(ctx context.Context, db *pgxpool.Pool, schema, rol
     if schema == "" { schema = "backup" }
     sid := pgx.Identifier{schema}.Sanitize()
     rid := pgx.Identifier{role}.Sanitize()
+    qual := func(tbl string) string { return pgx.Identifier{schema, tbl}.Sanitize() }
     stmts := []string{
         // Create schema owned by role; IF NOT EXISTS avoids errors if present
         fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s", sid, rid),
