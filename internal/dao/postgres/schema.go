@@ -242,7 +242,6 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT,
             shell TEXT,
-            run_script_id UUID REFERENCES scripts(id) ON DELETE SET NULL,
             timeout INTERVAL,
             tool_workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL,
             tags JSONB DEFAULT '{}'::jsonb,
@@ -251,6 +250,36 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_variant ON tasks(variant)`,
+        // Remove legacy column if present
+        `ALTER TABLE tasks DROP COLUMN IF EXISTS run_script_id`,
+        // Task-Script attachments: associate scripts to tasks under logical names and optional aliases
+        `CREATE TABLE IF NOT EXISTS task_scripts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            script_id UUID NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            alias TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_task_scripts_task_id ON task_scripts(task_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_task_scripts_script_id ON task_scripts(script_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_task_scripts_task_name ON task_scripts(task_id, name)`,
+        `CREATE INDEX IF NOT EXISTS idx_task_scripts_task_alias ON task_scripts(task_id, alias)`,
+        // Decisions: enforce unique (task_id, name) and unique (task_id, alias) when alias present
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'task_scripts_task_name_uniq' AND conrelid = 'task_scripts'::regclass
+            ) THEN
+                ALTER TABLE task_scripts ADD CONSTRAINT task_scripts_task_name_uniq UNIQUE (task_id, name);
+            END IF;
+        END $$;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'task_scripts_task_alias_uniq'
+            ) THEN
+                CREATE UNIQUE INDEX task_scripts_task_alias_uniq ON task_scripts(task_id, alias) WHERE alias IS NOT NULL;
+            END IF;
+        END $$;`,
         // Task replacement relations (SQL graph): new_task REPLACES old_task
         `CREATE TABLE IF NOT EXISTS task_replaces (
             new_task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

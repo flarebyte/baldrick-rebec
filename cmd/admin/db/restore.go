@@ -83,7 +83,7 @@ func upsertRow(ctx context.Context, db *pgxpool.Pool, tbl string, obj rowObj, up
     case "task_variants":
         return insertGeneric(ctx, db, tbl, []col{{"variant",""},{"workflow_id",""}}, "variant", upsert, obj)
     case "tasks":
-        return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"command",""},{"variant",""},{"title",""},{"description",""},{"motivation",""},{"role_name",""},{"created",":timestamptz"},{"notes",""},{"shell",""},{"run_script_id",":uuid"},{"timeout",":interval"},{"tool_workspace_id",":uuid"},{"tags",":jsonb"},{"level",""}}, "id", upsert, obj)
+        return insertGeneric(ctx, db, tbl, []col{{"id",":uuid"},{"command",""},{"variant",""},{"title",""},{"description",""},{"motivation",""},{"role_name",""},{"created",":timestamptz"},{"notes",""},{"shell",""},{"timeout",":interval"},{"tool_workspace_id",":uuid"},{"tags",":jsonb"},{"level",""}}, "id", upsert, obj)
     case "scripts_content":
         // id is bytea (base64 in backup)
         if v, ok := obj["id"].(string); ok && v != "" {

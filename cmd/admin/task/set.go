@@ -27,8 +27,6 @@ var (
     flagTaskNotes string
     flagTaskShell string
     flagTaskRole string
-    // removed: run text script
-    flagTaskRunScript string
     flagTaskTimeout string
     flagTaskTags    []string
     flagTaskLevel   string
@@ -61,7 +59,6 @@ var setCmd = &cobra.Command{
         if flagTaskMotiv != "" { t.Motivation = sql.NullString{String: flagTaskMotiv, Valid: true} }
         if flagTaskNotes != "" { t.Notes = sql.NullString{String: flagTaskNotes, Valid: true} }
         if flagTaskShell != "" { t.Shell = sql.NullString{String: flagTaskShell, Valid: true} }
-        if strings.TrimSpace(flagTaskRunScript) != "" { t.RunScriptID = sql.NullString{String: strings.TrimSpace(flagTaskRunScript), Valid: true} }
         if flagTaskTimeout != "" { t.Timeout = sql.NullString{String: flagTaskTimeout, Valid: true} }
         if len(flagTaskTags) > 0 { t.Tags = parseTags(flagTaskTags) }
         if strings.TrimSpace(flagTaskToolWS) != "" { t.ToolWorkspaceID = sql.NullString{String: strings.TrimSpace(flagTaskToolWS), Valid: true} }
@@ -108,7 +105,6 @@ func init() {
     setCmd.Flags().StringVar(&flagTaskMotiv, "motivation", "", "Purpose or context")
     setCmd.Flags().StringVar(&flagTaskNotes, "notes", "", "Markdown notes")
     setCmd.Flags().StringVar(&flagTaskShell, "shell", "", "Shell environment (bash, python)")
-    setCmd.Flags().StringVar(&flagTaskRunScript, "run-script", "", "Script UUID to execute for this task")
     setCmd.Flags().StringVar(&flagTaskTimeout, "timeout", "", "Text interval, e.g., '5 minutes'")
     setCmd.Flags().StringSliceVar(&flagTaskTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
     setCmd.Flags().StringVar(&flagTaskLevel, "level", "", "Level: h1..h6")
