@@ -23,6 +23,12 @@ function logStep(i, total, msg) {
   console.error(`[${i}/${total}] ${msg}`);
 }
 
+function assert(cond, msg) {
+  if (!cond) {
+    throw new Error(`Assertion failed: ${msg}`);
+  }
+}
+
 async function runRbc(...args) {
   // Mirrors alias: rbc='go run main.go'
   // Use template literal to avoid shell-escaping pitfalls; ZX handles args quoting.
@@ -158,6 +164,25 @@ try {
     'Runs vet and lints',
     '#!/usr/bin/env bash\nset -euo pipefail\ngo vet ./... && echo linting...\n',
   );
+
+  // Regression: script list includes complex name; script find resolves by complex name
+  {
+    const listJSON = await runRbcJSON('admin', 'script', 'list', '--role', TEST_ROLE_USER, '--output', 'json');
+    const byId = (id) => (listJSON || []).find((x) => x && (x.id === id || x.ID === id));
+    const ju = byId(sidUnit);
+    assert(ju, 'script list json missing unit script');
+    assert(ju.name === 'Unit: go test', 'unit script name mismatch in list json');
+    assert((ju.variant ?? '') === '', 'unit script variant should be empty in list json');
+
+    const ji = byId(sidInteg);
+    assert(ji && ji.name === 'Integration: compose+test', 'integration script not present or name mismatch');
+
+    const jl = byId(sidLint);
+    assert(jl && jl.name === 'Lint & Vet', 'lint script not present or name mismatch');
+
+    const foundUnit = await runRbcJSON('admin', 'script', 'find', '--name', 'Unit: go test', '--variant', '', '--role', TEST_ROLE_USER);
+    assert(foundUnit && foundUnit.id === sidUnit, 'script find did not resolve unit by complex name');
+  }
 
   // 5) Tasks
   step++;
