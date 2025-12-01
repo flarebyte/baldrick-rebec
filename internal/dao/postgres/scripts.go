@@ -30,8 +30,8 @@ type Script struct {
 }
 
 type ScriptComplexName struct {
-    Name    string
-    Variant string
+    Name    string `json:"name"`
+    Variant string `json:"variant"`
 }
 
 // InsertScriptContent ensures a content row exists for the given text and returns its hex id.

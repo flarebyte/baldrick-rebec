@@ -27,8 +27,8 @@ type Stickie struct {
 }
 
 type StickieComplexName struct {
-    Name    string
-    Variant string
+    Name    string `json:"name"`
+    Variant string `json:"variant"`
 }
 
 // UpsertStickie inserts a new stickie if ID is empty, otherwise updates it.
