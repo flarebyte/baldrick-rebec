@@ -158,33 +158,9 @@ try {
   const st2 = idFrom(await stickieSet({ blackboard: bb1, topicName: 'devops', topicRole: TEST_ROLE_USER, note: 'Evaluate GitHub Actions caching for go build', labels: ['idea','devops'], priority: 'could', name: 'DevOps Caching', variant: '' }));
   const st3 = idFrom(await stickieSet({ blackboard: bb2, note: 'Team retro every Friday', labels: ['team','ritual'], priority: 'must', name: 'Team Retro', variant: '' }));
 
-  await runRbc('admin', 'stickie-rel', 'set', '--from', st1, '--to', st2, '--type', 'uses', '--labels', 'ref,dependency');
-  await runRbc(
-    'admin',
-    'stickie-rel',
-    'set',
-    '--from',
-    st2,
-    '--to',
-    st3,
-    '--type',
-    'includes',
-    '--labels',
-    'backlog',
-  );
-  await runRbc(
-    'admin',
-    'stickie-rel',
-    'set',
-    '--from',
-    st1,
-    '--to',
-    st3,
-    '--type',
-    'contrasts_with',
-    '--labels',
-    'tradeoff',
-  );
+  await stickieRelSet({ from: st1, to: st2, type: 'uses', labels: 'ref,dependency' });
+  await stickieRelSet({ from: st2, to: st3, type: 'includes', labels: 'backlog' });
+  await stickieRelSet({ from: st1, to: st3, type: 'contrasts_with', labels: 'tradeoff' });
 
   // 10) Workspaces, Packages
   step++;
