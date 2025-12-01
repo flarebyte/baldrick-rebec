@@ -822,6 +822,17 @@ try {
     '--limit',
     '50',
   );
+  // Regression: stickie list includes complex name; stickie find resolves by complex name and blackboard
+  {
+    const stList = await runRbcJSON('admin', 'stickie', 'list', '--blackboard', bb1, '--output', 'json');
+    const byId = (id) => (stList || []).find((x) => x && (x.id === id || x.ID === id));
+    const s1json = byId(st1);
+    assert(s1json && s1json.name === 'Onboarding Refresh', 'stickie list json missing or wrong name for st1');
+    const s2json = byId(st2);
+    assert(s2json && s2json.name === 'DevOps Caching', 'stickie list json missing or wrong name for st2');
+    const f1 = await runRbcJSON('admin', 'stickie', 'find', '--name', 'Onboarding Refresh', '--variant', '', '--blackboard', bb1);
+    assert(f1 && f1.id === st1, 'stickie find did not resolve st1 by complex name within board');
+  }
   await runRbc(
     'admin',
     'stickie',

@@ -128,3 +128,48 @@ func DeleteStickie(ctx context.Context, db *pgxpool.Pool, id string) (int64, err
     if err != nil { return 0, dbutil.ErrWrap("stickie.delete", err, dbutil.ParamSummary("id", id)) }
     return ct.RowsAffected(), nil
 }
+
+// GetStickieByComplexName performs exact lookup on (complex_name.name, complex_name.variant) with archived flag.
+func GetStickieByComplexName(ctx context.Context, db *pgxpool.Pool, name, variant string, archived bool) (*Stickie, error) {
+    const q = `
+        SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, labels,
+               created, updated, created_by_task_id::text, edit_count, priority_level, complex_name, archived
+        FROM stickies
+        WHERE (complex_name->>'name') = $1
+          AND (complex_name->>'variant') = $2
+          AND archived = $3
+        ORDER BY updated DESC
+        LIMIT 1`
+    var s Stickie
+    var cnJSON []byte
+    if err := db.QueryRow(ctx, q, name, variant, archived).
+        Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Labels,
+            &s.Created, &s.Updated, &s.CreatedByTaskID, &s.EditCount, &s.PriorityLevel, &cnJSON, &s.Archived); err != nil {
+        return nil, dbutil.ErrWrap("stickie.get_by_complex_name", err, dbutil.ParamSummary("name", name), dbutil.ParamSummary("variant", variant), dbutil.ParamSummary("archived", archived))
+    }
+    if len(cnJSON) > 0 { _ = json.Unmarshal(cnJSON, &s.ComplexName) }
+    return &s, nil
+}
+
+// GetStickieByComplexNameInBlackboard exact lookup constrained by blackboard UUID.
+func GetStickieByComplexNameInBlackboard(ctx context.Context, db *pgxpool.Pool, name, variant string, archived bool, blackboardID string) (*Stickie, error) {
+    const q = `
+        SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, labels,
+               created, updated, created_by_task_id::text, edit_count, priority_level, complex_name, archived
+        FROM stickies
+        WHERE blackboard_id = $1::uuid
+          AND (complex_name->>'name') = $2
+          AND (complex_name->>'variant') = $3
+          AND archived = $4
+        ORDER BY updated DESC
+        LIMIT 1`
+    var s Stickie
+    var cnJSON []byte
+    if err := db.QueryRow(ctx, q, blackboardID, name, variant, archived).
+        Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Labels,
+            &s.Created, &s.Updated, &s.CreatedByTaskID, &s.EditCount, &s.PriorityLevel, &cnJSON, &s.Archived); err != nil {
+        return nil, dbutil.ErrWrap("stickie.get_by_complex_name_board", err, dbutil.ParamSummary("board", blackboardID), dbutil.ParamSummary("name", name), dbutil.ParamSummary("variant", variant), dbutil.ParamSummary("archived", archived))
+    }
+    if len(cnJSON) > 0 { _ = json.Unmarshal(cnJSON, &s.ComplexName) }
+    return &s, nil
+}
