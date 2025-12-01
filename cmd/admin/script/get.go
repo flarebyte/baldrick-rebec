@@ -41,6 +41,11 @@ var getCmd = &cobra.Command{
             "role": s.RoleName,
             "content_id": s.ScriptContentID,
         }
+        if s.ComplexName.Name != "" || s.ComplexName.Variant != "" {
+            out["name"] = s.ComplexName.Name
+            out["variant"] = s.ComplexName.Variant
+        }
+        if s.Archived { out["archived"] = true }
         if s.Created.Valid { out["created"] = s.Created.Time.Format(time.RFC3339Nano) }
         if s.Updated.Valid { out["updated"] = s.Updated.Time.Format(time.RFC3339Nano) }
         if s.Description.Valid && s.Description.String != "" { out["description"] = s.Description.String }
@@ -55,4 +60,3 @@ func init() {
     ScriptCmd.AddCommand(getCmd)
     getCmd.Flags().StringVar(&flagScrGetID, "id", "", "Script UUID (required)")
 }
-

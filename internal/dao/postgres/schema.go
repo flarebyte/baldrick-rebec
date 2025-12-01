@@ -117,7 +117,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             script_content TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
-        // Scripts: metadata referencing content by hash
+        // Scripts: metadata referencing content by hash (with complex_name and archived)
         `CREATE TABLE IF NOT EXISTS scripts (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             title TEXT NOT NULL,
@@ -127,6 +127,8 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             script_content_id BYTEA,
             role_name TEXT NOT NULL DEFAULT 'user',
             tags JSONB DEFAULT '{}'::jsonb,
+            complex_name JSONB NOT NULL,
+            archived BOOLEAN NOT NULL DEFAULT FALSE,
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
@@ -141,6 +143,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_scripts_role_name ON scripts(role_name)`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_complex_name ON scripts ((complex_name->>'name'), (complex_name->>'variant')) WHERE archived = FALSE`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_updated ON scripts (updated DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_complex_name_gin ON scripts USING GIN (complex_name jsonb_path_ops)`,
         // Workspaces table associated to a role (and optional project)
         `CREATE TABLE IF NOT EXISTS workspaces (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -171,7 +176,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             script_content TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
-        // Scripts: metadata referencing content by hash
+        // Scripts: metadata referencing content by hash (with complex_name and archived)
         `CREATE TABLE IF NOT EXISTS scripts (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             title TEXT NOT NULL,
@@ -181,6 +186,8 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             script_content_id BYTEA,
             role_name TEXT NOT NULL DEFAULT 'user',
             tags JSONB DEFAULT '{}'::jsonb,
+            complex_name JSONB NOT NULL,
+            archived BOOLEAN NOT NULL DEFAULT FALSE,
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
@@ -195,6 +202,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_scripts_role_name ON scripts(role_name)`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_complex_name ON scripts ((complex_name->>'name'), (complex_name->>'variant')) WHERE archived = FALSE`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_updated ON scripts (updated DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_complex_name_gin ON scripts USING GIN (complex_name jsonb_path_ops)`,
         `CREATE INDEX IF NOT EXISTS idx_tags_role_name ON tags(role_name)`,
         `DO $$ BEGIN
             IF NOT EXISTS (
