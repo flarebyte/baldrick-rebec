@@ -17,48 +17,23 @@ const SKIP_RESET = argv['skip-reset'] ?? false;
 const SKIP_SNAPSHOT = argv['skip-snapshot'] ?? false;
 
 // -----------------------------
-// Helpers
+// Helpers (shared)
 // -----------------------------
-function logStep(i, total, msg) {
-  console.error(`[${i}/${total}] ${msg}`);
-}
-
-function assert(cond, msg) {
-  if (!cond) {
-    throw new Error(`Assertion failed: ${msg}`);
-  }
-}
-
-async function runRbc(...args) {
-  // Mirrors alias: rbc='go run main.go'
-  // Use template literal to avoid shell-escaping pitfalls; ZX handles args quoting.
-  return await $`go run main.go ${args}`;
-}
-
-async function runRbcJSON(...args) {
-  const p = await runRbc(...args);
-  try {
-    return JSON.parse(p.stdout || 'null');
-  } catch (err) {
-    console.error('Failed to parse JSON from:', args.join(' '));
-    console.error(p.stdout);
-    throw err;
-  }
-}
-
-function idFrom(obj) {
-  if (!obj || typeof obj !== 'object') return '';
-  return obj.id || obj.ID || '';
-}
-
-async function createScript(role, title, description, body) {
-  // Send script body via stdin to avoid shell quoting pitfalls in ZX.
-  const proc = $`go run main.go admin script set --role ${role} --title ${title} --description ${description}`;
-  proc.stdin.write(body);
-  proc.stdin.end();
-  const out = await proc;
-  return JSON.parse(out.stdout).id;
-}
+import {
+  runRbc,
+  runRbcJSON,
+  idFrom,
+  logStep,
+  assert,
+  createScript,
+  runSetRole,
+  runSetWorkflow,
+  scriptListJSON,
+  scriptFind,
+  stickieListJSON,
+  stickieFind,
+  stickieSet,
+} from './cli-helper.mjs';
 
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 
@@ -90,58 +65,14 @@ try {
   // 2.5) Ensure roles exist for package FKs
   step++;
   logStep(step, TOTAL, 'Ensuring roles for test users (FK for packages)');
-  await runRbc(
-    'admin',
-    'role',
-    'set',
-    '--name',
-    TEST_ROLE_USER,
-    '--title',
-    'RBCTest User',
-  );
-  await runRbc(
-    'admin',
-    'role',
-    'set',
-    '--name',
-    TEST_ROLE_QA,
-    '--title',
-    'RBCTest QA',
-  );
+  await runSetRole({ name: TEST_ROLE_USER, title: 'RBCTest User' });
+  await runSetRole({ name: TEST_ROLE_QA, title: 'RBCTest QA' });
 
   // 3) Workflows
   step++;
   logStep(step, TOTAL, 'Creating workflows');
-  await runRbc(
-    'admin',
-    'workflow',
-    'set',
-    '--name',
-    'ci-test',
-    '--title',
-    'Continuous Integration: Test Suite',
-    '--description',
-    'Runs unit and integration tests.',
-    '--notes',
-    'CI test workflow',
-    '--role',
-    TEST_ROLE_USER,
-  );
-  await runRbc(
-    'admin',
-    'workflow',
-    'set',
-    '--name',
-    'ci-lint',
-    '--title',
-    'Continuous Integration: Lint & Format',
-    '--description',
-    'Lints and vets the codebase.',
-    '--notes',
-    'CI lint workflow',
-    '--role',
-    TEST_ROLE_USER,
-  );
+  await runSetWorkflow({ name: 'ci-test', title: 'Continuous Integration: Test Suite', description: 'Runs unit and integration tests.', notes: 'CI test workflow', role: TEST_ROLE_USER });
+  await runSetWorkflow({ name: 'ci-lint', title: 'Continuous Integration: Lint & Format', description: 'Lints and vets the codebase.', notes: 'CI lint workflow', role: TEST_ROLE_USER });
 
   // 4) Scripts
   step++;
