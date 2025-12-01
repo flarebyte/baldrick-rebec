@@ -51,6 +51,8 @@ import {
   queueSize,
   queueTake,
   projectSet,
+  tagSet,
+  topicSet,
   storeSet,
   workspaceSet,
   packageSet,
