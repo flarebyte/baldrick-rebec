@@ -48,7 +48,7 @@ try {
   step++;
   if (!SKIP_RESET) {
     logStep(step, TOTAL, 'Resetting database (destructive)');
-    await runRbc('admin', 'db', 'reset', '--force', '--drop-app-role=false');
+    await dbReset({ dropAppRole: false });
   } else {
     logStep(step, TOTAL, 'Skipping reset (--skip-reset)');
   }
@@ -60,7 +60,7 @@ try {
     TOTAL,
     'Scaffolding roles, database, privileges, schema, content index, backup grants',
   );
-  await runRbc('admin', 'db', 'scaffold', '--all', '--yes');
+  await dbScaffoldAll();
 
   // 2.5) Ensure roles exist for package FKs
   step++;
@@ -123,177 +123,27 @@ try {
   await runSetTask({ workflow: 'ci-lint', command: 'lint', variant: 'go', role: TEST_ROLE_USER, title: 'Lint & Vet', description: 'Runs vet and lints.', shell: 'bash', timeout: '5 minutes', tags: 'lint,style', level: 'h2' });
 
   // Replacements
-  await runRbc(
-    'admin',
-    'task',
-    'set',
-    '--workflow',
-    'ci-test',
-    '--command',
-    'unit',
-    '--variant',
-    'go-patch1',
-    '--role',
-    TEST_ROLE_USER,
-    '--title',
-    'Run Unit Tests (Quick)',
-    '--description',
-    'Patch: run quick subset',
-    '--shell',
-    'bash',
-    '--replaces',
-    tUnit,
-    '--replace-level',
-    'patch',
-    '--replace-comment',
-    'Flaky test workaround',
-  );
-  await runRbc(
-    'admin',
-    'task',
-    'set',
-    '--workflow',
-    'ci-test',
-    '--command',
-    'unit',
-    '--variant',
-    'go-minor1',
-    '--role',
-    TEST_ROLE_USER,
-    '--title',
-    'Run Unit Tests (Race)',
-    '--description',
-    'Minor: enable race detector',
-    '--shell',
-    'bash',
-    '--replaces',
-    tUnit,
-    '--replace-level',
-    'minor',
-    '--replace-comment',
-    'Add -race',
-  );
+  await taskSetReplacement({ workflow: 'ci-test', command: 'unit', variant: 'go-patch1', role: TEST_ROLE_USER, title: 'Run Unit Tests (Quick)', description: 'Patch: run quick subset', shell: 'bash', replaces: tUnit, replaceLevel: 'patch', replaceComment: 'Flaky test workaround' });
+  await taskSetReplacement({ workflow: 'ci-test', command: 'unit', variant: 'go-minor1', role: TEST_ROLE_USER, title: 'Run Unit Tests (Race)', description: 'Minor: enable race detector', shell: 'bash', replaces: tUnit, replaceLevel: 'minor', replaceComment: 'Add -race' });
 
   // 6) Tags & Topics
   step++;
   logStep(step, TOTAL, 'Creating tags and topics');
-  await runRbc(
-    'admin',
-    'tag',
-    'set',
-    '--name',
-    'priority-high',
-    '--title',
-    'High Priority',
-    '--role',
-    TEST_ROLE_USER,
-  );
-  await runRbc(
-    'admin',
-    'topic',
-    'set',
-    '--name',
-    'onboarding',
-    '--role',
-    TEST_ROLE_USER,
-    '--title',
-    'Onboarding',
-    '--description',
-    'New hires onboarding',
-    '--tags',
-    'area=people,priority=med',
-  );
-  await runRbc(
-    'admin',
-    'topic',
-    'set',
-    '--name',
-    'devops',
-    '--role',
-    TEST_ROLE_USER,
-    '--title',
-    'DevOps',
-    '--description',
-    'Build, deploy, CI/CD',
-    '--tags',
-    'area=platform,priority=high',
-  );
+  await tagSet({ name: 'priority-high', title: 'High Priority', role: TEST_ROLE_USER });
+  await topicSet({ name: 'onboarding', role: TEST_ROLE_USER, title: 'Onboarding', description: 'New hires onboarding', tags: 'area=people,priority=med' });
+  await topicSet({ name: 'devops', role: TEST_ROLE_USER, title: 'DevOps', description: 'Build, deploy, CI/CD', tags: 'area=platform,priority=high' });
 
   // 7) Projects
   step++;
   logStep(step, TOTAL, 'Creating projects');
-  await runRbc(
-    'admin',
-    'project',
-    'set',
-    '--name',
-    'acme/build-system',
-    '--role',
-    TEST_ROLE_USER,
-    '--description',
-    'Build system and CI pipeline',
-    '--tags',
-    'status=active,type=ci',
-  );
-  await runRbc(
-    'admin',
-    'project',
-    'set',
-    '--name',
-    'acme/product',
-    '--role',
-    TEST_ROLE_USER,
-    '--description',
-    'Main product',
-    '--tags',
-    'status=active,type=app',
-  );
+  await projectSet({ name: 'acme/build-system', role: TEST_ROLE_USER, description: 'Build system and CI pipeline', tags: 'status=active,type=ci' });
+  await projectSet({ name: 'acme/product', role: TEST_ROLE_USER, description: 'Main product', tags: 'status=active,type=app' });
 
   // 8) Stores & Blackboards
   step++;
   logStep(step, TOTAL, 'Creating stores and blackboards');
-  await runRbc(
-    'admin',
-    'store',
-    'set',
-    '--name',
-    'ideas-acme-build',
-    '--role',
-    TEST_ROLE_USER,
-    '--title',
-    'Ideas for acme/build-system',
-    '--description',
-    'Idea backlog',
-    '--type',
-    'journal',
-    '--scope',
-    'project',
-    '--lifecycle',
-    'monthly',
-    '--tags',
-    'topic=ideas,project=acme/build-system',
-  );
-  await runRbc(
-    'admin',
-    'store',
-    'set',
-    '--name',
-    'blackboard-global',
-    '--role',
-    TEST_ROLE_USER,
-    '--title',
-    'Shared Blackboard',
-    '--description',
-    'Scratch space for team',
-    '--type',
-    'blackboard',
-    '--scope',
-    'shared',
-    '--lifecycle',
-    'weekly',
-    '--tags',
-    'visibility=team',
-  );
+  await storeSet({ name: 'ideas-acme-build', role: TEST_ROLE_USER, title: 'Ideas for acme/build-system', description: 'Idea backlog', type: 'journal', scope: 'project', lifecycle: 'monthly', tags: 'topic=ideas,project=acme/build-system' });
+  await storeSet({ name: 'blackboard-global', role: TEST_ROLE_USER, title: 'Shared Blackboard', description: 'Scratch space for team', type: 'blackboard', scope: 'shared', lifecycle: 'weekly', tags: 'visibility=team' });
 
   const s1 = idFrom(await storeGet({ name: 'ideas-acme-build', role: TEST_ROLE_USER }));
   const s2 = idFrom(await storeGet({ name: 'blackboard-global', role: TEST_ROLE_USER }));
@@ -308,19 +158,7 @@ try {
   const st2 = idFrom(await stickieSet({ blackboard: bb1, topicName: 'devops', topicRole: TEST_ROLE_USER, note: 'Evaluate GitHub Actions caching for go build', labels: ['idea','devops'], priority: 'could', name: 'DevOps Caching', variant: '' }));
   const st3 = idFrom(await stickieSet({ blackboard: bb2, note: 'Team retro every Friday', labels: ['team','ritual'], priority: 'must', name: 'Team Retro', variant: '' }));
 
-  await runRbc(
-    'admin',
-    'stickie-rel',
-    'set',
-    '--from',
-    st1,
-    '--to',
-    st2,
-    '--type',
-    'uses',
-    '--labels',
-    'ref,dependency',
-  );
+  await runRbc('admin', 'stickie-rel', 'set', '--from', st1, '--to', st2, '--type', 'uses', '--labels', 'ref,dependency');
   await runRbc(
     'admin',
     'stickie-rel',
@@ -351,60 +189,12 @@ try {
   // 10) Workspaces, Packages
   step++;
   logStep(step, TOTAL, 'Creating workspaces and packages');
-  await runRbc(
-    'admin',
-    'workspace',
-    'set',
-    '--role',
-    TEST_ROLE_USER,
-    '--project',
-    'acme/build-system',
-    '--description',
-    'Local build-system workspace',
-    '--tags',
-    'status=active',
-  );
-  await runRbc(
-    'admin',
-    'workspace',
-    'set',
-    '--role',
-    TEST_ROLE_USER,
-    '--project',
-    'acme/product',
-    '--description',
-    'Local product workspace',
-    '--tags',
-    'status=active',
-  );
+  await workspaceSet({ role: TEST_ROLE_USER, project: 'acme/build-system', description: 'Local build-system workspace', tags: 'status=active' });
+  await workspaceSet({ role: TEST_ROLE_USER, project: 'acme/product', description: 'Local product workspace', tags: 'status=active' });
 
-  await runRbc(
-    'admin',
-    'package',
-    'set',
-    '--role',
-    TEST_ROLE_USER,
-    '--variant',
-    'unit/go',
-  );
-  await runRbc(
-    'admin',
-    'package',
-    'set',
-    '--role',
-    TEST_ROLE_QA,
-    '--variant',
-    'integration',
-  );
-  await runRbc(
-    'admin',
-    'package',
-    'set',
-    '--role',
-    TEST_ROLE_USER,
-    '--variant',
-    'lint/go',
-  );
+  await packageSet({ role: TEST_ROLE_USER, variant: 'unit/go' });
+  await packageSet({ role: TEST_ROLE_QA, variant: 'integration' });
+  await packageSet({ role: TEST_ROLE_USER, variant: 'lint/go' });
 
   // 11) Conversation, Experiment, Messages & Queue
   step++;
@@ -418,161 +208,41 @@ try {
   await $`echo "Onboarding checklist updated" | go run main.go admin message set --experiment ${expID} --title DocsUpdate --tags docs,update --role ${TEST_ROLE_USER}`;
 
   const q1 = idFrom(await queueAdd({ description: 'Run quick unit subset', status: 'Waiting', why: 'waiting for CI window', tags: 'kind=test,priority=low' }));
-  await runRbc(
-    'admin',
-    'queue',
-    'add',
-    '--description',
-    'Run full integration suite',
-    '--status',
-    'Buildable',
-    '--tags',
-    'kind=test,priority=high',
-  );
-  await runRbc(
-    'admin',
-    'queue',
-    'add',
-    '--description',
-    'Strict lint pass',
-    '--status',
-    'Blocked',
-    '--why',
-    'env not ready',
-    '--tags',
-    'kind=lint',
-  );
+  await queueAdd({ description: 'Run full integration suite', status: 'Buildable', tags: 'kind=test,priority=high' });
+  await queueAdd({ description: 'Strict lint pass', status: 'Blocked', why: 'env not ready', tags: 'kind=lint' });
 
-  await runRbc('admin', 'queue', 'peek', '--limit', '2');
-  await runRbc('admin', 'queue', 'size');
-  await runRbc('admin', 'queue', 'take', '--id', q1);
+  await queuePeek({ limit: 2 });
+  await queueSize();
+  await queueTake({ id: q1 });
 
   // 12) Listings & counts
   step++;
   logStep(step, TOTAL, 'Listing entities and counts (per-role and JSON)');
-  await runRbc(
-    'admin',
-    'workflow',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc(
-    'admin',
-    'task',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc(
-    'admin',
-    'conversation',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc('admin', 'experiment', 'list', '--limit', '50');
-  await runRbc(
-    'admin',
-    'message',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc(
-    'admin',
-    'project',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc(
-    'admin',
-    'workspace',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc(
-    'admin',
-    'script',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc(
-    'admin',
-    'store',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc(
-    'admin',
-    'topic',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc(
-    'admin',
-    'blackboard',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc('admin', 'stickie', 'list', '--limit', '50');
-  await runRbc(
-    'admin',
-    'stickie',
-    'list',
-    '--blackboard',
-    bb1,
-    '--limit',
-    '50',
-  );
+  await listWithRole('workflow', TEST_ROLE_USER, 50);
+  await listWithRole('task', TEST_ROLE_USER, 50);
+  await listWithRole('conversation', TEST_ROLE_USER, 50);
+  await experimentList(50);
+  await listWithRole('message', TEST_ROLE_USER, 50);
+  await listWithRole('project', TEST_ROLE_USER, 50);
+  await listWithRole('workspace', TEST_ROLE_USER, 50);
+  await listWithRole('script', TEST_ROLE_USER, 50);
+  await listWithRole('store', TEST_ROLE_USER, 50);
+  await listWithRole('topic', TEST_ROLE_USER, 50);
+  await listWithRole('blackboard', TEST_ROLE_USER, 50);
+  await stickieList(50);
+  await stickieListByBlackboard({ blackboard: bb1, limit: 50 });
   // Regression: stickie list includes complex name; stickie find resolves by complex name and blackboard
   {
-    const stList = await runRbcJSON('admin', 'stickie', 'list', '--blackboard', bb1, '--output', 'json');
+  const stList = await stickieListJSON({ blackboard: bb1 });
     const byId = (id) => (stList || []).find((x) => x && (x.id === id || x.ID === id));
     const s1json = byId(st1);
     assert(s1json && s1json.name === 'Onboarding Refresh', 'stickie list json missing or wrong name for st1');
     const s2json = byId(st2);
     assert(s2json && s2json.name === 'DevOps Caching', 'stickie list json missing or wrong name for st2');
-    const f1 = await runRbcJSON('admin', 'stickie', 'find', '--name', 'Onboarding Refresh', '--variant', '', '--blackboard', bb1);
+  const f1 = await stickieFind({ name: 'Onboarding Refresh', variant: '', blackboard: bb1 });
     assert(f1 && f1.id === st1, 'stickie find did not resolve st1 by complex name within board');
   }
-  await runRbc(
-    'admin',
-    'stickie',
-    'list',
-    '--topic-name',
-    'devops',
-    '--topic-role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
+  await stickieListByTopic({ topicName: 'devops', topicRole: TEST_ROLE_USER, limit: 50 });
   await runRbc(
     'admin',
     'stickie-rel',
@@ -594,17 +264,9 @@ try {
     'uses',
     '--ignore-missing',
   );
-  await runRbc(
-    'admin',
-    'tag',
-    'list',
-    '--role',
-    TEST_ROLE_USER,
-    '--limit',
-    '50',
-  );
-  await runRbc('admin', 'db', 'count', '--per-role');
-  await runRbc('admin', 'db', 'count', '--json');
+  await listWithRole('tag', TEST_ROLE_USER, 50);
+  await dbCountPerRole();
+  await dbCountJSON();
 
   // 13) Snapshot (backup/list/show/restore-dry/delete)
   step++;
@@ -614,29 +276,12 @@ try {
       TOTAL,
       'Snapshot backup smoke test (backup/list/show/restore dry-run/delete)',
     );
-    const bkp = await runRbcJSON(
-      'admin',
-      'snapshot',
-      'backup',
-      '--description',
-      'rbctest snapshot',
-      '--who',
-      TEST_ROLE_USER,
-      '--json',
-    );
+    const bkp = await snapshotBackupJSON({ description: 'rbctest snapshot', who: TEST_ROLE_USER });
     const bkpID = idFrom(bkp);
-    await runRbc('admin', 'snapshot', 'list', '--limit', '5');
-    await runRbc('admin', 'snapshot', 'show', bkpID);
-    await runRbc(
-      'admin',
-      'snapshot',
-      'restore',
-      bkpID,
-      '--mode',
-      'append',
-      '--dry-run',
-    );
-    await runRbc('admin', 'snapshot', 'delete', bkpID, '--force');
+    await snapshotList({ limit: 5 });
+    await snapshotShow({ id: bkpID });
+    await snapshotRestoreDry({ id: bkpID, mode: 'append' });
+    await snapshotDelete({ id: bkpID });
   } else {
     logStep(step, TOTAL, 'Skipping snapshot (--skip-snapshot)');
   }

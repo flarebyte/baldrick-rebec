@@ -159,3 +159,87 @@ export async function stickieFind({ name, variant = '', archived = false, blackb
   if (blackboard) args.push('--blackboard', blackboard);
   return await runRbcJSON(...args);
 }
+
+// Non-JSON convenience wrappers
+export async function dbReset({ dropAppRole = false } = {}) {
+  return await runRbc('admin', 'db', 'reset', '--force', `--drop-app-role=${dropAppRole ? 'true' : 'false'}`);
+}
+
+export async function dbScaffoldAll() {
+  return await runRbc('admin', 'db', 'scaffold', '--all', '--yes');
+}
+
+export async function taskSetReplacement({ workflow, command, variant = '', role = 'user', title = '', description = '', shell = '', replaces = '', replaceLevel = '', replaceComment = '' }) {
+  const args = ['admin', 'task', 'set', '--workflow', workflow, '--command', command, '--variant', variant, '--role', role];
+  if (title) args.push('--title', title);
+  if (description) args.push('--description', description);
+  if (shell) args.push('--shell', shell);
+  if (replaces) args.push('--replaces', replaces);
+  if (replaceLevel) args.push('--replace-level', replaceLevel);
+  if (replaceComment) args.push('--replace-comment', replaceComment);
+  return await runRbc(...args);
+}
+
+export async function tagSet({ name, title, role = 'user' }) {
+  return await runRbc('admin', 'tag', 'set', '--name', name, '--title', title, '--role', role);
+}
+
+export async function topicSet({ name, role = 'user', title, description = '', tags = '' }) {
+  const args = ['admin', 'topic', 'set', '--name', name, '--role', role, '--title', title];
+  if (description) args.push('--description', description);
+  if (tags) args.push('--tags', tags);
+  return await runRbc(...args);
+}
+
+export async function projectSet({ name, role = 'user', description = '', tags = '' }) {
+  const args = ['admin', 'project', 'set', '--name', name, '--role', role];
+  if (description) args.push('--description', description);
+  if (tags) args.push('--tags', tags);
+  return await runRbc(...args);
+}
+
+export async function storeSet({ name, role = 'user', title = '', description = '', type = '', scope = '', lifecycle = '', tags = '' }) {
+  const args = ['admin', 'store', 'set', '--name', name, '--role', role];
+  if (title) args.push('--title', title);
+  if (description) args.push('--description', description);
+  if (type) args.push('--type', type);
+  if (scope) args.push('--scope', scope);
+  if (lifecycle) args.push('--lifecycle', lifecycle);
+  if (tags) args.push('--tags', tags);
+  return await runRbc(...args);
+}
+
+export async function workspaceSet({ role = 'user', project = '', description = '', tags = '' }) {
+  const args = ['admin', 'workspace', 'set', '--role', role];
+  if (project) args.push('--project', project);
+  if (description) args.push('--description', description);
+  if (tags) args.push('--tags', tags);
+  return await runRbc(...args);
+}
+
+export async function packageSet({ role = 'user', variant }) {
+  return await runRbc('admin', 'package', 'set', '--role', role, '--variant', variant);
+}
+
+export async function queuePeek({ limit = 2 } = {}) { return await runRbc('admin', 'queue', 'peek', '--limit', String(limit)); }
+export async function queueSize() { return await runRbc('admin', 'queue', 'size'); }
+export async function queueTake({ id }) { return await runRbc('admin', 'queue', 'take', '--id', id); }
+
+export async function listWithRole(cmd, role, limit = 50) {
+  return await runRbc('admin', cmd, 'list', '--role', role, '--limit', String(limit));
+}
+export async function experimentList(limit = 50) { return await runRbc('admin', 'experiment', 'list', '--limit', String(limit)); }
+export async function stickieList(limit = 50) { return await runRbc('admin', 'stickie', 'list', '--limit', String(limit)); }
+export async function stickieListByBlackboard({ blackboard, limit = 50 }) { return await runRbc('admin', 'stickie', 'list', '--blackboard', blackboard, '--limit', String(limit)); }
+export async function stickieListByTopic({ topicName, topicRole, limit = 50 }) { return await runRbc('admin', 'stickie', 'list', '--topic-name', topicName, '--topic-role', topicRole, '--limit', String(limit)); }
+
+export async function dbCountPerRole() { return await runRbc('admin', 'db', 'count', '--per-role'); }
+export async function dbCountJSON() { return await runRbc('admin', 'db', 'count', '--json'); }
+
+export async function snapshotBackupJSON({ description, who }) {
+  return await runRbcJSON('admin', 'snapshot', 'backup', '--description', description, '--who', who, '--json');
+}
+export async function snapshotList({ limit = 5 } = {}) { return await runRbc('admin', 'snapshot', 'list', '--limit', String(limit)); }
+export async function snapshotShow({ id }) { return await runRbc('admin', 'snapshot', 'show', id); }
+export async function snapshotRestoreDry({ id, mode = 'append' }) { return await runRbc('admin', 'snapshot', 'restore', id, '--mode', mode, '--dry-run'); }
+export async function snapshotDelete({ id }) { return await runRbc('admin', 'snapshot', 'delete', id, '--force'); }
