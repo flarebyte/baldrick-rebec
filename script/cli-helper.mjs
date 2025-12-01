@@ -89,6 +89,45 @@ export async function scriptFind({ name, variant = '', archived = false, role = 
   return await runRbcJSON(...args);
 }
 
+export async function runSetTask({ workflow, command, variant = '', role = 'user', title = '', description = '', shell = '', timeout = '', tags = '', level = '' }) {
+  const args = ['admin', 'task', 'set', '--workflow', workflow, '--command', command, '--variant', variant, '--role', role];
+  if (title) args.push('--title', title);
+  if (description) args.push('--description', description);
+  if (shell) args.push('--shell', shell);
+  if (timeout) args.push('--timeout', timeout);
+  if (tags) args.push('--tags', tags);
+  if (level) args.push('--level', level);
+  return await runRbcJSON(...args);
+}
+
+export async function storeGet({ name, role = 'user' }) {
+  return await runRbcJSON('admin', 'store', 'get', '--name', name, '--role', role);
+}
+
+export async function blackboardSet({ role = 'user', storeId, project = '', background = '', guidelines = '' }) {
+  const args = ['admin', 'blackboard', 'set', '--role', role, '--store-id', storeId];
+  if (project) args.push('--project', project);
+  if (background) args.push('--background', background);
+  if (guidelines) args.push('--guidelines', guidelines);
+  return await runRbcJSON(...args);
+}
+
+export async function conversationSet({ title, role = 'user' }) {
+  return await runRbcJSON('admin', 'conversation', 'set', '--title', title, '--role', role);
+}
+
+export async function experimentCreate({ conversation }) {
+  return await runRbcJSON('admin', 'experiment', 'create', '--conversation', conversation);
+}
+
+export async function queueAdd({ description, status = '', why = '', tags = '' }) {
+  const args = ['admin', 'queue', 'add', '--description', description];
+  if (status) args.push('--status', status);
+  if (why) args.push('--why', why);
+  if (tags) args.push('--tags', tags);
+  return await runRbcJSON(...args);
+}
+
 export async function stickieSet({ id = '', blackboard, topicName = '', topicRole = '', note = '', labels = [], createdByTask = '', priority = '', name = '', variant = '', archived = false }) {
   const args = ['admin', 'stickie', 'set'];
   if (id) args.push('--id', id);
@@ -120,4 +159,3 @@ export async function stickieFind({ name, variant = '', archived = false, blackb
   if (blackboard) args.push('--blackboard', blackboard);
   return await runRbcJSON(...args);
 }
-

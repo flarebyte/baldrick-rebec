@@ -98,7 +98,7 @@ try {
 
   // Regression: script list includes complex name; script find resolves by complex name
   {
-    const listJSON = await runRbcJSON('admin', 'script', 'list', '--role', TEST_ROLE_USER, '--output', 'json');
+    const listJSON = await scriptListJSON({ role: TEST_ROLE_USER });
     const byId = (id) => (listJSON || []).find((x) => x && (x.id === id || x.ID === id));
     const ju = byId(sidUnit);
     assert(ju, 'script list json missing unit script');
@@ -111,90 +111,16 @@ try {
     const jl = byId(sidLint);
     assert(jl && jl.name === 'Lint & Vet', 'lint script not present or name mismatch');
 
-    const foundUnit = await runRbcJSON('admin', 'script', 'find', '--name', 'Unit: go test', '--variant', '', '--role', TEST_ROLE_USER);
+    const foundUnit = await scriptFind({ name: 'Unit: go test', variant: '', role: TEST_ROLE_USER });
     assert(foundUnit && foundUnit.id === sidUnit, 'script find did not resolve unit by complex name');
   }
 
   // 5) Tasks
   step++;
   logStep(step, TOTAL, 'Creating tasks');
-  const tUnit = idFrom(
-    await runRbcJSON(
-      'admin',
-      'task',
-      'set',
-      '--workflow',
-      'ci-test',
-      '--command',
-      'unit',
-      '--variant',
-      'go',
-      '--role',
-      TEST_ROLE_USER,
-      '--title',
-      'Run Unit Tests',
-      '--description',
-      'Executes unit tests.',
-      '--shell',
-      'bash',
-      '--timeout',
-      '10 minutes',
-      '--tags',
-      'unit,fast',
-      '--level',
-      'h2',
-    ),
-  );
-  await runRbcJSON(
-    'admin',
-    'task',
-    'set',
-    '--workflow',
-    'ci-test',
-    '--command',
-    'integration',
-    '--variant',
-    '',
-    '--role',
-    TEST_ROLE_USER,
-    '--title',
-    'Run Integration Tests',
-    '--description',
-    'Runs integration tests.',
-    '--shell',
-    'bash',
-    '--timeout',
-    '30 minutes',
-    '--tags',
-    'integration,slow',
-    '--level',
-    'h2',
-  );
-  await runRbcJSON(
-    'admin',
-    'task',
-    'set',
-    '--workflow',
-    'ci-lint',
-    '--command',
-    'lint',
-    '--variant',
-    'go',
-    '--role',
-    TEST_ROLE_USER,
-    '--title',
-    'Lint & Vet',
-    '--description',
-    'Runs vet and lints.',
-    '--shell',
-    'bash',
-    '--timeout',
-    '5 minutes',
-    '--tags',
-    'lint,style',
-    '--level',
-    'h2',
-  );
+  const tUnit = idFrom(await runSetTask({ workflow: 'ci-test', command: 'unit', variant: 'go', role: TEST_ROLE_USER, title: 'Run Unit Tests', description: 'Executes unit tests.', shell: 'bash', timeout: '10 minutes', tags: 'unit,fast', level: 'h2' }));
+  await runSetTask({ workflow: 'ci-test', command: 'integration', variant: '', role: TEST_ROLE_USER, title: 'Run Integration Tests', description: 'Runs integration tests.', shell: 'bash', timeout: '30 minutes', tags: 'integration,slow', level: 'h2' });
+  await runSetTask({ workflow: 'ci-lint', command: 'lint', variant: 'go', role: TEST_ROLE_USER, title: 'Lint & Vet', description: 'Runs vet and lints.', shell: 'bash', timeout: '5 minutes', tags: 'lint,style', level: 'h2' });
 
   // Replacements
   await runRbc(
@@ -369,118 +295,18 @@ try {
     'visibility=team',
   );
 
-  const s1 = idFrom(
-    await runRbcJSON(
-      'admin',
-      'store',
-      'get',
-      '--name',
-      'ideas-acme-build',
-      '--role',
-      TEST_ROLE_USER,
-    ),
-  );
-  const s2 = idFrom(
-    await runRbcJSON(
-      'admin',
-      'store',
-      'get',
-      '--name',
-      'blackboard-global',
-      '--role',
-      TEST_ROLE_USER,
-    ),
-  );
+  const s1 = idFrom(await storeGet({ name: 'ideas-acme-build', role: TEST_ROLE_USER }));
+  const s2 = idFrom(await storeGet({ name: 'blackboard-global', role: TEST_ROLE_USER }));
 
-  const bb1 = idFrom(
-    await runRbcJSON(
-      'admin',
-      'blackboard',
-      'set',
-      '--role',
-      TEST_ROLE_USER,
-      '--store-id',
-      s1,
-      '--project',
-      'acme/build-system',
-      '--background',
-      'Ideas board for build system',
-      '--guidelines',
-      'Keep concise; tag items with priority',
-    ),
-  );
-  const bb2 = idFrom(
-    await runRbcJSON(
-      'admin',
-      'blackboard',
-      'set',
-      '--role',
-      TEST_ROLE_USER,
-      '--store-id',
-      s2,
-      '--background',
-      'Team-wide blackboard',
-      '--guidelines',
-      'Wipe weekly on Mondays',
-    ),
-  );
+  const bb1 = idFrom(await blackboardSet({ role: TEST_ROLE_USER, storeId: s1, project: 'acme/build-system', background: 'Ideas board for build system', guidelines: 'Keep concise; tag items with priority' }));
+  const bb2 = idFrom(await blackboardSet({ role: TEST_ROLE_USER, storeId: s2, background: 'Team-wide blackboard', guidelines: 'Wipe weekly on Mondays' }));
 
   // 9) Stickies and relations
   step++;
   logStep(step, TOTAL, 'Creating stickies and relations');
-  const st1 = idFrom(
-    await runRbcJSON(
-      'admin',
-      'stickie',
-      'set',
-      '--blackboard',
-      bb1,
-      '--topic-name',
-      'onboarding',
-      '--topic-role',
-      TEST_ROLE_USER,
-      '--note',
-      'Refresh onboarding guide for new hires',
-      '--labels',
-      'onboarding,docs,priority:med',
-      '--priority',
-      'should',
-    ),
-  );
-  const st2 = idFrom(
-    await runRbcJSON(
-      'admin',
-      'stickie',
-      'set',
-      '--blackboard',
-      bb1,
-      '--topic-name',
-      'devops',
-      '--topic-role',
-      TEST_ROLE_USER,
-      '--note',
-      'Evaluate GitHub Actions caching for go build',
-      '--labels',
-      'idea,devops',
-      '--priority',
-      'could',
-    ),
-  );
-  const st3 = idFrom(
-    await runRbcJSON(
-      'admin',
-      'stickie',
-      'set',
-      '--blackboard',
-      bb2,
-      '--note',
-      'Team retro every Friday',
-      '--labels',
-      'team,ritual',
-      '--priority',
-      'must',
-    ),
-  );
+  const st1 = idFrom(await stickieSet({ blackboard: bb1, topicName: 'onboarding', topicRole: TEST_ROLE_USER, note: 'Refresh onboarding guide for new hires', labels: ['onboarding','docs','priority:med'], priority: 'should', name: 'Onboarding Refresh', variant: '' }));
+  const st2 = idFrom(await stickieSet({ blackboard: bb1, topicName: 'devops', topicRole: TEST_ROLE_USER, note: 'Evaluate GitHub Actions caching for go build', labels: ['idea','devops'], priority: 'could', name: 'DevOps Caching', variant: '' }));
+  const st3 = idFrom(await stickieSet({ blackboard: bb2, note: 'Team retro every Friday', labels: ['team','ritual'], priority: 'must', name: 'Team Retro', variant: '' }));
 
   await runRbc(
     'admin',
@@ -583,43 +409,15 @@ try {
   // 11) Conversation, Experiment, Messages & Queue
   step++;
   logStep(step, TOTAL, 'Creating conversation, experiment, messages and queue');
-  const convMeta = await runRbcJSON(
-    'admin',
-    'conversation',
-    'set',
-    '--title',
-    'Test Conversation',
-    '--role',
-    TEST_ROLE_USER,
-  );
+  const convMeta = await conversationSet({ title: 'Test Conversation', role: TEST_ROLE_USER });
   const convID = idFrom(convMeta);
-  const expMeta = await runRbcJSON(
-    'admin',
-    'experiment',
-    'create',
-    '--conversation',
-    convID,
-  );
+  const expMeta = await experimentCreate({ conversation: convID });
   const expID = idFrom(expMeta);
   await $`echo "Hello from user12" | go run main.go admin message set --experiment ${expID} --title Greeting --tags hello --role ${TEST_ROLE_USER}`;
   await $`echo "Build started" | go run main.go admin message set --experiment ${expID} --title BuildStart --tags build --role ${TEST_ROLE_USER}`;
   await $`echo "Onboarding checklist updated" | go run main.go admin message set --experiment ${expID} --title DocsUpdate --tags docs,update --role ${TEST_ROLE_USER}`;
 
-  const q1 = idFrom(
-    await runRbcJSON(
-      'admin',
-      'queue',
-      'add',
-      '--description',
-      'Run quick unit subset',
-      '--status',
-      'Waiting',
-      '--why',
-      'waiting for CI window',
-      '--tags',
-      'kind=test,priority=low',
-    ),
-  );
+  const q1 = idFrom(await queueAdd({ description: 'Run quick unit subset', status: 'Waiting', why: 'waiting for CI window', tags: 'kind=test,priority=low' }));
   await runRbc(
     'admin',
     'queue',
