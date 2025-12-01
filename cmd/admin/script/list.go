@@ -44,16 +44,21 @@ var listCmd = &cobra.Command{
                 item := map[string]any{"id": s.ID, "title": s.Title, "role": s.RoleName}
                 if s.Created.Valid { item["created"] = s.Created.Time.Format(time.RFC3339Nano) }
                 if s.Updated.Valid { item["updated"] = s.Updated.Time.Format(time.RFC3339Nano) }
+                if s.ComplexName.Name != "" || s.ComplexName.Variant != "" {
+                    item["name"] = s.ComplexName.Name
+                    item["variant"] = s.ComplexName.Variant
+                }
+                if s.Archived { item["archived"] = true }
                 arr = append(arr, item)
             }
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
         // table default
         table := tablewriter.NewWriter(os.Stdout)
-        table.SetHeader([]string{"ID", "TITLE", "UPDATED"})
+        table.SetHeader([]string{"ID", "TITLE", "NAME", "VARIANT", "UPDATED"})
         for _, s := range ss {
             updated := ""; if s.Updated.Valid { updated = s.Updated.Time.Format(time.RFC3339) }
-            table.Append([]string{s.ID, s.Title, updated})
+            table.Append([]string{s.ID, s.Title, s.ComplexName.Name, s.ComplexName.Variant, updated})
         }
         table.Render()
         return nil

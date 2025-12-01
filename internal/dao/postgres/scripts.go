@@ -152,6 +152,30 @@ func GetScriptByComplexName(ctx context.Context, db *pgxpool.Pool, name, variant
     return &s, nil
 }
 
+// GetScriptByComplexNameRole performs exact lookup and constrains to a role when provided.
+func GetScriptByComplexNameRole(ctx context.Context, db *pgxpool.Pool, name, variant string, archived bool, role string) (*Script, error) {
+    const q = `
+        SELECT id::text, title, description, motivation, notes,
+               encode(script_content_id,'hex') AS cid, role_name, tags, complex_name, archived, created, updated
+        FROM scripts
+        WHERE (complex_name->>'name') = $1
+          AND (complex_name->>'variant') = $2
+          AND archived = $3
+          AND role_name = $4
+        ORDER BY updated DESC
+        LIMIT 1`
+    var s Script
+    var tagsJSON []byte
+    var cnJSON []byte
+    if err := db.QueryRow(ctx, q, name, variant, archived, role).
+        Scan(&s.ID, &s.Title, &s.Description, &s.Motivation, &s.Notes, &s.ScriptContentID, &s.RoleName, &tagsJSON, &cnJSON, &s.Archived, &s.Created, &s.Updated); err != nil {
+        return nil, dbutil.ErrWrap("script.get_by_complex_name_role", err, dbutil.ParamSummary("name", name), dbutil.ParamSummary("variant", variant), dbutil.ParamSummary("archived", archived), dbutil.ParamSummary("role", role))
+    }
+    if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &s.Tags) }
+    if len(cnJSON) > 0 { _ = json.Unmarshal(cnJSON, &s.ComplexName) }
+    return &s, nil
+}
+
 // DeleteScript removes a script by id.
 func DeleteScript(ctx context.Context, db *pgxpool.Pool, id string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM scripts WHERE id=$1::uuid`, id)

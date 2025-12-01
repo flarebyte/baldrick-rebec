@@ -18,6 +18,7 @@ var (
     flagFindName     string
     flagFindVariant  string
     flagFindArchived bool
+    flagFindRole     string
 )
 
 var findCmd = &cobra.Command{
@@ -35,7 +36,12 @@ var findCmd = &cobra.Command{
         if err != nil { return err }
         defer db.Close()
 
-        s, err := pgdao.GetScriptByComplexName(ctx, db, flagFindName, flagFindVariant, flagFindArchived)
+        var s *pgdao.Script
+        if strings.TrimSpace(flagFindRole) != "" {
+            s, err = pgdao.GetScriptByComplexNameRole(ctx, db, flagFindName, flagFindVariant, flagFindArchived, flagFindRole)
+        } else {
+            s, err = pgdao.GetScriptByComplexName(ctx, db, flagFindName, flagFindVariant, flagFindArchived)
+        }
         if err != nil { return err }
         // stderr summary
         fmt.Fprintf(os.Stderr, "script id=%s name=%q variant=%q archived=%t\n", s.ID, s.ComplexName.Name, s.ComplexName.Variant, s.Archived)
@@ -62,5 +68,5 @@ func init() {
     findCmd.Flags().StringVar(&flagFindName, "name", "", "Complex name: name (required)")
     findCmd.Flags().StringVar(&flagFindVariant, "variant", "", "Complex name: variant (optional; default empty)")
     findCmd.Flags().BoolVar(&flagFindArchived, "archived", false, "Search archived scripts instead of active ones")
+    findCmd.Flags().StringVar(&flagFindRole, "role", "", "Optional role_name scope filter")
 }
-
