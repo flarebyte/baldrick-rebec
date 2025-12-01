@@ -42,17 +42,22 @@ var listCmd = &cobra.Command{
                 if s.TopicName.Valid { item["topic_name"] = s.TopicName.String }
                 if s.TopicRoleName.Valid { item["topic_role_name"] = s.TopicRoleName.String }
                 if s.Updated.Valid { item["updated"] = s.Updated.Time.Format(time.RFC3339Nano) }
+                if s.ComplexName.Name != "" || s.ComplexName.Variant != "" {
+                    item["name"] = s.ComplexName.Name
+                    item["variant"] = s.ComplexName.Variant
+                }
+                if s.Archived { item["archived"] = true }
                 arr = append(arr, item)
             }
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
         // table default
         table := tablewriter.NewWriter(os.Stdout)
-        table.SetHeader([]string{"ID", "BLACKBOARD", "TOPIC", "UPDATED", "EDIT#"})
+        table.SetHeader([]string{"ID", "BLACKBOARD", "TOPIC", "NAME", "VARIANT", "UPDATED", "EDIT#"})
         for _, s := range ss {
             updated := ""; if s.Updated.Valid { updated = s.Updated.Time.Format(time.RFC3339) }
             topic := ""; if s.TopicName.Valid { topic = s.TopicName.String }
-            table.Append([]string{s.ID, s.BlackboardID, topic, updated, fmt.Sprintf("%d", s.EditCount)})
+            table.Append([]string{s.ID, s.BlackboardID, topic, s.ComplexName.Name, s.ComplexName.Variant, updated, fmt.Sprintf("%d", s.EditCount)})
         }
         table.Render(); return nil
     },
