@@ -261,6 +261,10 @@ try {
     const bkpID = idFrom(bkp);
     await snapshotList({ limit: 5 });
     await snapshotShow({ id: bkpID });
+    const verifyRows = await snapshotVerifyJSON({ id: bkpID });
+    assert(Array.isArray(verifyRows), 'snapshot verify did not return JSON array');
+    const prunePreview = await snapshotPrunePreviewJSON({ olderThan: '0d' });
+    assert(prunePreview && typeof prunePreview.candidates === 'number' && prunePreview.candidates >= 1, 'snapshot prune preview unexpected');
     await snapshotRestoreDry({ id: bkpID, mode: 'append' });
     await snapshotDelete({ id: bkpID });
   } else {

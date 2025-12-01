@@ -94,6 +94,7 @@ Key exports:
 - Queue: `queueAdd({...})`, `queuePeek`, `queueSize`, `queueTake`
 - Lists and counts: `listWithRole(cmd,role,limit)`, `experimentList(limit)`, `dbCountPerRole`, `dbCountJSON`
 - Snapshot: `snapshotBackupJSON({description,who})`, `snapshotList`, `snapshotShow`, `snapshotRestoreDry`, `snapshotDelete`
+  - Verify/Prune: `snapshotVerifyJSON({id,schema?})`, `snapshotPrunePreviewJSON({olderThan?,schema?})`, `snapshotPruneYesJSON({olderThan?,schema?})`
 
 Example:
 

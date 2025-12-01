@@ -273,3 +273,15 @@ export async function snapshotList({ limit = 5 } = {}) { return await runRbc('ad
 export async function snapshotShow({ id }) { return await runRbc('admin', 'snapshot', 'show', id); }
 export async function snapshotRestoreDry({ id, mode = 'append' }) { return await runRbc('admin', 'snapshot', 'restore', id, '--mode', mode, '--dry-run'); }
 export async function snapshotDelete({ id }) { return await runRbc('admin', 'snapshot', 'delete', id, '--force'); }
+
+export async function snapshotVerifyJSON({ id, schema = 'backup' }) {
+  return await runRbcJSON('admin', 'snapshot', 'verify', id, '--schema', schema, '--json');
+}
+
+export async function snapshotPrunePreviewJSON({ olderThan = '90d', schema = 'backup' }) {
+  return await runRbcJSON('admin', 'snapshot', 'prune', '--older-than', olderThan, '--schema', schema, '--json');
+}
+
+export async function snapshotPruneYesJSON({ olderThan = '90d', schema = 'backup' }) {
+  return await runRbcJSON('admin', 'snapshot', 'prune', '--older-than', olderThan, '--schema', schema, '--yes', '--json');
+}
