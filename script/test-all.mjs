@@ -203,9 +203,9 @@ try {
   const convID = idFrom(convMeta);
   const expMeta = await experimentCreate({ conversation: convID });
   const expID = idFrom(expMeta);
-  await $`echo "Hello from user12" | go run main.go admin message set --experiment ${expID} --title Greeting --tags hello --role ${TEST_ROLE_USER}`;
-  await $`echo "Build started" | go run main.go admin message set --experiment ${expID} --title BuildStart --tags build --role ${TEST_ROLE_USER}`;
-  await $`echo "Onboarding checklist updated" | go run main.go admin message set --experiment ${expID} --title DocsUpdate --tags docs,update --role ${TEST_ROLE_USER}`;
+  await messageSet({ text: 'Hello from user12', experiment: expID, title: 'Greeting', tags: 'hello', role: TEST_ROLE_USER });
+  await messageSet({ text: 'Build started', experiment: expID, title: 'BuildStart', tags: 'build', role: TEST_ROLE_USER });
+  await messageSet({ text: 'Onboarding checklist updated', experiment: expID, title: 'DocsUpdate', tags: 'docs,update', role: TEST_ROLE_USER });
 
   const q1 = idFrom(await queueAdd({ description: 'Run quick unit subset', status: 'Waiting', why: 'waiting for CI window', tags: 'kind=test,priority=low' }));
   await queueAdd({ description: 'Run full integration suite', status: 'Buildable', tags: 'kind=test,priority=high' });
@@ -243,27 +243,8 @@ try {
     assert(f1 && f1.id === st1, 'stickie find did not resolve st1 by complex name within board');
   }
   await stickieListByTopic({ topicName: 'devops', topicRole: TEST_ROLE_USER, limit: 50 });
-  await runRbc(
-    'admin',
-    'stickie-rel',
-    'list',
-    '--id',
-    st1,
-    '--direction',
-    'out',
-  );
-  await runRbc(
-    'admin',
-    'stickie-rel',
-    'get',
-    '--from',
-    st1,
-    '--to',
-    st2,
-    '--type',
-    'uses',
-    '--ignore-missing',
-  );
+  await stickieRelList({ id: st1, direction: 'out' });
+  await stickieRelGet({ from: st1, to: st2, type: 'uses', ignoreMissing: true });
   await listWithRole('tag', TEST_ROLE_USER, 50);
   await dbCountPerRole();
   await dbCountJSON();

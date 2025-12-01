@@ -78,3 +78,32 @@ Grant this role permissions to own or write to the backup schema, e.g. (or run `
 - For initial provisioning (roles/db/privileges/schema), set the Postgres admin password via `--pg-admin-password`.
 - Ensure app credentials are configured for runtime use:
   - `rbc admin config init --pg-app-user rbc_app --pg-app-password '<app-pass>'`
+## ZX CLI Helpers (scripts)
+
+This repo includes helper utilities under `script/cli-helper.mjs` to make end-to-end flows easier to read and maintain. They wrap the `rbc` admin CLI using Google ZX.
+
+Key exports:
+
+- Core: `runRbc`, `runRbcJSON`, `idFrom`, `logStep`, `assert`
+- Roles/Workflows: `runSetRole({name,title,description?,notes?})`, `runSetWorkflow({name,title,description?,role?,notes?})`
+- Scripts: `createScript(role,title,description,body,{name?,variant?,archived?})`, `scriptListJSON({role,...})`, `scriptFind({name,variant?,archived?,role?})`
+- Tasks: `runSetTask({...})`, `taskSetReplacement({...})`
+- Stores/Blackboards: `storeSet({...})`, `storeGet({name,role})`, `blackboardSet({...})`
+- Stickies: `stickieSet({...})`, `stickieListJSON({...})`, `stickieFind({...})`, `stickieList`, `stickieListByBlackboard`, `stickieListByTopic`, `stickieRelSet`, `stickieRelList`, `stickieRelGet`
+- Conversations/Experiments: `conversationSet({title,role?})`, `experimentCreate({conversation})`
+- Queue: `queueAdd({...})`, `queuePeek`, `queueSize`, `queueTake`
+- Lists and counts: `listWithRole(cmd,role,limit)`, `experimentList(limit)`, `dbCountPerRole`, `dbCountJSON`
+- Snapshot: `snapshotBackupJSON({description,who})`, `snapshotList`, `snapshotShow`, `snapshotRestoreDry`, `snapshotDelete`
+
+Example:
+
+```js
+import { runSetRole, runSetWorkflow, createScript, scriptFind } from './cli-helper.mjs';
+
+await runSetRole({ name: 'rbctest-user', title: 'Test User' });
+await runSetWorkflow({ name: 'ci-test', title: 'CI Test', role: 'rbctest-user' });
+const sid = await createScript('rbctest-user', 'Unit: go test', 'Run unit tests', '#!/usr/bin/env bash\ngo test ./...\n', { name: 'Unit: go test', variant: ''});
+const script = await scriptFind({ name: 'Unit: go test', variant: '', role: 'rbctest-user' });
+```
+
+The test script `script/test-all.mjs` demonstrates broader usage across entities.

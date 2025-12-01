@@ -160,6 +160,36 @@ export async function stickieFind({ name, variant = '', archived = false, blackb
   return await runRbcJSON(...args);
 }
 
+// Messages (stdin body)
+export async function messageSet({ text = '', experiment = '', title = '', tags = '', role = 'user' }) {
+  const args = ['admin', 'message', 'set'];
+  if (experiment) args.push('--experiment', experiment);
+  if (title) args.push('--title', title);
+  if (tags) args.push('--tags', tags);
+  if (role) args.push('--role', role);
+  const proc = $`go run main.go ${args}`;
+  proc.stdin.write(text || '');
+  proc.stdin.end();
+  return await proc;
+}
+
+// Stickie relations
+export async function stickieRelSet({ from, to, type, labels = '' }) {
+  const args = ['admin', 'stickie-rel', 'set', '--from', from, '--to', to, '--type', type];
+  if (labels) args.push('--labels', labels);
+  return await runRbc(...args);
+}
+
+export async function stickieRelList({ id, direction = 'out' }) {
+  return await runRbc('admin', 'stickie-rel', 'list', '--id', id, '--direction', direction);
+}
+
+export async function stickieRelGet({ from, to, type, ignoreMissing = false }) {
+  const args = ['admin', 'stickie-rel', 'get', '--from', from, '--to', to, '--type', type];
+  if (ignoreMissing) args.push('--ignore-missing');
+  return await runRbc(...args);
+}
+
 // Non-JSON convenience wrappers
 export async function dbReset({ dropAppRole = false } = {}) {
   return await runRbc('admin', 'db', 'reset', '--force', `--drop-app-role=${dropAppRole ? 'true' : 'false'}`);
