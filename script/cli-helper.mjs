@@ -1,6 +1,5 @@
 // Common CLI helpers for ZX-based admin scripts
-// Note: Keep ZX idioms only; do not import fs/path. Ensure $ and argv are available.
-import 'zx/globals';
+// Note: Keep ZX idioms only; do not import fs/path. ZX globals ($, argv) are provided by the zx runner.
 
 // Core runners
 export async function runRbc(...args) {
