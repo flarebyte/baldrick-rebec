@@ -23,6 +23,7 @@ import (
     "github.com/flarebyte/baldrick-rebec/cmd/admin/experiment"
     srvcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/server"
     snapcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/snapshot"
+    vaultcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/vault"
     "github.com/spf13/cobra"
 )
 
@@ -54,4 +55,5 @@ func init() {
     AdminCmd.AddCommand(experiment.ExperimentCmd)
     AdminCmd.AddCommand(srvcmd.ServerCmd)
     AdminCmd.AddCommand(snapcmd.SnapshotCmd)
+    AdminCmd.AddCommand(vaultcmd.VaultCmd)
 }
