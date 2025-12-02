@@ -177,7 +177,7 @@ function messageListItemSchemaFactory() {
     created: z.string().min(1),
     from_task_id: z.string().min(1).optional(),
     experiment_id: z.string().min(1).optional(),
-    tags: z.record(z.any()).optional(),
+    //tags: z.record(z.any()).optional(),
   });
 }
 export function validateMessageListContract(arr) { return z.array(messageListItemSchemaFactory()).parse(arr); }
