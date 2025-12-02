@@ -115,7 +115,9 @@ function projectListItemSchemaFactory() {
     updated: z.string().optional(),
   });
 }
-export function validateProjectListContract(arr) { return z.array(projectListItemSchemaFactory()).parse(arr); }
+export function validateProjectListContract(arr) {
+  return z.array(projectListItemSchemaFactory()).parse(arr);
+}
 
 // Stores
 function storeListItemSchemaFactory() {
@@ -130,7 +132,9 @@ function storeListItemSchemaFactory() {
     updated: z.string().optional(),
   });
 }
-export function validateStoreListContract(arr) { return z.array(storeListItemSchemaFactory()).parse(arr); }
+export function validateStoreListContract(arr) {
+  return z.array(storeListItemSchemaFactory()).parse(arr);
+}
 
 // Topics
 function topicListItemSchemaFactory() {
@@ -142,7 +146,9 @@ function topicListItemSchemaFactory() {
     updated: z.string().optional(),
   });
 }
-export function validateTopicListContract(arr) { return z.array(topicListItemSchemaFactory()).parse(arr); }
+export function validateTopicListContract(arr) {
+  return z.array(topicListItemSchemaFactory()).parse(arr);
+}
 
 // Blackboards
 function blackboardListItemSchemaFactory() {
@@ -154,7 +160,9 @@ function blackboardListItemSchemaFactory() {
     updated: z.string().optional(),
   });
 }
-export function validateBlackboardListContract(arr) { return z.array(blackboardListItemSchemaFactory()).parse(arr); }
+export function validateBlackboardListContract(arr) {
+  return z.array(blackboardListItemSchemaFactory()).parse(arr);
+}
 
 // Conversations
 function conversationListItemSchemaFactory() {
@@ -166,7 +174,9 @@ function conversationListItemSchemaFactory() {
     created: z.string().optional(),
   });
 }
-export function validateConversationListContract(arr) { return z.array(conversationListItemSchemaFactory()).parse(arr); }
+export function validateConversationListContract(arr) {
+  return z.array(conversationListItemSchemaFactory()).parse(arr);
+}
 
 // Messages
 function messageListItemSchemaFactory() {
@@ -180,4 +190,6 @@ function messageListItemSchemaFactory() {
     //tags: z.record(z.any()).optional(),
   });
 }
-export function validateMessageListContract(arr) { return z.array(messageListItemSchemaFactory()).parse(arr); }
+export function validateMessageListContract(arr) {
+  return z.array(messageListItemSchemaFactory()).parse(arr);
+}
