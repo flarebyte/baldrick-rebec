@@ -24,6 +24,9 @@ var (
     flagStLabels      []string
     flagStCreatedBy   string
     flagStPriority    string
+    flagStName        string
+    flagStVariant     string
+    flagStArchived    bool
 )
 
 var setCmd = &cobra.Command{
@@ -46,6 +49,10 @@ var setCmd = &cobra.Command{
         if len(flagStLabels) > 0 { st.Labels = flagStLabels }
         if strings.TrimSpace(flagStCreatedBy) != "" { st.CreatedByTaskID = sql.NullString{String: strings.TrimSpace(flagStCreatedBy), Valid: true} }
         if strings.TrimSpace(flagStPriority) != "" { st.PriorityLevel = sql.NullString{String: strings.ToLower(flagStPriority), Valid: true} }
+        if strings.TrimSpace(flagStName) != "" || strings.TrimSpace(flagStVariant) != "" {
+            st.ComplexName = pgdao.StickieComplexName{Name: strings.TrimSpace(flagStName), Variant: strings.TrimSpace(flagStVariant)}
+        }
+        st.Archived = flagStArchived
 
         if err := pgdao.UpsertStickie(ctx, db, st); err != nil { return err }
 
@@ -67,5 +74,7 @@ func init() {
     setCmd.Flags().StringSliceVar(&flagStLabels, "labels", nil, "Labels (repeat or comma-separated)")
     setCmd.Flags().StringVar(&flagStCreatedBy, "created-by-task", "", "Creator task UUID (optional)")
     setCmd.Flags().StringVar(&flagStPriority, "priority", "", "Priority level: must, should, could, wont")
+    setCmd.Flags().StringVar(&flagStName, "name", "", "Complex name: name (exact lookup key)")
+    setCmd.Flags().StringVar(&flagStVariant, "variant", "", "Complex name: variant (exact lookup key; may be empty)")
+    setCmd.Flags().BoolVar(&flagStArchived, "archived", false, "Mark stickie as archived (excluded from active lookups)")
 }
-

@@ -66,7 +66,7 @@ High-level view of common fields (not exhaustive).
   - `scripts_content(id BYTEA PK, script_content TEXT, created_at)`
   - `scripts(id UUID PK, title, description, motivation, notes, script_content_id BYTEA, role_name, tags, created, updated)`
 - Tasks
-  - `tasks(id UUID PK, command, variant UNIQUE, title, description, motivation, role_name, created, notes, shell, run_script_id, timeout INTERVAL, tool_workspace_id, tags, level)`
+  - `tasks(id UUID PK, command, variant UNIQUE, title, description, motivation, role_name, created, notes, shell, timeout INTERVAL, tool_workspace_id, tags, level)`
   - Variants: `task_variants(variant PK, workflow_id)`
 - Messages
   - `messages_content(id UUID PK, text_content, json_content, created_at)`
@@ -93,7 +93,7 @@ High-level view of common fields (not exhaustive).
   - messages.content_id → messages_content.id, messages.from_task_id → tasks.id
   - packages.role_name → roles.name, packages.task_id → tasks.id
   - queues.task_id → tasks.id, queues.inbound_message → messages.id, queues.target_workspace_id → workspaces.id
-  - tasks.run_script_id → scripts.id, tasks.tool_workspace_id → workspaces.id
+  - tasks.tool_workspace_id → workspaces.id
   - testcases.experiment_id → experiments.id
   - workspaces.build_script_id → scripts.id, workspaces.(project_name,role_name) → projects
   - blackboards.store_id → stores.id, blackboards.conversation_id → conversations.id, blackboards.task_id → tasks.id

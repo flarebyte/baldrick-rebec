@@ -1,4 +1,4 @@
-package script
+package task
 
 import (
     "context"
@@ -14,15 +14,14 @@ import (
     "github.com/spf13/cobra"
 )
 
-var (
-    flagScrGetID string
-)
-
-var getCmd = &cobra.Command{
-    Use:   "get",
-    Short: "Get a script by id",
+var tsGetCmd = &cobra.Command{
+    Use:   "get TASK_ID NAME_OR_ALIAS",
+    Short: "Resolve a script for a task by name or alias",
+    Args:  cobra.ExactArgs(2),
     RunE: func(cmd *cobra.Command, args []string) error {
-        if strings.TrimSpace(flagScrGetID) == "" { return errors.New("--id is required") }
+        taskID := strings.TrimSpace(args[0])
+        nameOrAlias := strings.TrimSpace(args[1])
+        if taskID == "" || nameOrAlias == "" { return errors.New("TASK_ID and NAME_OR_ALIAS are required") }
         cfg, err := cfgpkg.Load()
         if err != nil { return err }
         ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -30,7 +29,8 @@ var getCmd = &cobra.Command{
         db, err := pgdao.OpenApp(ctx, cfg)
         if err != nil { return err }
         defer db.Close()
-        s, err := pgdao.GetScriptByID(ctx, db, flagScrGetID)
+
+        s, err := pgdao.ResolveTaskScript(ctx, db, taskID, nameOrAlias)
         if err != nil { return err }
         // stderr line
         fmt.Fprintf(os.Stderr, "script id=%s title=%q role=%q\n", s.ID, s.Title, s.RoleName)
@@ -41,11 +41,6 @@ var getCmd = &cobra.Command{
             "role": s.RoleName,
             "content_id": s.ScriptContentID,
         }
-        if s.ComplexName.Name != "" || s.ComplexName.Variant != "" {
-            out["name"] = s.ComplexName.Name
-            out["variant"] = s.ComplexName.Variant
-        }
-        if s.Archived { out["archived"] = true }
         if s.Created.Valid { out["created"] = s.Created.Time.Format(time.RFC3339Nano) }
         if s.Updated.Valid { out["updated"] = s.Updated.Time.Format(time.RFC3339Nano) }
         if s.Description.Valid && s.Description.String != "" { out["description"] = s.Description.String }
@@ -57,6 +52,5 @@ var getCmd = &cobra.Command{
 }
 
 func init() {
-    ScriptCmd.AddCommand(getCmd)
-    getCmd.Flags().StringVar(&flagScrGetID, "id", "", "Script UUID (required)")
+    ScriptCmd.AddCommand(tsGetCmd)
 }

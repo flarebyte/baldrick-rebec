@@ -244,7 +244,7 @@ func relationships() []relRow {
         {"queues.task_id", "->", "tasks.id", "rel"},
         {"queues.inbound_message", "->", "messages.id", "rel"},
         {"queues.target_workspace_id", "->", "workspaces.id", "rel"},
-        {"tasks.run_script_id", "->", "scripts.id", "rel"},
+        // removed: tasks.run_script_id (legacy)
         {"tasks.tool_workspace_id", "->", "workspaces.id", "rel"},
         {"testcases.experiment_id", "->", "experiments.id", "rel"},
         {"workspaces.build_script_id", "->", "scripts.id", "rel"},

@@ -23,11 +23,11 @@ type Task struct {
     Created    sql.NullTime
     Notes      sql.NullString
     Shell      sql.NullString
-    RunScriptID sql.NullString
     Timeout    sql.NullString // textual interval
     ToolWorkspaceID sql.NullString
     Tags       map[string]any
     Level      sql.NullString // h1..h6
+    Archived   bool
 }
 
 // UpsertTask inserts or updates a task identified by (workflow_id, name, version).
@@ -77,11 +77,11 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
     }
     q := `INSERT INTO tasks (
             command, variant, role_name, title, description, motivation,
-            notes, shell, run_script_id, timeout, tool_workspace_id, tags, level
+            notes, shell, timeout, tool_workspace_id, tags, level, archived
           ) VALUES (
             $1, $2, COALESCE(NULLIF($3,''),'user'), NULLIF($4,''), NULLIF($5,''), NULLIF($6,''),
-            NULLIF($7,''), NULLIF($8,''), CASE WHEN $9='' THEN NULL ELSE $9::uuid END, CASE WHEN $10='' THEN NULL ELSE $10::interval END,
-            CASE WHEN $11='' THEN NULL ELSE $11::uuid END, COALESCE($12,'{}'::jsonb), NULLIF($13,'')
+            NULLIF($7,''), NULLIF($8,''), CASE WHEN $9='' THEN NULL ELSE $9::interval END,
+            CASE WHEN $10='' THEN NULL ELSE $10::uuid END, COALESCE($11,'{}'::jsonb), NULLIF($12,''), $13
           )
           ON CONFLICT (variant) DO UPDATE SET
             title = EXCLUDED.title,
@@ -89,12 +89,12 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
             motivation = EXCLUDED.motivation,
             notes = EXCLUDED.notes,
             shell = EXCLUDED.shell,
-            run_script_id = EXCLUDED.run_script_id,
             timeout = EXCLUDED.timeout,
             tool_workspace_id = EXCLUDED.tool_workspace_id,
             tags = EXCLUDED.tags,
             level = EXCLUDED.level,
-            role_name = EXCLUDED.role_name
+            role_name = EXCLUDED.role_name,
+            archived = EXCLUDED.archived
           RETURNING id, created`
     var id string
     var created sql.NullTime
@@ -102,7 +102,7 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
     if t.Tags != nil { tagsJSON, _ = json.Marshal(t.Tags) }
     if err := db.QueryRow(ctx, q,
         t.Command, t.Variant, t.RoleName, stringOrEmpty(t.Title), stringOrEmpty(t.Description), stringOrEmpty(t.Motivation),
-        stringOrEmpty(t.Notes), stringOrEmpty(t.Shell), stringOrEmpty(t.RunScriptID), stringOrEmpty(t.Timeout), stringOrEmpty(t.ToolWorkspaceID), tagsJSON, stringOrEmpty(t.Level),
+        stringOrEmpty(t.Notes), stringOrEmpty(t.Shell), stringOrEmpty(t.Timeout), stringOrEmpty(t.ToolWorkspaceID), tagsJSON, stringOrEmpty(t.Level), t.Archived,
     ).Scan(&id, &created); err != nil {
         return fmt.Errorf("upsert task: write failed: %w; %s", err, summarize(t))
     }
@@ -118,7 +118,7 @@ func UpsertTask(ctx context.Context, db *pgxpool.Pool, t *Task) error {
 // GetTaskByID fetches a task by numeric id.
 func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*Task, error) {
     q := `SELECT t.id::text, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
-                 t.notes, t.shell, t.run_script_id::text, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.created
+                 t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
           FROM tasks t
           LEFT JOIN task_variants tv ON tv.variant = t.variant
           WHERE t.id=$1::uuid`
@@ -126,7 +126,7 @@ func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*Task, error
     var tagsJSON []byte
     if err := db.QueryRow(ctx, q, id).Scan(
         &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
-        &t.Notes, &t.Shell, &t.RunScriptID, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created,
+        &t.Notes, &t.Shell, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Archived, &t.Created,
     ); err != nil {
         return nil, dbutil.ErrWrap("task.get", err, dbutil.ParamSummary("id", id))
     }
@@ -137,7 +137,7 @@ func GetTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (*Task, error
 // GetTaskByVariant fetches a task by variant.
 func GetTaskByVariant(ctx context.Context, db *pgxpool.Pool, variant string) (*Task, error) {
     q := `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
-                 t.notes, t.shell, t.run_script_id::text, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.created
+                 t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
           FROM tasks t
           LEFT JOIN task_variants tv ON tv.variant = t.variant
           WHERE t.variant=$1`
@@ -145,7 +145,7 @@ func GetTaskByVariant(ctx context.Context, db *pgxpool.Pool, variant string) (*T
     var tagsJSON []byte
     if err := db.QueryRow(ctx, q, variant).Scan(
         &t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
-        &t.Notes, &t.Shell, &t.RunScriptID, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created,
+        &t.Notes, &t.Shell, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Archived, &t.Created,
     ); err != nil {
         return nil, dbutil.ErrWrap("task.get", err, dbutil.ParamSummary("variant", variant))
     }
@@ -161,14 +161,14 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow, roleName string,
     var err error
     if stringsTrim(workflow) == "" {
         rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
-                                        t.notes, t.shell, t.run_script_id::text, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.created
+                                        t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
                                    FROM tasks t
                                    LEFT JOIN task_variants tv ON tv.variant = t.variant
                                    WHERE t.role_name=$1
                                    ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
     } else {
         rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
-                                        t.notes, t.shell, t.run_script_id::text, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.created
+                                        t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
                                    FROM tasks t
                                    LEFT JOIN task_variants tv ON tv.variant = t.variant
                                    WHERE tv.workflow_id=$1 AND t.role_name=$2
@@ -181,7 +181,84 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow, roleName string,
         var t Task
         var tagsJSON []byte
         if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
-            &t.Notes, &t.Shell, &t.RunScriptID, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created); err != nil {
+            &t.Notes, &t.Shell, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Archived, &t.Created); err != nil {
+            return nil, dbutil.ErrWrap("task.list.scan", err)
+        }
+        if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }
+        out = append(out, t)
+    }
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("task.list", err) }
+    return out, nil
+}
+
+// ListTasksWithArchived lists tasks with optional workflow filter and archived filtering.
+// Modes:
+// - if activeOnly is true: archived=false
+// - if archivedOnly is true: archived=true
+// - otherwise: no archived predicate (both)
+func ListTasksWithArchived(ctx context.Context, db *pgxpool.Pool, workflow, roleName string, limit, offset int, activeOnly, archivedOnly bool) ([]Task, error) {
+    if limit <= 0 { limit = 100 }
+    if offset < 0 { offset = 0 }
+    var rows pgxRows
+    var err error
+    // Construct cases mirroring ListTasks to keep parameter order simple
+    if stringsTrim(workflow) == "" {
+        switch {
+        case activeOnly:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE t.role_name=$1 AND t.archived=false
+                                       ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
+        case archivedOnly:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE t.role_name=$1 AND t.archived=true
+                                       ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
+        default:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE t.role_name=$1
+                                       ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
+        }
+    } else {
+        switch {
+        case activeOnly:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE tv.workflow_id=$1 AND t.role_name=$2 AND t.archived=false
+                                       ORDER BY t.variant ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
+        case archivedOnly:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE tv.workflow_id=$1 AND t.role_name=$2 AND t.archived=true
+                                       ORDER BY t.variant ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
+        default:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE tv.workflow_id=$1 AND t.role_name=$2
+                                       ORDER BY t.variant ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
+        }
+    }
+    if err != nil { return nil, dbutil.ErrWrap("task.list", err, dbutil.ParamSummary("workflow", workflow), dbutil.ParamSummary("role", roleName), fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset)) }
+    defer rows.Close()
+    var out []Task
+    for rows.Next() {
+        var t Task
+        var tagsJSON []byte
+        if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
+            &t.Notes, &t.Shell, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Archived, &t.Created); err != nil {
             return nil, dbutil.ErrWrap("task.list.scan", err)
         }
         if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }
@@ -221,10 +298,10 @@ func taskSummary(t *Task) string {
         dbutil.ParamSummary("motivation", t.Motivation),
         dbutil.ParamSummary("notes", t.Notes),
         dbutil.ParamSummary("shell", t.Shell),
-        dbutil.ParamSummary("run_script_id", t.RunScriptID),
         dbutil.ParamSummary("timeout", t.Timeout),
         dbutil.ParamSummary("tool_workspace_id", t.ToolWorkspaceID),
         dbutil.ParamSummary("level", t.Level),
+        dbutil.ParamSummary("archived", t.Archived),
     }
     // Tags: show size only to avoid leaking keys/values
     if t.Tags == nil { parts = append(parts, "tags=null") } else { parts = append(parts, fmt.Sprintf("tags=len=%d", len(t.Tags))) }

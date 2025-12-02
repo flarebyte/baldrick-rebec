@@ -117,7 +117,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             script_content TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
-        // Scripts: metadata referencing content by hash
+        // Scripts: metadata referencing content by hash (with complex_name and archived)
         `CREATE TABLE IF NOT EXISTS scripts (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             title TEXT NOT NULL,
@@ -127,6 +127,8 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             script_content_id BYTEA,
             role_name TEXT NOT NULL DEFAULT 'user',
             tags JSONB DEFAULT '{}'::jsonb,
+            complex_name JSONB NOT NULL,
+            archived BOOLEAN NOT NULL DEFAULT FALSE,
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
@@ -141,6 +143,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_scripts_role_name ON scripts(role_name)`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_complex_name ON scripts ((complex_name->>'name'), (complex_name->>'variant')) WHERE archived = FALSE`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_updated ON scripts (updated DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_complex_name_gin ON scripts USING GIN (complex_name jsonb_path_ops)`,
         // Workspaces table associated to a role (and optional project)
         `CREATE TABLE IF NOT EXISTS workspaces (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -171,7 +176,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             script_content TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
-        // Scripts: metadata referencing content by hash
+        // Scripts: metadata referencing content by hash (with complex_name and archived)
         `CREATE TABLE IF NOT EXISTS scripts (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             title TEXT NOT NULL,
@@ -181,6 +186,8 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             script_content_id BYTEA,
             role_name TEXT NOT NULL DEFAULT 'user',
             tags JSONB DEFAULT '{}'::jsonb,
+            complex_name JSONB NOT NULL,
+            archived BOOLEAN NOT NULL DEFAULT FALSE,
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated TIMESTAMPTZ NOT NULL DEFAULT now()
         )`,
@@ -195,6 +202,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_scripts_role_name ON scripts(role_name)`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_complex_name ON scripts ((complex_name->>'name'), (complex_name->>'variant')) WHERE archived = FALSE`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_updated ON scripts (updated DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_scripts_complex_name_gin ON scripts USING GIN (complex_name jsonb_path_ops)`,
         `CREATE INDEX IF NOT EXISTS idx_tags_role_name ON tags(role_name)`,
         `DO $$ BEGIN
             IF NOT EXISTS (
@@ -242,15 +252,47 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT,
             shell TEXT,
-            run_script_id UUID REFERENCES scripts(id) ON DELETE SET NULL,
             timeout INTERVAL,
             tool_workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL,
             tags JSONB DEFAULT '{}'::jsonb,
             level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
+            archived BOOLEAN NOT NULL DEFAULT FALSE,
             UNIQUE (variant),
             FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_variant ON tasks(variant)`,
+        // Remove legacy column if present
+        `ALTER TABLE tasks DROP COLUMN IF EXISTS run_script_id`,
+        // Ensure archived column exists for tasks
+        `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`,
+        // Task-Script attachments: associate scripts to tasks under logical names and optional aliases
+        `CREATE TABLE IF NOT EXISTS task_scripts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            script_id UUID NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            alias TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_task_scripts_task_id ON task_scripts(task_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_task_scripts_script_id ON task_scripts(script_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_task_scripts_task_name ON task_scripts(task_id, name)`,
+        `CREATE INDEX IF NOT EXISTS idx_task_scripts_task_alias ON task_scripts(task_id, alias)`,
+        // Decisions: enforce unique (task_id, name) and unique (task_id, alias) when alias present
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'task_scripts_task_name_uniq' AND conrelid = 'task_scripts'::regclass
+            ) THEN
+                ALTER TABLE task_scripts ADD CONSTRAINT task_scripts_task_name_uniq UNIQUE (task_id, name);
+            END IF;
+        END $$;`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'task_scripts_task_alias_uniq'
+            ) THEN
+                CREATE UNIQUE INDEX task_scripts_task_alias_uniq ON task_scripts(task_id, alias) WHERE alias IS NOT NULL;
+            END IF;
+        END $$;`,
         // Task replacement relations (SQL graph): new_task REPLACES old_task
         `CREATE TABLE IF NOT EXISTS task_replaces (
             new_task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -429,6 +471,8 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             created_by_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
             edit_count INT NOT NULL DEFAULT 0,
             priority_level TEXT CHECK (priority_level IN ('must','should','could','wont') OR priority_level IS NULL),
+            complex_name JSONB NOT NULL DEFAULT '{"name":"","variant":""}',
+            archived BOOLEAN NOT NULL DEFAULT FALSE,
             FOREIGN KEY (topic_name, topic_role_name) REFERENCES topics(name, role_name) ON DELETE SET NULL
         )`,
         // Trigger to auto-increment edit_count on any update
@@ -461,6 +505,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         END $$;`,
         `CREATE INDEX IF NOT EXISTS idx_stickies_blackboard ON stickies(blackboard_id)`,
         `CREATE INDEX IF NOT EXISTS idx_stickies_topic ON stickies(topic_name, topic_role_name)`,
+        `CREATE INDEX IF NOT EXISTS idx_stickies_complex_name ON stickies ((complex_name->>'name'), (complex_name->>'variant')) WHERE archived = FALSE`,
+        `CREATE INDEX IF NOT EXISTS idx_stickies_updated ON stickies (updated DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_stickies_complex_name_gin ON stickies USING GIN (complex_name jsonb_path_ops)`,
         // Ensure new optional structured JSONB column exists for stickies
         `ALTER TABLE stickies ADD COLUMN IF NOT EXISTS structured JSONB`,
         // Fallback store for stickie relationships when AGE is unavailable

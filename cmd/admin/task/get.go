@@ -61,11 +61,11 @@ var getCmd = &cobra.Command{
         if t.Motivation.Valid { out["motivation"] = t.Motivation.String }
         if t.Notes.Valid { out["notes"] = t.Notes.String }
         if t.Shell.Valid { out["shell"] = t.Shell.String }
-        if t.RunScriptID.Valid { out["run_script_id"] = t.RunScriptID.String }
         if t.Timeout.Valid { out["timeout"] = t.Timeout.String }
         if len(t.Tags) > 0 { out["tags"] = t.Tags }
         if t.Level.Valid { out["level"] = t.Level.String }
         if t.ToolWorkspaceID.Valid { out["tool_workspace_id"] = t.ToolWorkspaceID.String }
+        if t.Archived { out["archived"] = true }
         enc := json.NewEncoder(os.Stdout)
         enc.SetIndent("", "  ")
         return enc.Encode(out)

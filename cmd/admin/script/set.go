@@ -25,6 +25,9 @@ var (
     flagScrMotiv string
     flagScrNotes string
     flagScrTags  []string
+    flagScrName     string
+    flagScrVariant  string
+    flagScrArchived bool
 )
 
 var setCmd = &cobra.Command{
@@ -64,13 +67,15 @@ var setCmd = &cobra.Command{
         if err != nil { return err }
 
         // Upsert script
-        s := &pgdao.Script{
-            ID: flagScrID, Title: flagScrTitle, RoleName: flagScrRole, ScriptContentID: cid,
-        }
+        s := &pgdao.Script{ ID: flagScrID, Title: flagScrTitle, RoleName: flagScrRole, ScriptContentID: cid }
         if flagScrDesc != "" { s.Description = sql.NullString{String: flagScrDesc, Valid: true} }
         if flagScrMotiv != "" { s.Motivation = sql.NullString{String: flagScrMotiv, Valid: true} }
         if flagScrNotes != "" { s.Notes = sql.NullString{String: flagScrNotes, Valid: true} }
         if len(flagScrTags) > 0 { s.Tags = parseTags(flagScrTags) }
+        if strings.TrimSpace(flagScrName) != "" || strings.TrimSpace(flagScrVariant) != "" {
+            s.ComplexName = pgdao.ScriptComplexName{Name: strings.TrimSpace(flagScrName), Variant: strings.TrimSpace(flagScrVariant)}
+        }
+        s.Archived = flagScrArchived
         if err := pgdao.UpsertScript(ctx, db, s); err != nil { return err }
 
         // stderr summary
@@ -99,6 +104,9 @@ func init() {
     setCmd.Flags().StringVar(&flagScrMotiv, "motivation", "", "Motivation or intent")
     setCmd.Flags().StringVar(&flagScrNotes, "notes", "", "Markdown-formatted notes")
     setCmd.Flags().StringSliceVar(&flagScrTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
+    setCmd.Flags().StringVar(&flagScrName, "name", "", "Complex-name: name (exact lookup key)")
+    setCmd.Flags().StringVar(&flagScrVariant, "variant", "", "Complex-name: variant (exact lookup key; may be empty)")
+    setCmd.Flags().BoolVar(&flagScrArchived, "archived", false, "Mark script as archived (excluded from active lookups)")
 }
 
 // parseTags converts k=v pairs (or bare keys) into a map.

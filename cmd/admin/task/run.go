@@ -24,6 +24,7 @@ var (
     flagRunExperiment string
     flagRunTimeout   string // go duration; overrides task timeout
     flagRunEnv       []string
+    flagRunScriptName string
 )
 
 var runCmd = &cobra.Command{
@@ -43,8 +44,12 @@ var runCmd = &cobra.Command{
         defer db.Close()
         task, err := pgdao.GetTaskByVariant(ctx, db, flagRunVariant)
         if err != nil { return err }
-        if !task.RunScriptID.Valid || strings.TrimSpace(task.RunScriptID.String) == "" {
-            return fmt.Errorf("task %q has no run script id defined", task.Variant)
+        // Resolve script attachment by name (default "run")
+        name := strings.TrimSpace(flagRunScriptName)
+        if name == "" { name = "run" }
+        scr, err := pgdao.ResolveTaskScript(ctx, db, task.ID, name)
+        if err != nil {
+            return fmt.Errorf("no script named %q attached to task %s (variant=%q): %w. Attach one via: rbc admin task script add --task %s --script <SCRIPT_ID> --name %q", name, task.ID, task.Variant, err, task.ID, name)
         }
         // Parse timeout: flag overrides task's timeout
         toDur, err := chooseTimeout(flagRunTimeout, task.Timeout.String)
@@ -73,10 +78,8 @@ var runCmd = &cobra.Command{
         // Prepare command with context timeout
         runCtx, cancelRun := context.WithTimeout(context.Background(), toDur)
         defer cancelRun()
-        // Resolve script body: task.run_script_id -> scripts -> scripts_content
-        sc, err := pgdao.GetScriptByID(ctx, db, task.RunScriptID.String)
-        if err != nil { return err }
-        body, err := pgdao.GetScriptContent(ctx, db, sc.ScriptContentID)
+        // Resolve script body from resolved attachment
+        body, err := pgdao.GetScriptContent(ctx, db, scr.ScriptContentID)
         if err != nil { return err }
         cmdExec, interpreter := buildCommand(runCtx, task, body)
         // Environment
@@ -153,6 +156,7 @@ func init() {
     runCmd.Flags().StringVar(&flagRunExperiment, "experiment", "", "Experiment UUID to link execution")
     runCmd.Flags().StringVar(&flagRunTimeout, "timeout", "", "Override timeout as Go duration, e.g., 5m30s")
     runCmd.Flags().StringSliceVar(&flagRunEnv, "env", nil, "Extra environment variables KEY=VALUE (repeatable)")
+    runCmd.Flags().StringVar(&flagRunScriptName, "script", "run", "Logical script name attached to the task")
 }
 
 // chooseTimeout selects a time.Duration given an optional Go duration string and
