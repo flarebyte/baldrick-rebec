@@ -76,7 +76,7 @@ import {
   topicListJSON,
   topicSet,
   workflowListJSON,
-  workspaceSet
+  workspaceSet,
 } from './cli-helper.mjs';
 import {
   validateBlackboardListContract,

@@ -264,7 +264,7 @@ export async function stickieSet({
   if (topicName) args.push('--topic-name', topicName);
   if (topicRole) args.push('--topic-role', topicRole);
   if (note) args.push('--note', note);
-  if (labels && labels.length) args.push('--labels', labels.join(','));
+  if (labels?.length) args.push('--labels', labels.join(','));
   if (createdByTask) args.push('--created-by-task', createdByTask);
   if (priority) args.push('--priority', priority);
   if (name !== undefined) args.push('--name', name);
