@@ -160,6 +160,16 @@ export async function stickieListJSON({ blackboard = '', topicName = '', topicRo
   return await runRbcJSON(...args);
 }
 
+export async function workflowListJSON({ role, limit = 100, offset = 0 } = {}) {
+  return await runRbcJSON('admin', 'workflow', 'list', '--role', role, '--output', 'json', '--limit', String(limit), '--offset', String(offset));
+}
+
+export async function taskListJSON({ role, workflow = '', limit = 100, offset = 0 } = {}) {
+  const args = ['admin', 'task', 'list', '--role', role, '--output', 'json', '--limit', String(limit), '--offset', String(offset)];
+  if (workflow) args.push('--workflow', workflow);
+  return await runRbcJSON(...args);
+}
+
 export async function stickieFind({ name, variant = '', archived = false, blackboard = '' }) {
   const args = ['admin', 'stickie', 'find', '--name', name, '--variant', variant];
   if (archived) args.push('--archived');

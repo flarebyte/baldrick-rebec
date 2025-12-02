@@ -16,6 +16,8 @@ const TEST_ROLE_QA = 'rbctest-qa';
 const SKIP_RESET = argv['skip-reset'] ?? false;
 const SKIP_SNAPSHOT = argv['skip-snapshot'] ?? false;
 
+import { z } from 'zod';
+
 // -----------------------------
 // Helpers (shared)
 // -----------------------------
@@ -30,9 +32,11 @@ import {
   roleGetJSON,
   roleListJSON,
   runSetWorkflow,
+  workflowListJSON,
   runSetTask,
   taskSetReplacement,
   scriptListJSON,
+  taskListJSON,
   scriptFind,
   stickieListJSON,
   stickieFind,
@@ -73,7 +77,7 @@ import {
   dbReset,
   dbScaffoldAll,
 } from './cli-helper.mjs';
-import { validateRoleContract, validateRoleListContract } from './contract-helper.mjs';
+import { validateRoleContract, validateRoleListContract, validateWorkflowListContract, validateScriptListContract, validateTaskListContract, validateStickieListContract } from './contract-helper.mjs';
 
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 
@@ -123,6 +127,10 @@ try {
   logStep(step, TOTAL, 'Creating workflows');
   await runSetWorkflow({ name: 'ci-test', title: 'Continuous Integration: Test Suite', description: 'Runs unit and integration tests.', notes: 'CI test workflow', role: TEST_ROLE_USER });
   await runSetWorkflow({ name: 'ci-lint', title: 'Continuous Integration: Lint & Format', description: 'Lints and vets the codebase.', notes: 'CI lint workflow', role: TEST_ROLE_USER });
+  {
+    const wfList = await workflowListJSON({ role: TEST_ROLE_USER, limit: 50 });
+    validateWorkflowListContract(wfList, { allowEmptyTitle: false });
+  }
 
   // 4) Scripts
   step++;
@@ -149,6 +157,7 @@ try {
   // Regression: script list includes complex name; script find resolves by complex name
   {
     const listJSON = await scriptListJSON({ role: TEST_ROLE_USER });
+    validateScriptListContract(listJSON, { allowEmptyTitle: false });
     const byId = (id) => (listJSON || []).find((x) => x && (x.id === id || x.ID === id));
     const ju = byId(sidUnit);
     assert(ju, 'script list json missing unit script');
@@ -169,6 +178,10 @@ try {
   step++;
   logStep(step, TOTAL, 'Creating tasks');
   const tUnit = idFrom(await runSetTask({ workflow: 'ci-test', command: 'unit', variant: 'go', role: TEST_ROLE_USER, title: 'Run Unit Tests', description: 'Executes unit tests.', shell: 'bash', timeout: '10 minutes', tags: 'unit,fast', level: 'h2' }));
+  {
+    const tList = await taskListJSON({ role: TEST_ROLE_USER, limit: 50 });
+    validateTaskListContract(tList, { allowEmptyTitle: true });
+  }
   await runSetTask({ workflow: 'ci-test', command: 'integration', variant: '', role: TEST_ROLE_USER, title: 'Run Integration Tests', description: 'Runs integration tests.', shell: 'bash', timeout: '30 minutes', tags: 'integration,slow', level: 'h2' });
   await runSetTask({ workflow: 'ci-lint', command: 'lint', variant: 'go', role: TEST_ROLE_USER, title: 'Lint & Vet', description: 'Runs vet and lints.', shell: 'bash', timeout: '5 minutes', tags: 'lint,style', level: 'h2' });
 
@@ -259,7 +272,8 @@ try {
   await stickieListByBlackboard({ blackboard: bb1, limit: 50 });
   // Regression: stickie list includes complex name; stickie find resolves by complex name and blackboard
   {
-  const stList = await stickieListJSON({ blackboard: bb1 });
+    const stList = await stickieListJSON({ blackboard: bb1 });
+    validateStickieListContract(stList);
     const byId = (id) => (stList || []).find((x) => x && (x.id === id || x.ID === id));
     const s1json = byId(st1);
     assert(s1json && s1json.name === 'Onboarding Refresh', 'stickie list json missing or wrong name for st1');
