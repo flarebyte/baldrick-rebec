@@ -16,8 +16,6 @@ const TEST_ROLE_QA = 'rbctest-qa';
 const SKIP_RESET = argv['skip-reset'] ?? false;
 const SKIP_SNAPSHOT = argv['skip-snapshot'] ?? false;
 
-// Side-effect import ensures zx --install fetches zod; all usage is in contract-helper
-import 'zod';
 
 // -----------------------------
 // Helpers (shared)
