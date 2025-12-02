@@ -1,8 +1,11 @@
 // Contract validation helpers using Zod. These are for test-only assertions.
 // ZX runner will auto-install zod when run with `zx --install`.
 import * as Z from 'zod';
-// Support both ESM/CJS forms: prefer named export `z`, fallback to namespace
-const z = Z.z ?? Z;
+// Support both ESM/CJS forms:
+// - ESM provides named export `z`
+// - Some loaders expose zod under default
+// - Otherwise, fall back to the namespace itself
+const z = (Z && (Z.z || Z.default)) ? (Z.z || Z.default) : Z;
 
 function roleSchemaFactory({ allowEmptyTitle = false } = {}) {
   const titleSchema = allowEmptyTitle ? z.string() : z.string().min(1);
