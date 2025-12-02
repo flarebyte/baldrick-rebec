@@ -315,6 +315,8 @@ try {
   step++;
   logStep(step, TOTAL, 'Done.');
 } catch (err) {
-  console.error('Test-all failed:', err?.stderr || err?.message || err);
+  const msg = err && (err.stack || err.stderr || err.message || String(err));
+  const extra = err && (err.stdout ? `\nstdout:\n${err.stdout}` : '') + (err.stderr ? `\nstderr:\n${err.stderr}` : '');
+  console.error('Test-all failed:', msg, extra);
   process.exit(1);
 }
