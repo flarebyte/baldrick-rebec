@@ -256,12 +256,15 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             tool_workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL,
             tags JSONB DEFAULT '{}'::jsonb,
             level TEXT CHECK (level IN ('h1','h2','h3','h4','h5','h6') OR level IS NULL),
+            archived BOOLEAN NOT NULL DEFAULT FALSE,
             UNIQUE (variant),
             FOREIGN KEY (variant) REFERENCES task_variants(variant) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_tasks_variant ON tasks(variant)`,
         // Remove legacy column if present
         `ALTER TABLE tasks DROP COLUMN IF EXISTS run_script_id`,
+        // Ensure archived column exists for tasks
+        `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`,
         // Task-Script attachments: associate scripts to tasks under logical names and optional aliases
         `CREATE TABLE IF NOT EXISTS task_scripts (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
