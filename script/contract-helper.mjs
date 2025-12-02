@@ -103,3 +103,81 @@ function stickieListItemSchemaFactory() {
 export function validateStickieListContract(arr) {
   return z.array(stickieListItemSchemaFactory()).parse(arr);
 }
+
+// Projects
+function projectListItemSchemaFactory() {
+  return z.object({
+    name: z.string().min(1),
+    role: z.string().min(1),
+    description: z.string().min(1).optional(),
+    notes: z.string().min(1).optional(),
+    created: z.string().optional(),
+    updated: z.string().optional(),
+  });
+}
+export function validateProjectListContract(arr) { return z.array(projectListItemSchemaFactory()).parse(arr); }
+
+// Stores
+function storeListItemSchemaFactory() {
+  return z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    role: z.string().min(1),
+    title: z.string().min(1),
+    type: z.string().min(1).optional(),
+    scope: z.string().min(1).optional(),
+    lifecycle: z.string().min(1).optional(),
+    updated: z.string().optional(),
+  });
+}
+export function validateStoreListContract(arr) { return z.array(storeListItemSchemaFactory()).parse(arr); }
+
+// Topics
+function topicListItemSchemaFactory() {
+  return z.object({
+    name: z.string().min(1),
+    role: z.string().min(1),
+    title: z.string().min(1),
+    created: z.string().optional(),
+    updated: z.string().optional(),
+  });
+}
+export function validateTopicListContract(arr) { return z.array(topicListItemSchemaFactory()).parse(arr); }
+
+// Blackboards
+function blackboardListItemSchemaFactory() {
+  return z.object({
+    id: z.string().min(1),
+    role: z.string().min(1),
+    store_id: z.string().min(1),
+    project: z.string().min(1).optional(),
+    updated: z.string().optional(),
+  });
+}
+export function validateBlackboardListContract(arr) { return z.array(blackboardListItemSchemaFactory()).parse(arr); }
+
+// Conversations
+function conversationListItemSchemaFactory() {
+  return z.object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    project: z.string().min(1).optional(),
+    tags: z.record(z.any()).optional(),
+    created: z.string().optional(),
+  });
+}
+export function validateConversationListContract(arr) { return z.array(conversationListItemSchemaFactory()).parse(arr); }
+
+// Messages
+function messageListItemSchemaFactory() {
+  return z.object({
+    id: z.string().min(1),
+    content_id: z.string().min(1),
+    status: z.string().min(1),
+    created: z.string().min(1),
+    from_task_id: z.string().min(1).optional(),
+    experiment_id: z.string().min(1).optional(),
+    tags: z.record(z.any()).optional(),
+  });
+}
+export function validateMessageListContract(arr) { return z.array(messageListItemSchemaFactory()).parse(arr); }

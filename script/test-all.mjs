@@ -40,6 +40,12 @@ import {
   stickieListJSON,
   stickieFind,
   stickieSet,
+  projectListJSON,
+  storeListJSON,
+  topicListJSON,
+  blackboardListJSON,
+  conversationListJSON,
+  messageListJSON,
   storeGet,
   blackboardSet,
   messageSet,
@@ -76,7 +82,7 @@ import {
   dbReset,
   dbScaffoldAll,
 } from './cli-helper.mjs';
-import { validateRoleContract, validateRoleListContract, validateWorkflowListContract, validateScriptListContract, validateTaskListContract, validateStickieListContract } from './contract-helper.mjs';
+import { validateRoleContract, validateRoleListContract, validateWorkflowListContract, validateScriptListContract, validateTaskListContract, validateStickieListContract, validateProjectListContract, validateStoreListContract, validateTopicListContract, validateBlackboardListContract, validateConversationListContract, validateMessageListContract } from './contract-helper.mjs';
 
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 
@@ -194,24 +200,40 @@ try {
   await tagSet({ name: 'priority-high', title: 'High Priority', role: TEST_ROLE_USER });
   await topicSet({ name: 'onboarding', role: TEST_ROLE_USER, title: 'Onboarding', description: 'New hires onboarding', tags: 'area=people,priority=med' });
   await topicSet({ name: 'devops', role: TEST_ROLE_USER, title: 'DevOps', description: 'Build, deploy, CI/CD', tags: 'area=platform,priority=high' });
+  {
+    const topics = await topicListJSON({ role: TEST_ROLE_USER, limit: 50 });
+    validateTopicListContract(topics);
+  }
 
   // 7) Projects
   step++;
   logStep(step, TOTAL, 'Creating projects');
   await projectSet({ name: 'acme/build-system', role: TEST_ROLE_USER, description: 'Build system and CI pipeline', tags: 'status=active,type=ci' });
   await projectSet({ name: 'acme/product', role: TEST_ROLE_USER, description: 'Main product', tags: 'status=active,type=app' });
+  {
+    const prj = await projectListJSON({ role: TEST_ROLE_USER, limit: 50 });
+    validateProjectListContract(prj);
+  }
 
   // 8) Stores & Blackboards
   step++;
   logStep(step, TOTAL, 'Creating stores and blackboards');
   await storeSet({ name: 'ideas-acme-build', role: TEST_ROLE_USER, title: 'Ideas for acme/build-system', description: 'Idea backlog', type: 'journal', scope: 'project', lifecycle: 'monthly', tags: 'topic=ideas,project=acme/build-system' });
   await storeSet({ name: 'blackboard-global', role: TEST_ROLE_USER, title: 'Shared Blackboard', description: 'Scratch space for team', type: 'blackboard', scope: 'shared', lifecycle: 'weekly', tags: 'visibility=team' });
+  {
+    const stores = await storeListJSON({ role: TEST_ROLE_USER, limit: 50 });
+    validateStoreListContract(stores);
+  }
 
   const s1 = idFrom(await storeGet({ name: 'ideas-acme-build', role: TEST_ROLE_USER }));
   const s2 = idFrom(await storeGet({ name: 'blackboard-global', role: TEST_ROLE_USER }));
 
   const bb1 = idFrom(await blackboardSet({ role: TEST_ROLE_USER, storeId: s1, project: 'acme/build-system', background: 'Ideas board for build system', guidelines: 'Keep concise; tag items with priority' }));
   const bb2 = idFrom(await blackboardSet({ role: TEST_ROLE_USER, storeId: s2, background: 'Team-wide blackboard', guidelines: 'Wipe weekly on Mondays' }));
+  {
+    const bbs = await blackboardListJSON({ role: TEST_ROLE_USER, limit: 50 });
+    validateBlackboardListContract(bbs);
+  }
 
   // 9) Stickies and relations
   step++;
@@ -252,6 +274,12 @@ try {
   await queuePeek({ limit: 2 });
   await queueSize();
   await queueTake({ id: q1 });
+  {
+    const convs = await conversationListJSON({ role: TEST_ROLE_USER, limit: 50 });
+    validateConversationListContract(convs);
+    const msgs = await messageListJSON({ role: TEST_ROLE_USER, limit: 50 });
+    validateMessageListContract(msgs);
+  }
 
   // 12) Listings & counts
   step++;

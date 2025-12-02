@@ -302,3 +302,28 @@ export async function snapshotPrunePreviewJSON({ olderThan = '90d', schema = 'ba
 export async function snapshotPruneYesJSON({ olderThan = '90d', schema = 'backup' }) {
   return await runRbcJSON('admin', 'snapshot', 'prune', '--older-than', olderThan, '--schema', schema, '--yes', '--json');
 }
+
+export async function projectListJSON({ role, limit = 100, offset = 0 }) {
+  return await runRbcJSON('admin', 'project', 'list', '--role', role, '--output', 'json', '--limit', String(limit), '--offset', String(offset));
+}
+export async function storeListJSON({ role, limit = 100, offset = 0 }) {
+  return await runRbcJSON('admin', 'store', 'list', '--role', role, '--output', 'json', '--limit', String(limit), '--offset', String(offset));
+}
+export async function topicListJSON({ role, limit = 100, offset = 0 }) {
+  return await runRbcJSON('admin', 'topic', 'list', '--role', role, '--output', 'json', '--limit', String(limit), '--offset', String(offset));
+}
+export async function blackboardListJSON({ role, limit = 100, offset = 0 }) {
+  return await runRbcJSON('admin', 'blackboard', 'list', '--role', role, '--output', 'json', '--limit', String(limit), '--offset', String(offset));
+}
+export async function conversationListJSON({ role, project = '', limit = 100, offset = 0 }) {
+  const args = ['admin', 'conversation', 'list', '--role', role, '--output', 'json', '--limit', String(limit), '--offset', String(offset)];
+  if (project) args.push('--project', project);
+  return await runRbcJSON(...args);
+}
+export async function messageListJSON({ role, experiment = '', task = '', status = '', limit = 100, offset = 0 }) {
+  const args = ['admin', 'message', 'list', '--role', role, '--output', 'json', '--limit', String(limit), '--offset', String(offset)];
+  if (experiment) args.push('--experiment', experiment);
+  if (task) args.push('--task', task);
+  if (status) args.push('--status', status);
+  return await runRbcJSON(...args);
+}
