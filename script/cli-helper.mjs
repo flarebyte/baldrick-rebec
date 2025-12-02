@@ -48,6 +48,14 @@ export async function runSetRole({ name, title, description = '', notes = '' }) 
   );
 }
 
+export async function roleGetJSON({ name }) {
+  return await runRbcJSON('admin', 'role', 'get', '--name', name);
+}
+
+export async function roleListJSON({ limit = 100, offset = 0 } = {}) {
+  return await runRbcJSON('admin', 'role', 'list', '--output', 'json', '--limit', String(limit), '--offset', String(offset));
+}
+
 export async function runSetWorkflow({ name, title, description = '', role = 'user', notes = '' }) {
   return await runRbc(
     'admin',

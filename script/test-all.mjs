@@ -27,6 +27,8 @@ import {
   assert,
   createScript,
   runSetRole,
+  roleGetJSON,
+  roleListJSON,
   runSetWorkflow,
   runSetTask,
   taskSetReplacement,
@@ -71,6 +73,7 @@ import {
   dbReset,
   dbScaffoldAll,
 } from './cli-helper.mjs';
+import { validateRoleContract, validateRoleListContract } from './contract-helper.mjs';
 
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 
@@ -104,6 +107,16 @@ try {
   logStep(step, TOTAL, 'Ensuring roles for test users (FK for packages)');
   await runSetRole({ name: TEST_ROLE_USER, title: 'RBCTest User' });
   await runSetRole({ name: TEST_ROLE_QA, title: 'RBCTest QA' });
+  // Contract checks: roles
+  {
+    const rUser = await roleGetJSON({ name: TEST_ROLE_USER });
+    validateRoleContract(rUser, { allowEmptyTitle: false });
+    const rQA = await roleGetJSON({ name: TEST_ROLE_QA });
+    validateRoleContract(rQA, { allowEmptyTitle: false });
+    const rList = await roleListJSON({ limit: 200 });
+    const parsed = validateRoleListContract(rList, { allowEmptyTitle: false });
+    assert(parsed.length >= 2, 'expected at least the 2 test roles in role list');
+  }
 
   // 3) Workflows
   step++;
