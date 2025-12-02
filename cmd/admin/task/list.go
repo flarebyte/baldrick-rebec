@@ -48,13 +48,21 @@ var listCmd = &cobra.Command{
                 if t.Created.Valid { item["created"] = t.Created.Time.Format(time.RFC3339Nano) }
                 if t.Title.Valid { item["title"] = t.Title.String }
                 if len(t.Tags) > 0 { item["tags"] = t.Tags }
+                if t.Archived { item["archived"] = true }
                 arr = append(arr, item)
             }
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
         table := tablewriter.NewWriter(os.Stdout)
-        table.SetHeader([]string{"ID", "VARIANT", "COMMAND"})
+        table.SetHeader([]string{"ID", "VARIANT", "COMMAND", "ARCH"})
         for _, t := range tasks { table.Append([]string{t.ID, t.Variant, t.Command}) }
+        // rewrite rows with ARCH column
+        table = tablewriter.NewWriter(os.Stdout)
+        table.SetHeader([]string{"ID", "VARIANT", "COMMAND", "ARCH"})
+        for _, t := range tasks {
+            arch := ""; if t.Archived { arch = "yes" }
+            table.Append([]string{t.ID, t.Variant, t.Command, arch})
+        }
         table.Render(); return nil
     },
 }

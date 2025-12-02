@@ -97,7 +97,7 @@ func ResolveTaskScript(ctx context.Context, db *pgxpool.Pool, taskID, nameOrAlia
 // ListTasksUsingScript lists tasks that reference the given script via attachments.
 func ListTasksUsingScript(ctx context.Context, db *pgxpool.Pool, scriptID string) ([]Task, error) {
     rows, err := db.Query(ctx, `SELECT t.id::text, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
-                                       t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.created
+                                       t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
                                 FROM task_scripts ts
                                 JOIN tasks t ON t.id = ts.task_id
                                 LEFT JOIN task_variants tv ON tv.variant = t.variant
@@ -110,7 +110,7 @@ func ListTasksUsingScript(ctx context.Context, db *pgxpool.Pool, scriptID string
         var t Task
         var tagsJSON []byte
         if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
-            &t.Notes, &t.Shell, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Created); err != nil {
+            &t.Notes, &t.Shell, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Archived, &t.Created); err != nil {
             return nil, dbutil.ErrWrap("task_script.tasks.scan", err)
         }
         if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }

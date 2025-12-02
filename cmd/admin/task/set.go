@@ -31,6 +31,7 @@ var (
     flagTaskTags    []string
     flagTaskLevel   string
     flagTaskToolWS  string
+    flagTaskArchived bool
     // replacement relationship flags (AGE graph)
     flagTaskReplaces       string
     flagTaskReplaceLevel   string
@@ -63,6 +64,7 @@ var setCmd = &cobra.Command{
         if len(flagTaskTags) > 0 { t.Tags = parseTags(flagTaskTags) }
         if strings.TrimSpace(flagTaskToolWS) != "" { t.ToolWorkspaceID = sql.NullString{String: strings.TrimSpace(flagTaskToolWS), Valid: true} }
         if flagTaskLevel != "" { t.Level = sql.NullString{String: flagTaskLevel, Valid: true} }
+        t.Archived = flagTaskArchived
         if err := pgdao.UpsertTask(ctx, db, t); err != nil { return err }
         // Optional: create REPLACES edge in graph
         if strings.TrimSpace(flagTaskReplaces) != "" {
@@ -113,6 +115,7 @@ func init() {
     setCmd.Flags().StringVar(&flagTaskReplaceLevel, "replace-level", "minor", "Replacement level: patch|minor|major (default minor)")
     setCmd.Flags().StringVar(&flagTaskReplaceComment, "replace-comment", "", "Optional comment for replacement edge")
     setCmd.Flags().StringVar(&flagTaskReplaceCreated, "replace-created", "", "Optional timestamp (RFC3339) for replacement edge creation; defaults to now on DB side")
+    setCmd.Flags().BoolVar(&flagTaskArchived, "archived", false, "Mark task as archived (excluded from active lookups)")
 }
 
 // parseTags converts k=v pairs (or bare keys) into a map.
