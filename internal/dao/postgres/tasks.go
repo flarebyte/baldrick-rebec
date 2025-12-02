@@ -191,6 +191,83 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow, roleName string,
     return out, nil
 }
 
+// ListTasksWithArchived lists tasks with optional workflow filter and archived filtering.
+// Modes:
+// - if activeOnly is true: archived=false
+// - if archivedOnly is true: archived=true
+// - otherwise: no archived predicate (both)
+func ListTasksWithArchived(ctx context.Context, db *pgxpool.Pool, workflow, roleName string, limit, offset int, activeOnly, archivedOnly bool) ([]Task, error) {
+    if limit <= 0 { limit = 100 }
+    if offset < 0 { offset = 0 }
+    var rows pgxRows
+    var err error
+    // Construct cases mirroring ListTasks to keep parameter order simple
+    if stringsTrim(workflow) == "" {
+        switch {
+        case activeOnly:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE t.role_name=$1 AND t.archived=false
+                                       ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
+        case archivedOnly:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE t.role_name=$1 AND t.archived=true
+                                       ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
+        default:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE t.role_name=$1
+                                       ORDER BY t.variant ASC LIMIT $2 OFFSET $3`, roleName, limit, offset)
+        }
+    } else {
+        switch {
+        case activeOnly:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE tv.workflow_id=$1 AND t.role_name=$2 AND t.archived=false
+                                       ORDER BY t.variant ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
+        case archivedOnly:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE tv.workflow_id=$1 AND t.role_name=$2 AND t.archived=true
+                                       ORDER BY t.variant ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
+        default:
+            rows, err = db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                            t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                       FROM tasks t
+                                       LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                       WHERE tv.workflow_id=$1 AND t.role_name=$2
+                                       ORDER BY t.variant ASC LIMIT $3 OFFSET $4`, workflow, roleName, limit, offset)
+        }
+    }
+    if err != nil { return nil, dbutil.ErrWrap("task.list", err, dbutil.ParamSummary("workflow", workflow), dbutil.ParamSummary("role", roleName), fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset)) }
+    defer rows.Close()
+    var out []Task
+    for rows.Next() {
+        var t Task
+        var tagsJSON []byte
+        if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
+            &t.Notes, &t.Shell, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Archived, &t.Created); err != nil {
+            return nil, dbutil.ErrWrap("task.list.scan", err)
+        }
+        if len(tagsJSON) > 0 { _ = json.Unmarshal(tagsJSON, &t.Tags) }
+        out = append(out, t)
+    }
+    if err := rows.Err(); err != nil { return nil, dbutil.ErrWrap("task.list", err) }
+    return out, nil
+}
+
 // DeleteTaskByID deletes a task by id.
 func DeleteTaskByID(ctx context.Context, db *pgxpool.Pool, id string) (int64, error) {
     ct, err := db.Exec(ctx, `DELETE FROM tasks WHERE id=$1::uuid`, id)

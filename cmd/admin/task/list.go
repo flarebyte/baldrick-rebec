@@ -22,6 +22,8 @@ var (
     flagTaskListMax    int
     flagTaskListOutput string
     flagTaskListRole   string
+    flagTaskListActiveOnly   bool
+    flagTaskListArchivedOnly bool
 )
 
 var listCmd = &cobra.Command{
@@ -38,7 +40,8 @@ var listCmd = &cobra.Command{
         effLimit := flagTaskListMax
         if effLimit <= 0 { effLimit = flagTaskListLimit }
         if strings.TrimSpace(flagTaskListRole) == "" { return errors.New("--role is required") }
-        tasks, err := pgdao.ListTasks(ctx, db, flagTaskListWF, flagTaskListRole, effLimit, flagTaskListOffset)
+        if flagTaskListActiveOnly && flagTaskListArchivedOnly { return errors.New("--active-only and --archived-only are mutually exclusive") }
+        tasks, err := pgdao.ListTasksWithArchived(ctx, db, flagTaskListWF, flagTaskListRole, effLimit, flagTaskListOffset, flagTaskListActiveOnly, flagTaskListArchivedOnly)
         if err != nil { return err }
         fmt.Fprintf(os.Stderr, "tasks: %d\n", len(tasks))
         if strings.ToLower(strings.TrimSpace(flagTaskListOutput)) == "json" {
@@ -54,10 +57,6 @@ var listCmd = &cobra.Command{
             enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(arr)
         }
         table := tablewriter.NewWriter(os.Stdout)
-        table.SetHeader([]string{"ID", "VARIANT", "COMMAND", "ARCH"})
-        for _, t := range tasks { table.Append([]string{t.ID, t.Variant, t.Command}) }
-        // rewrite rows with ARCH column
-        table = tablewriter.NewWriter(os.Stdout)
         table.SetHeader([]string{"ID", "VARIANT", "COMMAND", "ARCH"})
         for _, t := range tasks {
             arch := ""; if t.Archived { arch = "yes" }
@@ -75,4 +74,6 @@ func init() {
     listCmd.Flags().IntVar(&flagTaskListMax, "max-results", 20, "Max results to return (default 20)")
     listCmd.Flags().StringVar(&flagTaskListOutput, "output", "table", "Output format: table or json")
     listCmd.Flags().StringVar(&flagTaskListRole, "role", "", "Role name (required)")
+    listCmd.Flags().BoolVar(&flagTaskListActiveOnly, "active-only", false, "Only non-archived tasks")
+    listCmd.Flags().BoolVar(&flagTaskListArchivedOnly, "archived-only", false, "Only archived tasks")
 }
