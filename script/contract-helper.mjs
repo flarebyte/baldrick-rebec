@@ -7,8 +7,8 @@ function roleSchemaFactory({ allowEmptyTitle = false } = {}) {
   return z.object({
     name: z.string().min(1),
     title: titleSchema,
-    description: z.string().optional(),
-    notes: z.string().optional(),
+    description: z.string().min(1).optional(),
+    notes: z.string().min(1).optional(),
     tags: z.record(z.any()).optional(),
     created: z.string().optional(),
     updated: z.string().optional(),
@@ -30,8 +30,8 @@ function workflowSchemaFactory({ allowEmptyTitle = false } = {}) {
   return z.object({
     name: z.string().min(1),
     title: titleSchema,
-    description: z.string().optional(),
-    notes: z.string().optional(),
+    description: z.string().min(1).optional(),
+    notes: z.string().min(1).optional(),
     created: z.string().optional(),
     updated: z.string().optional(),
   });
@@ -49,12 +49,12 @@ function scriptSchemaFactory({ allowEmptyTitle = false } = {}) {
     title: titleSchema,
     role: z.string().min(1),
     content_id: z.string().optional(),
-    name: z.string().optional(),
+    name: z.string().min(1).optional(),
     variant: z.string().optional(),
     archived: z.boolean().optional(),
-    description: z.string().optional(),
-    motivation: z.string().optional(),
-    notes: z.string().optional(),
+    description: z.string().min(1).optional(),
+    motivation: z.string().min(1).optional(),
+    notes: z.string().min(1).optional(),
     created: z.string().optional(),
     updated: z.string().optional(),
   });
@@ -66,15 +66,16 @@ export function validateScriptListContract(arr, opts = {}) {
 
 // Tasks
 function taskSchemaFactory({ allowEmptyTitle = true } = {}) {
-  const titleSchema = allowEmptyTitle ? z.string().optional() : z.string().min(1).optional();
+  const titleSchema = allowEmptyTitle ? z.string() : z.string().min(1);
   return z.object({
     id: z.string().min(1),
-    workflow: z.string().optional(),
     command: z.string().min(1),
     variant: z.string().min(1),
-    title: titleSchema,
-    tags: z.record(z.any()).optional(),
-    level: z.string().optional(),
+    // if present, ensure non-empty
+    workflow: z.string().min(1).optional(),
+    title: titleSchema.optional(),
+    // tags intentionally omitted due to variability
+    level: z.string().min(1).optional(),
     archived: z.boolean().optional(),
     created: z.string().optional(),
   });
@@ -90,9 +91,9 @@ function stickieListItemSchemaFactory() {
     id: z.string().min(1),
     blackboard_id: z.string().min(1),
     edit_count: z.number().int().nonnegative().optional(),
-    topic_name: z.string().optional(),
-    topic_role_name: z.string().optional(),
-    name: z.string().optional(),
+    topic_name: z.string().min(1).optional(),
+    topic_role_name: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
     variant: z.string().optional(),
     archived: z.boolean().optional(),
     updated: z.string().optional(),
