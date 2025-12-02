@@ -1,6 +1,8 @@
 // Contract validation helpers using Zod. These are for test-only assertions.
 // ZX runner will auto-install zod when run with `zx --install`.
-import { z } from 'zod';
+import * as Z from 'zod';
+// Support both ESM/CJS forms: prefer named export `z`, fallback to namespace
+const z = Z.z ?? Z;
 
 function roleSchemaFactory({ allowEmptyTitle = false } = {}) {
   const titleSchema = allowEmptyTitle ? z.string() : z.string().min(1);
@@ -102,4 +104,3 @@ function stickieListItemSchemaFactory() {
 export function validateStickieListContract(arr) {
   return z.array(stickieListItemSchemaFactory()).parse(arr);
 }
-
