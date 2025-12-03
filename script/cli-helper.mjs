@@ -799,3 +799,52 @@ export async function messageListJSON({
   if (status) args.push('--status', status);
   return await runRbcJSON(...args);
 }
+
+// -----------------------------
+// Vault helpers (read-only; never print secrets)
+// -----------------------------
+export async function vaultList() {
+  const p = await runRbc('admin', 'vault', 'list');
+  const lines = (p.stdout || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const items = [];
+  for (const line of lines) {
+    // Expected format: name\t[set|unset]\tbackend
+    const parts = line.split('\t');
+    if (parts.length >= 3) {
+      const name = parts[0].trim();
+      const statusRaw = parts[1].trim();
+      const status = statusRaw.replace(/\[|\]/g, '');
+      const backend = parts[2].trim();
+      items.push({ name, status, backend });
+    }
+  }
+  return items;
+}
+
+export async function vaultShow(name) {
+  const p = await runRbc('admin', 'vault', 'show', name);
+  const out = p.stdout || '';
+  const obj = { name: '', status: '', backend: '', updated: '' };
+  for (const line of out.split('\n')) {
+    const m = line.match(/^([^:]+):\s*(.*)$/);
+    if (!m) continue;
+    const k = m[1].trim().toLowerCase();
+    const v = m[2].trim();
+    if (k === 'name') obj.name = v;
+    else if (k === 'status') obj.status = v;
+    else if (k === 'backend') obj.backend = v;
+    else if (k.startsWith('last updated')) obj.updated = v;
+  }
+  return obj;
+}
+
+export async function vaultBackendCurrent() {
+  const p = await runRbc('admin', 'vault', 'backend', 'current');
+  return String(p.stdout || '').trim();
+}
+
+export async function vaultDoctor() {
+  // Return raw text for now; callers can inspect for 'status: OK'
+  const p = await runRbc('admin', 'vault', 'doctor');
+  return { stdout: String(p.stdout || ''), stderr: String(p.stderr || '') };
+}

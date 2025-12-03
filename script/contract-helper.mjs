@@ -193,3 +193,25 @@ function messageListItemSchemaFactory() {
 export function validateMessageListContract(arr) {
   return z.array(messageListItemSchemaFactory()).parse(arr);
 }
+
+// Vault (parsed, not JSON output)
+const VaultStatusEnum = z.enum(['set', 'unset']);
+
+export function validateVaultListContract(arr) {
+  const item = z.object({
+    name: z.string().min(1),
+    status: VaultStatusEnum,
+    backend: z.string().min(1),
+  });
+  return z.array(item).parse(arr);
+}
+
+export function validateVaultShowContract(obj) {
+  const schema = z.object({
+    name: z.string().min(1),
+    status: VaultStatusEnum,
+    backend: z.string().min(1),
+    updated: z.string().optional(),
+  });
+  return schema.parse(obj);
+}
