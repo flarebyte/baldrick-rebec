@@ -75,6 +75,10 @@ import {
   taskSetReplacement,
   topicListJSON,
   topicSet,
+  vaultBackendCurrent,
+  vaultDoctor,
+  vaultList,
+  vaultShow,
   workflowListJSON,
   workspaceSet,
 } from './cli-helper.mjs';
@@ -90,6 +94,8 @@ import {
   validateStoreListContract,
   validateTaskListContract,
   validateTopicListContract,
+  validateVaultListContract,
+  validateVaultShowContract,
   validateWorkflowListContract,
 } from './contract-helper.mjs';
 
@@ -98,7 +104,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 15;
+const TOTAL = 16;
 let step = 0;
 
 try {
@@ -632,7 +638,31 @@ try {
     logStep(step, TOTAL, 'Skipping snapshot (--skip-snapshot)');
   }
 
-  // 14) Done
+  // 15) Vault (read-only; conditional on presence of rbctest-key)
+  step++;
+  logStep(step, TOTAL, 'Vault read-only checks (if configured)');
+  try {
+    const items = await vaultList();
+    validateVaultListContract(items);
+    const exists = items.find(
+      (x) => x.name === 'rbctest-key' && x.status === 'set',
+    );
+    if (exists) {
+      const md = await vaultShow('rbctest-key');
+      validateVaultShowContract(md);
+      assert(md.name === 'rbctest-key', 'vault.show name matches');
+      assert(md.status === 'set', 'vault.show status is set');
+      const backend = await vaultBackendCurrent();
+      assert(backend === 'keychain', 'vault backend current is keychain');
+      await vaultDoctor();
+    } else {
+      console.error('vault: rbctest-key not set; skipping deep checks');
+    }
+  } catch (e) {
+    console.error('vault: checks skipped due to error:', e?.message || e);
+  }
+
+  // 16) Done
   step++;
   logStep(step, TOTAL, 'Done.');
 } catch (err) {

@@ -22,6 +22,7 @@ type Config struct {
     Server     ServerConfig     `yaml:"server"`
     Postgres   PostgresConfig   `yaml:"postgres"`
     Graph      GraphConfig      `yaml:"graph"`
+    Vault      VaultConfig      `yaml:"vault"`
 }
 
 func defaults() Config {
@@ -30,6 +31,7 @@ func defaults() Config {
         Postgres:   PostgresConfig{Host: "127.0.0.1", Port: 5432, DBName: "rbc", SSLMode: "disable",
             Admin: PGRole{User: "rbc_admin"}, App: PGRole{User: "rbc_app"}, Backup: PGRole{}},
         Graph:      GraphConfig{AllowFallback: false},
+        Vault:      VaultConfig{Backend: "keychain"},
     }
 }
 
@@ -92,6 +94,10 @@ func Load() (Config, error) {
     // Graph overrides
     // Booleans default to false; direct assignment is fine.
     cfg.Graph.AllowFallback = fileCfg.Graph.AllowFallback
+    // Vault overrides
+    if fileCfg.Vault.Backend != "" {
+        cfg.Vault.Backend = fileCfg.Vault.Backend
+    }
     return cfg, nil
 }
 
@@ -114,4 +120,10 @@ type GraphConfig struct {
     // AllowFallback controls whether CLI falls back to SQL mirror when graph (AGE) operations fail.
     // Default: false (no fallback) so issues are visible.
     AllowFallback bool `yaml:"allow_fallback"`
+}
+
+// VaultConfig controls secret storage backend used by the CLI/runtime.
+// Default backend is "keychain" on macOS.
+type VaultConfig struct {
+    Backend string `yaml:"backend"`
 }

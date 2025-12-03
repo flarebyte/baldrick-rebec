@@ -16,11 +16,11 @@ SCRIPTS_DIR := script
 ZX := npx zx
 
 # Run Biome via wrapper script to avoid logic here.
-biome-check:
+lint-check:
 	bash script/biome-check.sh
 
 # Write formatting changes for scripts managed by Biome (script/*.mjs via biome.json)
-biome-format:
+lint-format:
 	$(BIOME) format $(SCRIPTS_DIR) --write
 
 # Run the end-to-end ZX test script.
