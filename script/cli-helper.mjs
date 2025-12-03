@@ -805,7 +805,10 @@ export async function messageListJSON({
 // -----------------------------
 export async function vaultList() {
   const p = await runRbc('admin', 'vault', 'list');
-  const lines = (p.stdout || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = (p.stdout || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   const items = [];
   for (const line of lines) {
     // Expected format: name\t[set|unset]\tbackend

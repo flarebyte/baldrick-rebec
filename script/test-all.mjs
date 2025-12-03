@@ -58,10 +58,6 @@ import {
   snapshotRestoreDry,
   snapshotShow,
   snapshotVerifyJSON,
-  vaultBackendCurrent,
-  vaultDoctor,
-  vaultList,
-  vaultShow,
   stickieFind,
   stickieList,
   stickieListByBlackboard,
@@ -79,6 +75,10 @@ import {
   taskSetReplacement,
   topicListJSON,
   topicSet,
+  vaultBackendCurrent,
+  vaultDoctor,
+  vaultList,
+  vaultShow,
   workflowListJSON,
   workspaceSet,
 } from './cli-helper.mjs';
@@ -86,8 +86,6 @@ import {
   validateBlackboardListContract,
   validateConversationListContract,
   validateMessageListContract,
-  validateVaultListContract,
-  validateVaultShowContract,
   validateProjectListContract,
   validateRoleContract,
   validateRoleListContract,
@@ -96,6 +94,8 @@ import {
   validateStoreListContract,
   validateTaskListContract,
   validateTopicListContract,
+  validateVaultListContract,
+  validateVaultShowContract,
   validateWorkflowListContract,
 } from './contract-helper.mjs';
 
@@ -644,7 +644,9 @@ try {
   try {
     const items = await vaultList();
     validateVaultListContract(items);
-    const exists = items.find((x) => x.name === 'rbctest-key' && x.status === 'set');
+    const exists = items.find(
+      (x) => x.name === 'rbctest-key' && x.status === 'set',
+    );
     if (exists) {
       const md = await vaultShow('rbctest-key');
       validateVaultShowContract(md);
