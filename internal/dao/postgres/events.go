@@ -195,3 +195,9 @@ func jsonOrNil(b []byte) any {
     // Accept "{}" or other content as-is.
     return b
 }
+
+// nullOrFloat64 returns nil when the float is invalid (unset) to enable COALESCE in UPDATEs
+func nullOrFloat64(nf sql.NullFloat64) any {
+    if nf.Valid { return nf.Float64 }
+    return nil
+}

@@ -257,6 +257,7 @@ export async function stickieSet({
   name = '',
   variant = '',
   archived = false,
+  score = null,
 }) {
   const args = ['admin', 'stickie', 'set'];
   if (id) args.push('--id', id);
@@ -270,6 +271,7 @@ export async function stickieSet({
   if (name !== undefined) args.push('--name', name);
   if (variant !== undefined) args.push('--variant', variant);
   if (archived) args.push('--archived');
+  if (score !== null && score !== undefined) args.push('--score', String(score));
   return await runRbcJSON(...args);
 }
 
@@ -286,6 +288,10 @@ export async function stickieListJSON({
   if (topicRole) args.push('--topic-role', topicRole);
   args.push('--limit', String(limit), '--offset', String(offset));
   return await runRbcJSON(...args);
+}
+
+export async function stickieGetJSON({ id }) {
+  return await runRbcJSON('admin', 'stickie', 'get', '--id', id);
 }
 
 export async function workflowListJSON({ role, limit = 100, offset = 0 } = {}) {

@@ -471,6 +471,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             created_by_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
             edit_count INT NOT NULL DEFAULT 0,
             priority_level TEXT CHECK (priority_level IN ('must','should','could','wont') OR priority_level IS NULL),
+            score DOUBLE PRECISION,
             complex_name JSONB NOT NULL DEFAULT '{"name":"","variant":""}',
             archived BOOLEAN NOT NULL DEFAULT FALSE,
             FOREIGN KEY (topic_name, topic_role_name) REFERENCES topics(name, role_name) ON DELETE SET NULL
@@ -510,6 +511,8 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         `CREATE INDEX IF NOT EXISTS idx_stickies_complex_name_gin ON stickies USING GIN (complex_name jsonb_path_ops)`,
         // Ensure new optional structured JSONB column exists for stickies
         `ALTER TABLE stickies ADD COLUMN IF NOT EXISTS structured JSONB`,
+        // Ensure new optional score column exists for stickies
+        `ALTER TABLE stickies ADD COLUMN IF NOT EXISTS score DOUBLE PRECISION`,
         // Fallback store for stickie relationships when AGE is unavailable
         `CREATE TABLE IF NOT EXISTS stickie_relations (
             from_id UUID NOT NULL REFERENCES stickies(id) ON DELETE CASCADE,
