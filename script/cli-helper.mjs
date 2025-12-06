@@ -527,7 +527,17 @@ export async function toolSet({
   settings = '', // JSON string
   type = '',
 }) {
-  const args = ['admin', 'tool', 'set', '--name', name, '--title', title, '--role', role];
+  const args = [
+    'admin',
+    'tool',
+    'set',
+    '--name',
+    name,
+    '--title',
+    title,
+    '--role',
+    role,
+  ];
   if (description) args.push('--description', description);
   if (notes) args.push('--notes', notes);
   if (tags) args.push('--tags', tags);
@@ -556,7 +566,11 @@ export async function toolListJSON({ role, limit = 100, offset = 0 }) {
   );
 }
 
-export async function toolDelete({ name, force = true, ignoreMissing = false }) {
+export async function toolDelete({
+  name,
+  force = true,
+  ignoreMissing = false,
+}) {
   const args = ['admin', 'tool', 'delete', '--name', name];
   if (force) args.push('--force');
   if (ignoreMissing) args.push('--ignore-missing');

@@ -45,7 +45,6 @@ import {
   queueSize,
   queueTake,
   roleGetJSON,
-  toolGetJSON,
   roleListJSON,
   runSetRole,
   runSetTask,
@@ -72,11 +71,12 @@ import {
   storeGet,
   storeListJSON,
   storeSet,
-  toolListJSON,
-  toolSet,
   tagSet,
   taskListJSON,
   taskSetReplacement,
+  toolGetJSON,
+  toolListJSON,
+  toolSet,
   topicListJSON,
   topicSet,
   vaultBackendCurrent,
@@ -375,14 +375,27 @@ try {
   });
   {
     const tList = await toolListJSON({ role: TEST_ROLE_USER, limit: 50 });
-    assert(Array.isArray(tList) && tList.length >= 2, 'expected at least 2 tools in list');
-    const hasLinter = tList.find((x) => x && x.name === 'acme-linter' && x.title === 'Acme Linter');
-    const hasFmt = tList.find((x) => x && x.name === 'acme-formatter' && x.title === 'Acme Formatter');
+    assert(
+      Array.isArray(tList) && tList.length >= 2,
+      'expected at least 2 tools in list',
+    );
+    const hasLinter = tList.find(
+      (x) => x && x.name === 'acme-linter' && x.title === 'Acme Linter',
+    );
+    const hasFmt = tList.find(
+      (x) => x && x.name === 'acme-formatter' && x.title === 'Acme Formatter',
+    );
     assert(!!hasLinter, 'tool list missing acme-linter');
     assert(!!hasFmt, 'tool list missing acme-formatter');
     const t1 = await toolGetJSON({ name: 'acme-linter' });
-    assert(t1 && t1.name === 'acme-linter' && t1.role === TEST_ROLE_USER, 'tool get failed for acme-linter');
-    assert(t1.settings && t1.settings.autofix === true, 'tool get missing settings for acme-linter');
+    assert(
+      t1 && t1.name === 'acme-linter' && t1.role === TEST_ROLE_USER,
+      'tool get failed for acme-linter',
+    );
+    assert(
+      t1.settings && t1.settings.autofix === true,
+      'tool get missing settings for acme-linter',
+    );
   }
 
   // 8) Stores & Blackboards
