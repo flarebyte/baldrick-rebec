@@ -56,6 +56,7 @@ var findCmd = &cobra.Command{
         }
         if s.TopicName.Valid { out["topic_name"] = s.TopicName.String }
         if s.TopicRoleName.Valid { out["topic_role_name"] = s.TopicRoleName.String }
+        if s.Score.Valid { out["score"] = s.Score.Float64 }
         if s.Updated.Valid { out["updated"] = s.Updated.Time.Format(time.RFC3339Nano) }
         enc := json.NewEncoder(os.Stdout)
         enc.SetIndent("", "  ")
@@ -70,4 +71,3 @@ func init() {
     findCmd.Flags().BoolVar(&flagStFindArchived, "archived", false, "Search archived stickies instead of active ones")
     findCmd.Flags().StringVar(&flagStFindBlackboard, "blackboard", "", "Optional blackboard UUID scope filter")
 }
-

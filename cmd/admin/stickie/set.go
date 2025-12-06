@@ -27,6 +27,7 @@ var (
     flagStName        string
     flagStVariant     string
     flagStArchived    bool
+    flagStScore       float64
 )
 
 var setCmd = &cobra.Command{
@@ -54,6 +55,11 @@ var setCmd = &cobra.Command{
         }
         st.Archived = flagStArchived
 
+        // Optional score; only set if flag provided
+        if cmd.Flags().Changed("score") {
+            st.Score = sql.NullFloat64{Float64: flagStScore, Valid: true}
+        }
+
         if err := pgdao.UpsertStickie(ctx, db, st); err != nil { return err }
 
         fmt.Fprintf(os.Stderr, "stickie upserted id=%s blackboard=%s\n", st.ID, st.BlackboardID)
@@ -77,4 +83,5 @@ func init() {
     setCmd.Flags().StringVar(&flagStName, "name", "", "Complex name: name (exact lookup key)")
     setCmd.Flags().StringVar(&flagStVariant, "variant", "", "Complex name: variant (exact lookup key; may be empty)")
     setCmd.Flags().BoolVar(&flagStArchived, "archived", false, "Mark stickie as archived (excluded from active lookups)")
+    setCmd.Flags().Float64Var(&flagStScore, "score", 0, "Optimisation score (optional; double precision)")
 }

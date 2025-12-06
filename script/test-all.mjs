@@ -59,6 +59,7 @@ import {
   snapshotShow,
   snapshotVerifyJSON,
   stickieFind,
+  stickieGetJSON,
   stickieList,
   stickieListByBlackboard,
   stickieListByTopic,
@@ -418,6 +419,7 @@ try {
       priority: 'should',
       name: 'Onboarding Refresh',
       variant: '',
+      score: 0.42,
     }),
   );
   const st2 = idFrom(
@@ -449,6 +451,22 @@ try {
     type: 'uses',
     labels: 'ref,dependency',
   });
+
+  // Validate score set on create and update-after-create
+  {
+    const g1 = await stickieGetJSON({ id: st1 });
+    assert(
+      typeof g1.score === 'number' && Math.abs(g1.score - 0.42) < 1e-9,
+      'stickie st1 score should be 0.42 after create',
+    );
+    // Update stickie 2 with a score
+    await stickieSet({ id: st2, score: 0.99 });
+    const g2 = await stickieGetJSON({ id: st2 });
+    assert(
+      typeof g2.score === 'number' && Math.abs(g2.score - 0.99) < 1e-9,
+      'stickie st2 score should be 0.99 after update',
+    );
+  }
   await stickieRelSet({
     from: st2,
     to: st3,

@@ -37,6 +37,7 @@ var getCmd = &cobra.Command{
         if len(s.Labels) > 0 { out["labels"] = s.Labels }
         if s.CreatedByTaskID.Valid { out["created_by_task_id"] = s.CreatedByTaskID.String }
         if s.PriorityLevel.Valid { out["priority_level"] = s.PriorityLevel.String }
+        if s.Score.Valid { out["score"] = s.Score.Float64 }
         if s.Created.Valid { out["created"] = s.Created.Time.Format(time.RFC3339Nano) }
         if s.Updated.Valid { out["updated"] = s.Updated.Time.Format(time.RFC3339Nano) }
         enc := json.NewEncoder(os.Stdout); enc.SetIndent("", "  "); return enc.Encode(out)
@@ -47,4 +48,3 @@ func init() {
     StickieCmd.AddCommand(getCmd)
     getCmd.Flags().StringVar(&flagStGetID, "id", "", "Stickie UUID (required)")
 }
-
