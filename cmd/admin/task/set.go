@@ -1,141 +1,182 @@
 package task
 
 import (
-    "context"
-    "database/sql"
-    "encoding/json"
-    "errors"
-    "fmt"
-    "os"
-    "strings"
-    "time"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+	"time"
 
-    cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
-    pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    "github.com/spf13/cobra"
+	cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
+	pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
+	"github.com/spf13/cobra"
 )
 
 var (
-    flagTaskWF   string
-    flagTaskCmd  string
-    flagTaskVar  string
-    // removed: version
+	flagTaskWF  string
+	flagTaskCmd string
+	flagTaskVar string
+	// removed: version
 
-    flagTaskTitle string
-    flagTaskDesc  string
-    flagTaskMotiv string
-    flagTaskNotes string
-    flagTaskShell string
-    flagTaskRole string
-    flagTaskTimeout string
-    flagTaskTags    []string
-    flagTaskLevel   string
-    flagTaskToolWS  string
-    flagTaskArchived bool
-    // replacement relationship flags (AGE graph)
-    flagTaskReplaces       string
-    flagTaskReplaceLevel   string
-    flagTaskReplaceComment string
-    flagTaskReplaceCreated string
+	flagTaskTitle    string
+	flagTaskDesc     string
+	flagTaskMotiv    string
+	flagTaskNotes    string
+	flagTaskShell    string
+	flagTaskRole     string
+	flagTaskTimeout  string
+	flagTaskTags     []string
+	flagTaskLevel    string
+	flagTaskToolWS   string
+	flagTaskArchived bool
+	// replacement relationship flags (AGE graph)
+	flagTaskReplaces       string
+	flagTaskReplaceLevel   string
+	flagTaskReplaceComment string
+	flagTaskReplaceCreated string
 )
 
 var setCmd = &cobra.Command{
-    Use:   "set",
-    Short: "Create or update a task (by workflow and command/variant)",
-    RunE: func(cmd *cobra.Command, args []string) error {
-        if strings.TrimSpace(flagTaskWF) == "" || strings.TrimSpace(flagTaskCmd) == "" {
-            return errors.New("--workflow and --command are required")
-        }
-        cfg, err := cfgpkg.Load()
-        if err != nil { return err }
-        ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-        defer cancel()
-        db, err := pgdao.OpenApp(ctx, cfg)
-        if err != nil { return err }
-        defer db.Close()
-        t := &pgdao.Task{WorkflowID: flagTaskWF, Command: flagTaskCmd, Variant: flagTaskVar}
-        if strings.TrimSpace(flagTaskRole) != "" { t.RoleName = strings.TrimSpace(flagTaskRole) }
-        if flagTaskTitle != "" { t.Title = sql.NullString{String: flagTaskTitle, Valid: true} }
-        if flagTaskDesc  != "" { t.Description = sql.NullString{String: flagTaskDesc, Valid: true} }
-        if flagTaskMotiv != "" { t.Motivation = sql.NullString{String: flagTaskMotiv, Valid: true} }
-        if flagTaskNotes != "" { t.Notes = sql.NullString{String: flagTaskNotes, Valid: true} }
-        if flagTaskShell != "" { t.Shell = sql.NullString{String: flagTaskShell, Valid: true} }
-        if flagTaskTimeout != "" { t.Timeout = sql.NullString{String: flagTaskTimeout, Valid: true} }
-        if len(flagTaskTags) > 0 { t.Tags = parseTags(flagTaskTags) }
-        if strings.TrimSpace(flagTaskToolWS) != "" { t.ToolWorkspaceID = sql.NullString{String: strings.TrimSpace(flagTaskToolWS), Valid: true} }
-        if flagTaskLevel != "" { t.Level = sql.NullString{String: flagTaskLevel, Valid: true} }
-        t.Archived = flagTaskArchived
-        if err := pgdao.UpsertTask(ctx, db, t); err != nil { return err }
-        // Optional: create REPLACES edge in graph
-        if strings.TrimSpace(flagTaskReplaces) != "" {
-            level := strings.ToLower(strings.TrimSpace(flagTaskReplaceLevel))
-            if level == "" { level = "minor" }
-            if level != "patch" && level != "minor" && level != "major" { return fmt.Errorf("--replace-level must be patch|minor|major") }
-            if err := pgdao.CreateTaskReplacesEdge(ctx, db, t.ID, flagTaskReplaces, level, flagTaskReplaceComment, strings.TrimSpace(flagTaskReplaceCreated)); err != nil {
-                // Non-fatal: print a warning and proceed
-                fmt.Fprintf(os.Stderr, "warn: graph REPLACES edge not created: %v\n", err)
-            }
-        }
-        // Human
-        fmt.Fprintf(os.Stderr, "task upserted workflow=%q command=%q variant=%q id=%s\n", t.WorkflowID, t.Command, t.Variant, t.ID)
-        // JSON
-        out := map[string]any{
-            "status":"upserted",
-            "id": t.ID,
-            "workflow": t.WorkflowID,
-            "command": t.Command,
-            "variant": t.Variant,
-            
-        }
-        if t.Created.Valid { out["created"] = t.Created.Time.Format(time.RFC3339Nano) }
-        if t.ToolWorkspaceID.Valid { out["tool_workspace_id"] = t.ToolWorkspaceID.String }
-        enc := json.NewEncoder(os.Stdout)
-        enc.SetIndent("", "  ")
-        return enc.Encode(out)
-    },
+	Use:   "set",
+	Short: "Create or update a task (by workflow and command/variant)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(flagTaskWF) == "" || strings.TrimSpace(flagTaskCmd) == "" {
+			return errors.New("--workflow and --command are required")
+		}
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return err
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		db, err := pgdao.OpenApp(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		t := &pgdao.Task{WorkflowID: flagTaskWF, Command: flagTaskCmd, Variant: flagTaskVar}
+		if strings.TrimSpace(flagTaskRole) != "" {
+			t.RoleName = strings.TrimSpace(flagTaskRole)
+		}
+		if flagTaskTitle != "" {
+			t.Title = sql.NullString{String: flagTaskTitle, Valid: true}
+		}
+		if flagTaskDesc != "" {
+			t.Description = sql.NullString{String: flagTaskDesc, Valid: true}
+		}
+		if flagTaskMotiv != "" {
+			t.Motivation = sql.NullString{String: flagTaskMotiv, Valid: true}
+		}
+		if flagTaskNotes != "" {
+			t.Notes = sql.NullString{String: flagTaskNotes, Valid: true}
+		}
+		if flagTaskShell != "" {
+			t.Shell = sql.NullString{String: flagTaskShell, Valid: true}
+		}
+		if flagTaskTimeout != "" {
+			t.Timeout = sql.NullString{String: flagTaskTimeout, Valid: true}
+		}
+		if len(flagTaskTags) > 0 {
+			t.Tags = parseTags(flagTaskTags)
+		}
+		if strings.TrimSpace(flagTaskToolWS) != "" {
+			t.ToolWorkspaceID = sql.NullString{String: strings.TrimSpace(flagTaskToolWS), Valid: true}
+		}
+		if flagTaskLevel != "" {
+			t.Level = sql.NullString{String: flagTaskLevel, Valid: true}
+		}
+		t.Archived = flagTaskArchived
+		if err := pgdao.UpsertTask(ctx, db, t); err != nil {
+			return err
+		}
+		// Optional: create REPLACES edge in graph
+		if strings.TrimSpace(flagTaskReplaces) != "" {
+			level := strings.ToLower(strings.TrimSpace(flagTaskReplaceLevel))
+			if level == "" {
+				level = "minor"
+			}
+			if level != "patch" && level != "minor" && level != "major" {
+				return fmt.Errorf("--replace-level must be patch|minor|major")
+			}
+			if err := pgdao.CreateTaskReplacesEdge(ctx, db, t.ID, flagTaskReplaces, level, flagTaskReplaceComment, strings.TrimSpace(flagTaskReplaceCreated)); err != nil {
+				// Non-fatal: print a warning and proceed
+				fmt.Fprintf(os.Stderr, "warn: graph REPLACES edge not created: %v\n", err)
+			}
+		}
+		// Human
+		fmt.Fprintf(os.Stderr, "task upserted workflow=%q command=%q variant=%q id=%s\n", t.WorkflowID, t.Command, t.Variant, t.ID)
+		// JSON
+		out := map[string]any{
+			"status":   "upserted",
+			"id":       t.ID,
+			"workflow": t.WorkflowID,
+			"command":  t.Command,
+			"variant":  t.Variant,
+		}
+		if t.Created.Valid {
+			out["created"] = t.Created.Time.Format(time.RFC3339Nano)
+		}
+		if t.ToolWorkspaceID.Valid {
+			out["tool_workspace_id"] = t.ToolWorkspaceID.String
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(out)
+	},
 }
 
 func init() {
-    TaskCmd.AddCommand(setCmd)
-    setCmd.Flags().StringVar(&flagTaskWF, "workflow", "", "Workflow name (required)")
-    setCmd.Flags().StringVar(&flagTaskCmd, "command", "", "Task command (e.g., unit, lint) (required)")
-    setCmd.Flags().StringVar(&flagTaskVar, "variant", "", "Task variant (e.g., go, typescript/v5)")
-    setCmd.Flags().StringVar(&flagTaskRole, "role", "", "Role name (optional; defaults to 'user')")
-    // removed: --version
-    setCmd.Flags().StringVar(&flagTaskTitle, "title", "", "Human-readable title")
-    setCmd.Flags().StringVar(&flagTaskDesc, "description", "", "Plain text description")
-    setCmd.Flags().StringVar(&flagTaskMotiv, "motivation", "", "Purpose or context")
-    setCmd.Flags().StringVar(&flagTaskNotes, "notes", "", "Markdown notes")
-    setCmd.Flags().StringVar(&flagTaskShell, "shell", "", "Shell environment (bash, python)")
-    setCmd.Flags().StringVar(&flagTaskTimeout, "timeout", "", "Text interval, e.g., '5 minutes'")
-    setCmd.Flags().StringSliceVar(&flagTaskTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
-    setCmd.Flags().StringVar(&flagTaskLevel, "level", "", "Level: h1..h6")
-    setCmd.Flags().StringVar(&flagTaskToolWS, "tool-workspace", "", "Optional workspace UUID used as tooling workspace for the task")
-    setCmd.Flags().StringVar(&flagTaskReplaces, "replaces", "", "Optional task UUID that this task replaces (graph edge)")
-    setCmd.Flags().StringVar(&flagTaskReplaceLevel, "replace-level", "minor", "Replacement level: patch|minor|major (default minor)")
-    setCmd.Flags().StringVar(&flagTaskReplaceComment, "replace-comment", "", "Optional comment for replacement edge")
-    setCmd.Flags().StringVar(&flagTaskReplaceCreated, "replace-created", "", "Optional timestamp (RFC3339) for replacement edge creation; defaults to now on DB side")
-    setCmd.Flags().BoolVar(&flagTaskArchived, "archived", false, "Mark task as archived (excluded from active lookups)")
+	TaskCmd.AddCommand(setCmd)
+	setCmd.Flags().StringVar(&flagTaskWF, "workflow", "", "Workflow name (required)")
+	setCmd.Flags().StringVar(&flagTaskCmd, "command", "", "Task command (e.g., unit, lint) (required)")
+	setCmd.Flags().StringVar(&flagTaskVar, "variant", "", "Task variant (e.g., go, typescript/v5)")
+	setCmd.Flags().StringVar(&flagTaskRole, "role", "", "Role name (optional; defaults to 'user')")
+	// removed: --version
+	setCmd.Flags().StringVar(&flagTaskTitle, "title", "", "Human-readable title")
+	setCmd.Flags().StringVar(&flagTaskDesc, "description", "", "Plain text description")
+	setCmd.Flags().StringVar(&flagTaskMotiv, "motivation", "", "Purpose or context")
+	setCmd.Flags().StringVar(&flagTaskNotes, "notes", "", "Markdown notes")
+	setCmd.Flags().StringVar(&flagTaskShell, "shell", "", "Shell environment (bash, python)")
+	setCmd.Flags().StringVar(&flagTaskTimeout, "timeout", "", "Text interval, e.g., '5 minutes'")
+	setCmd.Flags().StringSliceVar(&flagTaskTags, "tags", nil, "Tags as key=value pairs (repeat or comma-separated). Plain values mapped to true")
+	setCmd.Flags().StringVar(&flagTaskLevel, "level", "", "Level: h1..h6")
+	setCmd.Flags().StringVar(&flagTaskToolWS, "tool-workspace", "", "Optional workspace UUID used as tooling workspace for the task")
+	setCmd.Flags().StringVar(&flagTaskReplaces, "replaces", "", "Optional task UUID that this task replaces (graph edge)")
+	setCmd.Flags().StringVar(&flagTaskReplaceLevel, "replace-level", "minor", "Replacement level: patch|minor|major (default minor)")
+	setCmd.Flags().StringVar(&flagTaskReplaceComment, "replace-comment", "", "Optional comment for replacement edge")
+	setCmd.Flags().StringVar(&flagTaskReplaceCreated, "replace-created", "", "Optional timestamp (RFC3339) for replacement edge creation; defaults to now on DB side")
+	setCmd.Flags().BoolVar(&flagTaskArchived, "archived", false, "Mark task as archived (excluded from active lookups)")
 }
 
 // parseTags converts k=v pairs (or bare keys) into a map.
 func parseTags(items []string) map[string]any {
-    if len(items) == 0 { return nil }
-    out := map[string]any{}
-    for _, raw := range items {
-        if raw == "" { continue }
-        parts := strings.Split(raw, ",")
-        for _, p := range parts {
-            p = strings.TrimSpace(p)
-            if p == "" { continue }
-            if eq := strings.IndexByte(p, '='); eq > 0 {
-                k := strings.TrimSpace(p[:eq])
-                v := strings.TrimSpace(p[eq+1:])
-                if k != "" { out[k] = v }
-            } else {
-                out[p] = true
-            }
-        }
-    }
-    return out
+	if len(items) == 0 {
+		return nil
+	}
+	out := map[string]any{}
+	for _, raw := range items {
+		if raw == "" {
+			continue
+		}
+		parts := strings.Split(raw, ",")
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			if eq := strings.IndexByte(p, '='); eq > 0 {
+				k := strings.TrimSpace(p[:eq])
+				v := strings.TrimSpace(p[eq+1:])
+				if k != "" {
+					out[k] = v
+				}
+			} else {
+				out[p] = true
+			}
+		}
+	}
+	return out
 }

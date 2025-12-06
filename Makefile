@@ -21,6 +21,7 @@ lint-check:
 
 # Write formatting changes for scripts managed by Biome (script/*.mjs via biome.json)
 lint-format:
+	gofmt -w .
 	$(BIOME) format $(SCRIPTS_DIR) --write
 
 # Run the end-to-end ZX test script.
