@@ -114,24 +114,24 @@ func (s *Service) CreateResponse(
     // c) Merge parameters: request overrides config defaults
     var opts []llms.CallOption
     if t := firstPtr(req.Temperature, cfg.DefaultTemperature); t != nil {
-        opts = append(opts, llms.WithTemperature(*t))
+        opts = append(opts, llms.WithTemperature(float64(*t)))
     }
     if mt := firstPtr(req.MaxOutputTokens, cfg.DefaultMaxTokens); mt != nil {
         opts = append(opts, llms.WithMaxTokens(*mt))
     }
     if tp := cfg.DefaultTopP; req.Temperature == nil { // top_p is independent; include if set
         if tp != nil {
-            opts = append(opts, llms.WithTopP(*tp))
+            opts = append(opts, llms.WithTopP(float64(*tp)))
         }
     } else if cfg.DefaultTopP != nil {
         // include top_p default even when temperature present, if the client did not specify an explicit top_p
-        opts = append(opts, llms.WithTopP(*cfg.DefaultTopP))
+        opts = append(opts, llms.WithTopP(float64(*cfg.DefaultTopP)))
     }
 
     // d) Convert tools to function definitions (best-effort)
     fns := toLLMFunctions(req.Tools)
     if len(fns) > 0 {
-        opts = append(opts, llms.WithFunctions(fns...))
+        opts = append(opts, llms.WithFunctions(fns))
     }
 
     // Provider/model hints if supported by backend
@@ -276,4 +276,3 @@ func firstPtr[T any](a, b *T) *T {
     }
     return b
 }
-

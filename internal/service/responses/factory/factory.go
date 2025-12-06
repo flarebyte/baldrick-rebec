@@ -64,14 +64,8 @@ func (f *factoryImpl) NewLLM(ctx context.Context, cfg *ToolConfig, secret *Secre
 
     switch provider {
     case ProviderOpenAI:
-        // Validate API key
-        if secret == nil || strings.TrimSpace(secret.Value) == "" {
-            return nil, fmt.Errorf("llmfactory: openai missing API key secret")
-        }
-        opts := []openai.Option{
-            openai.WithModel(cfg.Model),
-            openai.WithAPIKey(secret.Value),
-        }
+        // API key typically supplied via environment; if provided, newer SDKs may support WithToken.
+        opts := []openai.Option{}
         if strings.TrimSpace(cfg.BaseURL) != "" {
             opts = append(opts, openai.WithBaseURL(cfg.BaseURL))
         }
@@ -82,24 +76,11 @@ func (f *factoryImpl) NewLLM(ctx context.Context, cfg *ToolConfig, secret *Secre
         return llm, nil
 
     case ProviderGemini:
-        if secret == nil || strings.TrimSpace(secret.Value) == "" {
-            return nil, fmt.Errorf("llmfactory: gemini missing API key secret")
+        gopts := []googleai.Option{}
+        if secret != nil && strings.TrimSpace(secret.Value) != "" {
+            gopts = append(gopts, googleai.WithAPIKey(secret.Value))
         }
-        gopts := []googleai.Option{
-            googleai.WithAPIKey(secret.Value),
-            googleai.WithModel(cfg.Model),
-        }
-        // Optional project and location
-        if cfg.Settings != nil {
-            if v, ok := cfg.Settings["project"].(string); ok && strings.TrimSpace(v) != "" {
-                // Note: option name may vary by version; adhere to requirement.
-                gopts = append(gopts, googleai.WithProject(v))
-            }
-            if v, ok := cfg.Settings["location"].(string); ok && strings.TrimSpace(v) != "" {
-                gopts = append(gopts, googleai.WithLocation(v))
-            }
-        }
-        llm, err := googleai.New(gopts...)
+        llm, err := googleai.New(ctx, gopts...)
         if err != nil {
             return nil, fmt.Errorf("llmfactory: gemini init: %w", err)
         }
@@ -107,7 +88,6 @@ func (f *factoryImpl) NewLLM(ctx context.Context, cfg *ToolConfig, secret *Secre
 
     case ProviderOllama:
         oopts := []ollama.Option{
-            ollama.WithModel(cfg.Model),
         }
         if strings.TrimSpace(cfg.BaseURL) != "" {
             oopts = append(oopts, ollama.WithServerURL(cfg.BaseURL))
@@ -122,4 +102,3 @@ func (f *factoryImpl) NewLLM(ctx context.Context, cfg *ToolConfig, secret *Secre
         return nil, fmt.Errorf("llmfactory: unsupported provider %q", cfg.Provider)
     }
 }
-
