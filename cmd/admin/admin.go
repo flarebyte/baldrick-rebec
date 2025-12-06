@@ -1,59 +1,61 @@
 package admin
 
 import (
-    "github.com/flarebyte/baldrick-rebec/cmd/admin/conversation"
-    configcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/config"
-    dbcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/db"
-    scripcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/script"
-    qcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/queue"
-    tccmd "github.com/flarebyte/baldrick-rebec/cmd/admin/testcase"
-    storecmd "github.com/flarebyte/baldrick-rebec/cmd/admin/store"
-    bbcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/blackboard"
-    stickcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/stickie"
-    stickrelcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/stickie_rel"
-    "github.com/flarebyte/baldrick-rebec/cmd/admin/message"
-    wscmd "github.com/flarebyte/baldrick-rebec/cmd/admin/workspace"
-    "github.com/flarebyte/baldrick-rebec/cmd/admin/role"
-    prjcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/project"
-    tagcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/tag"
-    topiccmd "github.com/flarebyte/baldrick-rebec/cmd/admin/topic"
-    pkgcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/package"
-    "github.com/flarebyte/baldrick-rebec/cmd/admin/workflow"
-    "github.com/flarebyte/baldrick-rebec/cmd/admin/task"
-    "github.com/flarebyte/baldrick-rebec/cmd/admin/experiment"
-    srvcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/server"
-    snapcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/snapshot"
-    vaultcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/vault"
-    "github.com/spf13/cobra"
+	bbcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/blackboard"
+	configcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/config"
+	"github.com/flarebyte/baldrick-rebec/cmd/admin/conversation"
+	dbcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/db"
+	"github.com/flarebyte/baldrick-rebec/cmd/admin/experiment"
+	"github.com/flarebyte/baldrick-rebec/cmd/admin/message"
+	pkgcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/package"
+	prjcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/project"
+	qcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/queue"
+	"github.com/flarebyte/baldrick-rebec/cmd/admin/role"
+	scripcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/script"
+	srvcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/server"
+	snapcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/snapshot"
+	stickcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/stickie"
+	stickrelcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/stickie_rel"
+	storecmd "github.com/flarebyte/baldrick-rebec/cmd/admin/store"
+	tagcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/tag"
+	"github.com/flarebyte/baldrick-rebec/cmd/admin/task"
+	tccmd "github.com/flarebyte/baldrick-rebec/cmd/admin/testcase"
+	toolcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/tool"
+	topiccmd "github.com/flarebyte/baldrick-rebec/cmd/admin/topic"
+	vaultcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/vault"
+	"github.com/flarebyte/baldrick-rebec/cmd/admin/workflow"
+	wscmd "github.com/flarebyte/baldrick-rebec/cmd/admin/workspace"
+	"github.com/spf13/cobra"
 )
 
 var AdminCmd = &cobra.Command{
-    Use:   "admin",
-    Short: "TODO: Describe the 'admin' command",
+	Use:   "admin",
+	Short: "TODO: Describe the 'admin' command",
 }
 
 func init() {
-    AdminCmd.AddCommand(conversation.ConversationCmd)
-    AdminCmd.AddCommand(configcmd.ConfigCmd)
-    AdminCmd.AddCommand(dbcmd.DBCmd)
-    AdminCmd.AddCommand(qcmd.QueueCmd)
-    AdminCmd.AddCommand(tccmd.TestcaseCmd)
-    AdminCmd.AddCommand(storecmd.StoreCmd)
-    AdminCmd.AddCommand(bbcmd.BlackboardCmd)
-    AdminCmd.AddCommand(stickcmd.StickieCmd)
-    AdminCmd.AddCommand(stickrelcmd.StickieRelCmd)
-    AdminCmd.AddCommand(scripcmd.ScriptCmd)
-    AdminCmd.AddCommand(message.MessageCmd)
-    AdminCmd.AddCommand(wscmd.WorkspaceCmd)
-    AdminCmd.AddCommand(role.RoleCmd)
-    AdminCmd.AddCommand(prjcmd.ProjectCmd)
-    AdminCmd.AddCommand(tagcmd.TagCmd)
-    AdminCmd.AddCommand(topiccmd.TopicCmd)
-    AdminCmd.AddCommand(pkgcmd.PackageCmd)
-    AdminCmd.AddCommand(workflow.WorkflowCmd)
-    AdminCmd.AddCommand(task.TaskCmd)
-    AdminCmd.AddCommand(experiment.ExperimentCmd)
-    AdminCmd.AddCommand(srvcmd.ServerCmd)
-    AdminCmd.AddCommand(snapcmd.SnapshotCmd)
-    AdminCmd.AddCommand(vaultcmd.VaultCmd)
+	AdminCmd.AddCommand(conversation.ConversationCmd)
+	AdminCmd.AddCommand(configcmd.ConfigCmd)
+	AdminCmd.AddCommand(dbcmd.DBCmd)
+	AdminCmd.AddCommand(qcmd.QueueCmd)
+	AdminCmd.AddCommand(tccmd.TestcaseCmd)
+	AdminCmd.AddCommand(storecmd.StoreCmd)
+	AdminCmd.AddCommand(bbcmd.BlackboardCmd)
+	AdminCmd.AddCommand(stickcmd.StickieCmd)
+	AdminCmd.AddCommand(stickrelcmd.StickieRelCmd)
+	AdminCmd.AddCommand(scripcmd.ScriptCmd)
+	AdminCmd.AddCommand(message.MessageCmd)
+	AdminCmd.AddCommand(wscmd.WorkspaceCmd)
+	AdminCmd.AddCommand(role.RoleCmd)
+	AdminCmd.AddCommand(prjcmd.ProjectCmd)
+	AdminCmd.AddCommand(tagcmd.TagCmd)
+	AdminCmd.AddCommand(topiccmd.TopicCmd)
+	AdminCmd.AddCommand(pkgcmd.PackageCmd)
+	AdminCmd.AddCommand(workflow.WorkflowCmd)
+	AdminCmd.AddCommand(task.TaskCmd)
+	AdminCmd.AddCommand(experiment.ExperimentCmd)
+	AdminCmd.AddCommand(srvcmd.ServerCmd)
+	AdminCmd.AddCommand(snapcmd.SnapshotCmd)
+	AdminCmd.AddCommand(vaultcmd.VaultCmd)
+	AdminCmd.AddCommand(toolcmd.ToolCmd)
 }

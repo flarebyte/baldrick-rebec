@@ -74,6 +74,9 @@ import {
   tagSet,
   taskListJSON,
   taskSetReplacement,
+  toolGetJSON,
+  toolListJSON,
+  toolSet,
   topicListJSON,
   topicSet,
   vaultBackendCurrent,
@@ -105,7 +108,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 16;
+const TOTAL = 17;
 let step = 0;
 
 try {
@@ -347,6 +350,52 @@ try {
   {
     const prj = await projectListJSON({ role: TEST_ROLE_USER, limit: 50 });
     validateProjectListContract(prj);
+  }
+
+  // 7.5) Tools
+  step++;
+  logStep(step, TOTAL, 'Creating tools and verifying CRUD');
+  await toolSet({
+    name: 'acme-linter',
+    title: 'Acme Linter',
+    role: TEST_ROLE_USER,
+    description: 'Lints code with custom rules',
+    tags: 'lang=go,scope=lint',
+    settings: JSON.stringify({ severity: 'strict', autofix: true }),
+    type: 'linter',
+  });
+  await toolSet({
+    name: 'acme-formatter',
+    title: 'Acme Formatter',
+    role: TEST_ROLE_USER,
+    description: 'Formats code',
+    tags: 'lang=go,scope=format',
+    settings: JSON.stringify({ style: 'gofmt' }),
+    type: 'formatter',
+  });
+  {
+    const tList = await toolListJSON({ role: TEST_ROLE_USER, limit: 50 });
+    assert(
+      Array.isArray(tList) && tList.length >= 2,
+      'expected at least 2 tools in list',
+    );
+    const hasLinter = tList.find(
+      (x) => x && x.name === 'acme-linter' && x.title === 'Acme Linter',
+    );
+    const hasFmt = tList.find(
+      (x) => x && x.name === 'acme-formatter' && x.title === 'Acme Formatter',
+    );
+    assert(!!hasLinter, 'tool list missing acme-linter');
+    assert(!!hasFmt, 'tool list missing acme-formatter');
+    const t1 = await toolGetJSON({ name: 'acme-linter' });
+    assert(
+      t1 && t1.name === 'acme-linter' && t1.role === TEST_ROLE_USER,
+      'tool get failed for acme-linter',
+    );
+    assert(
+      t1.settings && t1.settings.autofix === true,
+      'tool get missing settings for acme-linter',
+    );
   }
 
   // 8) Stores & Blackboards
