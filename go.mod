@@ -3,11 +3,12 @@ module github.com/flarebyte/baldrick-rebec
 go 1.24.1
 
 require (
-	github.com/jackc/pgx/v5 v5.6.0
-	github.com/keybase/go-keychain v0.0.1
-	github.com/olekukonko/tablewriter v0.0.5
-	github.com/spf13/cobra v1.10.1
-	golang.org/x/term v0.37.0
+    github.com/go-chi/chi/v5 v5.0.12
+    github.com/jackc/pgx/v5 v5.6.0
+    github.com/keybase/go-keychain v0.0.1
+    github.com/olekukonko/tablewriter v0.0.5
+    github.com/spf13/cobra v1.10.1
+    golang.org/x/term v0.37.0
 	google.golang.org/grpc v1.67.1
 	gopkg.in/yaml.v3 v3.0.1
 )
