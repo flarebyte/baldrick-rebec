@@ -516,6 +516,53 @@ export async function projectSet({
   return await runRbc(...args);
 }
 
+// Tools
+export async function toolSet({
+  name,
+  title,
+  role = 'user',
+  description = '',
+  notes = '',
+  tags = '',
+  settings = '', // JSON string
+  type = '',
+}) {
+  const args = ['admin', 'tool', 'set', '--name', name, '--title', title, '--role', role];
+  if (description) args.push('--description', description);
+  if (notes) args.push('--notes', notes);
+  if (tags) args.push('--tags', tags);
+  if (settings) args.push('--settings', settings);
+  if (type) args.push('--type', type);
+  return await runRbc(...args);
+}
+
+export async function toolGetJSON({ name }) {
+  return await runRbcJSON('admin', 'tool', 'get', '--name', name);
+}
+
+export async function toolListJSON({ role, limit = 100, offset = 0 }) {
+  return await runRbcJSON(
+    'admin',
+    'tool',
+    'list',
+    '--role',
+    role,
+    '--output',
+    'json',
+    '--limit',
+    String(limit),
+    '--offset',
+    String(offset),
+  );
+}
+
+export async function toolDelete({ name, force = true, ignoreMissing = false }) {
+  const args = ['admin', 'tool', 'delete', '--name', name];
+  if (force) args.push('--force');
+  if (ignoreMissing) args.push('--ignore-missing');
+  return await runRbc(...args);
+}
+
 export async function storeSet({
   name,
   role = 'user',
