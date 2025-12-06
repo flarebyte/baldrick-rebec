@@ -23,6 +23,7 @@ import (
 	toolcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/tool"
 	topiccmd "github.com/flarebyte/baldrick-rebec/cmd/admin/topic"
 	vaultcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/vault"
+	promptcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/prompt"
 	"github.com/flarebyte/baldrick-rebec/cmd/admin/workflow"
 	wscmd "github.com/flarebyte/baldrick-rebec/cmd/admin/workspace"
 	"github.com/spf13/cobra"
@@ -58,4 +59,5 @@ func init() {
 	AdminCmd.AddCommand(snapcmd.SnapshotCmd)
 	AdminCmd.AddCommand(vaultcmd.VaultCmd)
 	AdminCmd.AddCommand(toolcmd.ToolCmd)
+	AdminCmd.AddCommand(promptcmd.PromptCmd)
 }
