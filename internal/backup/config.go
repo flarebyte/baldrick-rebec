@@ -17,6 +17,7 @@ func DefaultEntities() []BackupEntityConfig {
         {EntityName: "tags", TableName: "tags", PKColumns: []string{"name"}, HasRoleName: true, IncludeByDefault: true},
         {EntityName: "projects", TableName: "projects", PKColumns: []string{"name", "role_name"}, HasRoleName: true, IncludeByDefault: true},
         {EntityName: "stores", TableName: "stores", PKColumns: []string{"id"}, HasRoleName: true, IncludeByDefault: true},
+        {EntityName: "tools", TableName: "tools", PKColumns: []string{"name"}, HasRoleName: true, IncludeByDefault: true},
         {EntityName: "scripts", TableName: "scripts", PKColumns: []string{"id"}, HasRoleName: true, IncludeByDefault: true},
         {EntityName: "tasks", TableName: "tasks", PKColumns: []string{"id"}, HasRoleName: true, IncludeByDefault: true},
         {EntityName: "topics", TableName: "topics", PKColumns: []string{"name", "role_name"}, HasRoleName: true, IncludeByDefault: true},
@@ -37,4 +38,3 @@ func DefaultEntities() []BackupEntityConfig {
         {EntityName: "scripts_content", TableName: "scripts_content", PKColumns: []string{"id"}, HasRoleName: false, IncludeByDefault: true},
     }
 }
-

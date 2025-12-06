@@ -49,6 +49,30 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             notes TEXT
         )`,
+        // Tools table (name as unique identifier) with role scope, tags and settings
+        `CREATE TABLE IF NOT EXISTS tools (
+            name TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            role_name TEXT NOT NULL DEFAULT 'user',
+            created TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+            notes TEXT,
+            tags JSONB DEFAULT '{}'::jsonb,
+            settings JSONB DEFAULT '{}'::jsonb,
+            tool_type TEXT
+        )`,
+        `DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'tools_set_updated'
+            ) THEN
+                CREATE TRIGGER tools_set_updated
+                BEFORE UPDATE ON tools
+                FOR EACH ROW
+                EXECUTE PROCEDURE set_updated();
+            END IF;
+        END $$;`,
+        `CREATE INDEX IF NOT EXISTS idx_tools_role_name ON tools(role_name)`,
         // Projects table (name scoped by role) with tags
         `CREATE TABLE IF NOT EXISTS projects (
             name TEXT NOT NULL,

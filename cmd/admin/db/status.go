@@ -164,7 +164,7 @@ var statusCmd = &cobra.Command{
         if db, err := pgdao.OpenAdmin(ctx, cfg); err == nil {
             defer db.Close()
             // Check presence of all known tables
-            known := []string{"roles","workflows","tags","projects","stores","topics","conversations","experiments","task_variants","tasks","scripts_content","scripts","messages_content","messages","workspaces","blackboards","stickies","stickie_relations","packages","queues","testcases"}
+            known := []string{"roles","workflows","tags","projects","stores","tools","topics","conversations","experiments","task_variants","tasks","scripts_content","scripts","messages_content","messages","workspaces","blackboards","stickies","stickie_relations","packages","queues","testcases"}
             st.Postgres.Schema.Tables = map[string]bool{}
             allOK := true
             for _, tbl := range known {
