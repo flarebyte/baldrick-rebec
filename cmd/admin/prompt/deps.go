@@ -22,9 +22,9 @@ func SetDeps(d Deps) {
 }
 
 func ensureDefaults() {
-    if deps.ToolDAO == nil {
-        deps.ToolDAO = toolingdao.NewMockToolDAO(nil)
-    }
+    // ToolDAO must be provided by caller (e.g., command initializes PG adapter).
+    // Fallback to mock for tests if not set.
+    if deps.ToolDAO == nil { deps.ToolDAO = toolingdao.NewMockToolDAO(nil) }
     if deps.VaultDAO == nil {
         deps.VaultDAO = toolingdao.NewMockVaultDAO(nil)
     }
@@ -35,4 +35,3 @@ func ensureDefaults() {
         deps.ResponsesService = responsesvc.New()
     }
 }
-

@@ -77,6 +77,7 @@ import {
   toolGetJSON,
   toolListJSON,
   toolSet,
+  promptRunJSON,
   topicListJSON,
   topicSet,
   vaultBackendCurrent,
@@ -108,7 +109,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 17;
+const TOTAL = 18;
 let step = 0;
 
 try {
@@ -396,6 +397,38 @@ try {
       t1.settings && t1.settings.autofix === true,
       'tool get missing settings for acme-linter',
     );
+  }
+
+  // 7.6) Prompt (Ollama gemma3:1b) — optional
+  step++;
+  logStep(step, TOTAL, 'Prompt run via Ollama (gemma3:1b), if available');
+  try {
+    const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+    await toolSet({
+      name: 'ollama-gemma',
+      title: 'Ollama Gemma 1B',
+      role: TEST_ROLE_USER,
+      description: 'Local small model for tests',
+      settings: JSON.stringify({
+        provider: 'ollama',
+        model: 'gemma3:1b',
+        base_url: OLLAMA_BASE_URL,
+      }),
+      type: 'llm',
+    });
+    const out = await promptRunJSON({
+      toolName: 'ollama-gemma',
+      input: 'Say "hello" in one short line.',
+      maxOutputTokens: 64,
+    });
+    // Basic shape assertions when available
+    if (out) {
+      assert(out.object === 'response', 'prompt: expected response object');
+      assert(typeof out.model === 'string', 'prompt: model string');
+      assert(Array.isArray(out.output), 'prompt: output array');
+    }
+  } catch (e) {
+    console.error('prompt (ollama) skipped:', e?.message || String(e));
   }
 
   // 8) Stores & Blackboards

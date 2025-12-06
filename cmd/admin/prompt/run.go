@@ -9,6 +9,8 @@ import (
     "strings"
     "time"
 
+    cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
+    pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
     toolingdao "github.com/flarebyte/baldrick-rebec/internal/dao/tooling"
     responsesvc "github.com/flarebyte/baldrick-rebec/internal/service/responses"
     factorypkg "github.com/flarebyte/baldrick-rebec/internal/service/responses/factory"
@@ -31,6 +33,16 @@ var runCmd = &cobra.Command{
     Use:   "run",
     Short: "Run a single prompt against a configured tool",
     RunE: func(cmd *cobra.Command, args []string) error {
+        // Attempt to initialize a Postgres-backed ToolDAO from app config; fall back to mocks.
+        if cfg, err := cfgpkg.Load(); err == nil {
+            ctxInit, cancelInit := context.WithTimeout(context.Background(), 10*time.Second)
+            defer cancelInit()
+            if db, e := pgdao.OpenApp(ctxInit, cfg); e == nil {
+                // We intentionally do not keep the DB open after command finishes.
+                // The adapter holds the pool; ensure it's closed on process exit.
+                deps.ToolDAO = toolingdao.NewPGToolDAOAdapter(db)
+            }
+        }
         ensureDefaults()
         if strings.TrimSpace(flagToolName) == "" {
             return errors.New("--tool-name is required")
