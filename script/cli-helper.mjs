@@ -271,7 +271,8 @@ export async function stickieSet({
   if (name !== undefined) args.push('--name', name);
   if (variant !== undefined) args.push('--variant', variant);
   if (archived) args.push('--archived');
-  if (score !== null && score !== undefined) args.push('--score', String(score));
+  if (score !== null && score !== undefined)
+    args.push('--score', String(score));
   return await runRbcJSON(...args);
 }
 
