@@ -103,8 +103,7 @@ import {
   validateVaultShowContract,
   validateWorkflowListContract,
 } from './contract-helper.mjs';
-
-import { createGrpcJsonClient } from '../clients/js/grpcJsonClient.mjs';
+import { createGrpcJsonClient } from './grpc-json-client.mjs';
 
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 
@@ -458,7 +457,9 @@ try {
   } catch (e) {
     console.error('js grpc client skipped:', e?.message || String(e));
   } finally {
-    try { await $`go run main.go admin server stop`; } catch {}
+    try {
+      await $`go run main.go admin server stop`;
+    } catch {}
   }
 
   // 8) Stores & Blackboards

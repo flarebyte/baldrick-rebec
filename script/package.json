@@ -1,0 +1,17 @@
+{
+  "name": "script",
+  "version": "1.0.0",
+  "description": "Local scripting for rebec",
+  "main": "test-all.mjs",
+  "dependencies": {
+    "long": "^5.3.2",
+    "protobufjs": "^7.5.4",
+    "undici-types": "^7.16.0",
+    "zod": "^4.1.13"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Olivier Huin <npm.olivier.huin@flarebyte.com> (http://flarebyte.com/)",
+  "license": "MIT"
+}

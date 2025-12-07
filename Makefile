@@ -12,7 +12,6 @@
 BIOME := npx @biomejs/biome
 
 # Scope to lint/format. Biome uses biome.json to include only script/*.mjs
-SCRIPTS_DIR := script
 ZX := npx zx
 
 # Run Biome via wrapper script to avoid logic here.
@@ -20,9 +19,10 @@ lint-check:
 	bash script/biome-check.sh
 
 # Write formatting changes for scripts managed by Biome (script/*.mjs via biome.json)
-lint-format:
+lint-fix:
 	gofmt -w .
-	$(BIOME) format $(SCRIPTS_DIR) --write
+	$(BIOME) format script --write
+	$(BIOME) check script --write
 
 # Run the end-to-end ZX test script.
 test-all:
