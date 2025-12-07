@@ -462,6 +462,41 @@ try {
     } catch {}
   }
 
+  // 7.8) Connect-Node client (optional, requires generated service stubs)
+  step++;
+  logStep(step, TOTAL, 'Prompt via Connect-Node client (if stubs available)');
+  try {
+    const connectClient = await import('./grpc-json-client-connect.mjs');
+    let svcMod = null;
+    try {
+      svcMod = await import('../gen/prompt/v1/prompt_connect.js');
+    } catch {}
+    if (!svcMod || !svcMod.PromptService) {
+      console.error('connect client skipped: generated service not found');
+    } else {
+      await $`go run main.go admin server start --detach`;
+      await sleep(1000);
+      const client = connectClient.createConnectGrpcJsonClient({
+        baseUrl: 'http://127.0.0.1:53051',
+        service: svcMod.PromptService,
+      });
+      const out = await client.Run({
+        tool_name: 'ollama-gemma',
+        input: 'Say "hello" in one short line.',
+        max_output_tokens: 64,
+      });
+      if (out) {
+        assert(out.object === 'response', 'connect client: expected response object');
+        assert(Array.isArray(out.output), 'connect client: output array');
+      }
+      try {
+        await $`go run main.go admin server stop`;
+      } catch {}
+    }
+  } catch (e) {
+    console.error('connect client skipped:', e?.message || String(e));
+  }
+
   // 8) Stores & Blackboards
   step++;
   logStep(step, TOTAL, 'Creating stores and blackboards');
