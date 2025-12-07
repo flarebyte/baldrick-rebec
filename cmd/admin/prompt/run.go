@@ -15,6 +15,8 @@ import (
     responsesvc "github.com/flarebyte/baldrick-rebec/internal/service/responses"
     factorypkg "github.com/flarebyte/baldrick-rebec/internal/service/responses/factory"
     "github.com/spf13/cobra"
+    "google.golang.org/grpc"
+    grpcjson "github.com/flarebyte/baldrick-rebec/internal/transport/grpcjson"
 )
 
 var (
@@ -22,6 +24,8 @@ var (
     flagInput          string
     flagInputFile      string
     flagToolsPath      string
+    flagRemote         bool
+    flagAddr           string
     flagTemperature    float32
     flagHasTemperature bool
     flagMaxOutTokens   int
@@ -33,13 +37,14 @@ var runCmd = &cobra.Command{
     Use:   "run",
     Short: "Run a single prompt against a configured tool",
     RunE: func(cmd *cobra.Command, args []string) error {
-        // Attempt to initialize a Postgres-backed ToolDAO from app config; fall back to mocks.
+        if flagRemote {
+            return runRemote(cmd, args)
+        }
+        // Local mode: Attempt to initialize a Postgres-backed ToolDAO from app config; fall back to mocks.
         if cfg, err := cfgpkg.Load(); err == nil {
             ctxInit, cancelInit := context.WithTimeout(context.Background(), 10*time.Second)
             defer cancelInit()
             if db, e := pgdao.OpenApp(ctxInit, cfg); e == nil {
-                // We intentionally do not keep the DB open after command finishes.
-                // The adapter holds the pool; ensure it's closed on process exit.
                 deps.ToolDAO = toolingdao.NewPGToolDAOAdapter(db)
             }
         }
@@ -140,6 +145,8 @@ func init() {
     runCmd.Flags().StringVar(&flagInput, "input", "", "Input text (optional)")
     runCmd.Flags().StringVar(&flagInputFile, "input-file", "", "Input file path (optional)")
     runCmd.Flags().StringVar(&flagToolsPath, "tools", "", "Path to JSON tool definitions (optional)")
+    runCmd.Flags().BoolVar(&flagRemote, "remote", false, "Use gRPC server instead of direct DB")
+    runCmd.Flags().StringVar(&flagAddr, "addr", "127.0.0.1:53051", "gRPC server address for --remote mode")
     runCmd.Flags().BoolVar(&flagJSON, "json", false, "Print full JSON response")
     runCmd.Flags().Float32Var(&flagTemperature, "temperature", 0, "Sampling temperature")
     runCmd.Flags().IntVar(&flagMaxOutTokens, "max-output-tokens", 0, "Max output tokens")
@@ -204,4 +211,67 @@ func printCompact(resp *responsesvc.Response) {
             }
         }
     }
+}
+
+// Remote mode via gRPC JSON codec
+func runRemote(cmd *cobra.Command, args []string) error {
+    // Build request using same loading rules
+    if strings.TrimSpace(flagToolName) == "" {
+        return errors.New("--tool-name is required")
+    }
+    // Track presence
+    flagHasTemperature = cmd.Flags().Changed("temperature")
+    flagHasMaxTokens = cmd.Flags().Changed("max-output-tokens")
+
+    input, err := readInput(flagInput, flagInputFile)
+    if err != nil {
+        return err
+    }
+    var tools []map[string]any
+    if strings.TrimSpace(flagToolsPath) != "" {
+        data, err := os.ReadFile(flagToolsPath)
+        if err != nil { return fmt.Errorf("read tools file: %w", err) }
+        if err := json.Unmarshal(data, &tools); err != nil {
+            return fmt.Errorf("parse tools JSON: %w", err)
+        }
+    }
+    // Dial gRPC with JSON codec
+    grpcjson.Register()
+    conn, err := grpc.Dial(flagAddr,
+        grpc.WithInsecure(),
+        grpc.WithDefaultCallOptions(grpc.ForceCodec(grpcjson.Codec{})))
+    if err != nil { return err }
+    defer conn.Close()
+
+    // Construct dynamic request compatible with server JSON codec types
+    req := map[string]any{
+        "tool_name": flagToolName,
+        "input":     input,
+    }
+    if len(tools) > 0 { req["tools"] = tools }
+    if flagHasTemperature { req["temperature"] = flagTemperature }
+    if flagHasMaxTokens { req["max_output_tokens"] = flagMaxOutTokens }
+
+    var out map[string]any
+    if err := conn.Invoke(context.Background(), "/prompt.v1.PromptService/Run", req, &out); err != nil {
+        return err
+    }
+    // If --json, pretty-print raw JSON
+    if flagJSON {
+        enc := json.NewEncoder(os.Stdout)
+        enc.SetIndent("", "  ")
+        return enc.Encode(out)
+    }
+    // Otherwise, print text and tool_call blocks
+    // Attempt to map to internal Response for compact printing
+    b, _ := json.Marshal(out)
+    var resp responsesvc.Response
+    if err := json.Unmarshal(b, &resp); err == nil {
+        printCompact(&resp)
+        return nil
+    }
+    // Fallback: print raw JSON
+    enc := json.NewEncoder(os.Stdout)
+    enc.SetIndent("", "  ")
+    return enc.Encode(out)
 }

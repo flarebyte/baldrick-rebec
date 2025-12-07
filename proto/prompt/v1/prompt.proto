@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package prompt.v1;
+
+option go_package = "github.com/flarebyte/baldrick-rebec/internal/gen/prompt/v1;promptv1";
+
+import "google/protobuf/struct.proto";
+
+message ToolFunction {
+  string name = 1;
+  google.protobuf.Struct parameters = 2;
+}
+
+message ToolDefinition {
+  string type = 1; // always "function"
+  ToolFunction function = 2;
+}
+
+message ToolCall {
+  string name = 1;
+  google.protobuf.Struct arguments = 2;
+}
+
+message ContentBlock {
+  string type = 1;                 // "output_text" or "tool_call"
+  string text = 2;                 // for text
+  ToolCall tool_call = 3;          // for tool calls
+}
+
+message Usage {
+  int32 input_tokens = 1;
+  int32 output_tokens = 2;
+  int32 total_tokens = 3;
+}
+
+message PromptRunRequest {
+  string tool_name = 1;
+  string model = 2;
+  google.protobuf.Value input = 3;
+  repeated ToolDefinition tools = 4;
+  float temperature = 5;
+  int32 max_output_tokens = 6;
+}
+
+message PromptRunResponse {
+  string id = 1;
+  string object = 2;
+  string model = 3;
+  int64 created = 4;
+  repeated ContentBlock output = 5;
+  Usage usage = 6;
+}
+
+service PromptService {
+  rpc Run(PromptRunRequest) returns (PromptRunResponse);
+}
+
