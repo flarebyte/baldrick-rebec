@@ -1,24 +1,24 @@
 package server
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "net"
-    "os"
-    "os/signal"
-    "path/filepath"
-    "syscall"
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
 
-    "github.com/flarebyte/baldrick-rebec/internal/config"
-    pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
-    toolingdao "github.com/flarebyte/baldrick-rebec/internal/dao/tooling"
-    promptsvc "github.com/flarebyte/baldrick-rebec/internal/server/prompt"
-    responsesvc "github.com/flarebyte/baldrick-rebec/internal/service/responses"
-    factorypkg "github.com/flarebyte/baldrick-rebec/internal/service/responses/factory"
-    "github.com/flarebyte/baldrick-rebec/internal/paths"
-    "google.golang.org/grpc"
-    "google.golang.org/grpc/reflection"
+	"github.com/flarebyte/baldrick-rebec/internal/config"
+	pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
+	toolingdao "github.com/flarebyte/baldrick-rebec/internal/dao/tooling"
+	"github.com/flarebyte/baldrick-rebec/internal/paths"
+	promptsvc "github.com/flarebyte/baldrick-rebec/internal/server/prompt"
+	responsesvc "github.com/flarebyte/baldrick-rebec/internal/service/responses"
+	factorypkg "github.com/flarebyte/baldrick-rebec/internal/service/responses/factory"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func DefaultPIDPath() string {
@@ -37,23 +37,23 @@ func RunForeground(addr, pidPath string) error {
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
-    s := grpc.NewServer()
-    reflection.Register(s)
+	s := grpc.NewServer()
+	reflection.Register(s)
 
-    // Register PromptService backed by DAOs and services
-    if cfg, err := config.Load(); err == nil {
-        // Open DB with default timeout
-        // Note: keep pool for process lifetime; server will close on shutdown.
-        if db, e := pgdao.OpenApp(context.Background(), cfg); e == nil {
-            svc := &promptsvc.Service{
-                ToolDAO:          toolingdao.NewPGToolDAOAdapter(db),
-                VaultDAO:         toolingdao.NewVaultDAOAdapter(),
-                LLMFactory:       factorypkg.New(),
-                ResponsesService: responsesvc.New(),
-            }
-            svc.Register(s)
-        }
-    }
+	// Register PromptService backed by DAOs and services
+	if cfg, err := config.Load(); err == nil {
+		// Open DB with default timeout
+		// Note: keep pool for process lifetime; server will close on shutdown.
+		if db, e := pgdao.OpenApp(context.Background(), cfg); e == nil {
+			svc := &promptsvc.Service{
+				ToolDAO:          toolingdao.NewPGToolDAOAdapter(db),
+				VaultDAO:         toolingdao.NewVaultDAOAdapter(),
+				LLMFactory:       factorypkg.New(),
+				ResponsesService: responsesvc.New(),
+			}
+			svc.Register(s)
+		}
+	}
 
 	// Graceful shutdown on SIGTERM/SIGINT and config reload on SIGHUP
 	sigCh := make(chan os.Signal, 1)

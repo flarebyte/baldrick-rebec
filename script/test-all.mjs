@@ -40,6 +40,7 @@ import {
   packageSet,
   projectListJSON,
   projectSet,
+  promptRunJSON,
   queueAdd,
   queuePeek,
   queueSize,
@@ -77,7 +78,6 @@ import {
   toolGetJSON,
   toolListJSON,
   toolSet,
-  promptRunJSON,
   topicListJSON,
   topicSet,
   vaultBackendCurrent,
@@ -403,7 +403,8 @@ try {
   step++;
   logStep(step, TOTAL, 'Prompt run via Ollama (gemma3:1b), if available');
   try {
-    const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+    const OLLAMA_BASE_URL =
+      process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
     await toolSet({
       name: 'ollama-gemma',
       title: 'Ollama Gemma 1B',

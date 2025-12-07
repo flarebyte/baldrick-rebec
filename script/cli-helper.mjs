@@ -936,23 +936,32 @@ export async function promptRun({
   if (input) args.push('--input', input);
   if (inputFile) args.push('--input-file', inputFile);
   if (toolsPath) args.push('--tools', toolsPath);
-  if (typeof temperature === 'number') args.push('--temperature', String(temperature));
-  if (typeof maxOutputTokens === 'number') args.push('--max-output-tokens', String(maxOutputTokens));
+  if (typeof temperature === 'number')
+    args.push('--temperature', String(temperature));
+  if (typeof maxOutputTokens === 'number')
+    args.push('--max-output-tokens', String(maxOutputTokens));
   if (json) args.push('--json');
   return await runRbc(...args);
 }
 
 export async function promptRunJSON(opts) {
-  return await runRbcJSON('admin', 'prompt', 'run', ...(() => {
-    const args = [];
-    if (!opts || !opts.toolName) throw new Error('toolName is required');
-    args.push('--tool-name', opts.toolName);
-    if (opts.input) args.push('--input', opts.input);
-    if (opts.inputFile) args.push('--input-file', opts.inputFile);
-    if (opts.toolsPath) args.push('--tools', opts.toolsPath);
-    if (typeof opts.temperature === 'number') args.push('--temperature', String(opts.temperature));
-    if (typeof opts.maxOutputTokens === 'number') args.push('--max-output-tokens', String(opts.maxOutputTokens));
-    args.push('--json');
-    return args;
-  })());
+  return await runRbcJSON(
+    'admin',
+    'prompt',
+    'run',
+    ...(() => {
+      const args = [];
+      if (!opts || !opts.toolName) throw new Error('toolName is required');
+      args.push('--tool-name', opts.toolName);
+      if (opts.input) args.push('--input', opts.input);
+      if (opts.inputFile) args.push('--input-file', opts.inputFile);
+      if (opts.toolsPath) args.push('--tools', opts.toolsPath);
+      if (typeof opts.temperature === 'number')
+        args.push('--temperature', String(opts.temperature));
+      if (typeof opts.maxOutputTokens === 'number')
+        args.push('--max-output-tokens', String(opts.maxOutputTokens));
+      args.push('--json');
+      return args;
+    })(),
+  );
 }

@@ -37,31 +37,31 @@ func UpsertTool(ctx context.Context, db *pgxpool.Pool, t *Tool) error {
             tool_type = EXCLUDED.tool_type,
             updated = now()
           RETURNING created, updated`
-    var tagsJSON, settingsJSON []byte
-    if t.Tags != nil {
-        tagsJSON, _ = json.Marshal(t.Tags)
-    }
-    if t.Settings != nil {
-        settingsJSON, _ = json.Marshal(t.Settings)
-    }
-    var tagsParam any
-    if len(tagsJSON) > 0 {
-        tagsParam = string(tagsJSON)
-    } else {
-        tagsParam = nil // allow COALESCE to apply '{}'
-    }
-    var settingsParam any
-    if len(settingsJSON) > 0 {
-        settingsParam = string(settingsJSON)
-    } else {
-        settingsParam = nil // allow COALESCE to apply '{}'
-    }
-    if err := db.QueryRow(ctx, q,
-        t.Name, t.Title, stringOrEmpty(t.Description), t.RoleName, stringOrEmpty(t.Notes), tagsParam, settingsParam, stringOrEmpty(t.ToolType),
-    ).Scan(&t.Created, &t.Updated); err != nil {
-        return dbutil.ErrWrap("tool.upsert", err, dbutil.ParamSummary("name", t.Name), dbutil.ParamSummary("role", t.RoleName))
-    }
-    return nil
+	var tagsJSON, settingsJSON []byte
+	if t.Tags != nil {
+		tagsJSON, _ = json.Marshal(t.Tags)
+	}
+	if t.Settings != nil {
+		settingsJSON, _ = json.Marshal(t.Settings)
+	}
+	var tagsParam any
+	if len(tagsJSON) > 0 {
+		tagsParam = string(tagsJSON)
+	} else {
+		tagsParam = nil // allow COALESCE to apply '{}'
+	}
+	var settingsParam any
+	if len(settingsJSON) > 0 {
+		settingsParam = string(settingsJSON)
+	} else {
+		settingsParam = nil // allow COALESCE to apply '{}'
+	}
+	if err := db.QueryRow(ctx, q,
+		t.Name, t.Title, stringOrEmpty(t.Description), t.RoleName, stringOrEmpty(t.Notes), tagsParam, settingsParam, stringOrEmpty(t.ToolType),
+	).Scan(&t.Created, &t.Updated); err != nil {
+		return dbutil.ErrWrap("tool.upsert", err, dbutil.ParamSummary("name", t.Name), dbutil.ParamSummary("role", t.RoleName))
+	}
+	return nil
 }
 
 // GetToolByName fetches a tool by name.
