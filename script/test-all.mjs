@@ -104,12 +104,14 @@ import {
   validateWorkflowListContract,
 } from './contract-helper.mjs';
 
+import { createGrpcJsonClient } from '../clients/js/grpcJsonClient.mjs';
+
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 18;
+const TOTAL = 19;
 let step = 0;
 
 try {
@@ -430,6 +432,33 @@ try {
     }
   } catch (e) {
     console.error('prompt (ollama) skipped:', e?.message || String(e));
+  }
+
+  // 7.7) JS gRPC JSON client (optional)
+  step++;
+  logStep(step, TOTAL, 'Prompt via JS gRPC JSON client (if server available)');
+  try {
+    // Start server in background if not running
+    await $`go run main.go admin server start --detach`;
+    await sleep(1000);
+    const client = await createGrpcJsonClient({
+      baseUrl: 'http://127.0.0.1:53051',
+      protoPath: 'proto/prompt/v1/prompt.proto',
+      serviceName: 'prompt.v1.PromptService',
+    });
+    const out = await client.Run({
+      tool_name: 'ollama-gemma',
+      input: 'Say "hello" in one short line.',
+      max_output_tokens: 64,
+    });
+    if (out) {
+      assert(out.object === 'response', 'js client: expected response object');
+      assert(Array.isArray(out.output), 'js client: output array');
+    }
+  } catch (e) {
+    console.error('js grpc client skipped:', e?.message || String(e));
+  } finally {
+    try { await $`go run main.go admin server stop`; } catch {}
   }
 
   // 8) Stores & Blackboards
