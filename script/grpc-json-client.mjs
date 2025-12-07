@@ -4,7 +4,7 @@
 // - Sends application/grpc+json requests framed per gRPC over HTTP/2
 
 import http2 from 'node:http2';
-import * as protobuf from 'protobufjs';
+import protobufjs from 'protobufjs';
 
 const CONTENT_TYPE = 'application/grpc+json';
 
@@ -35,7 +35,18 @@ export async function createGrpcJsonClient({
   if (!baseUrl || !protoPath || !serviceName) {
     throw new Error('baseUrl, protoPath, serviceName are required');
   }
-  const root = await protobuf.load(protoPath);
+  const pb =
+    protobufjs && typeof protobufjs.load === 'function'
+      ? protobufjs
+      : protobufjs?.default && typeof protobufjs.default.load === 'function'
+        ? protobufjs.default
+        : null;
+  if (!pb) {
+    throw new Error(
+      'protobuf.load is not available; ensure protobufjs is installed correctly',
+    );
+  }
+  const root = await pb.load(protoPath);
   const svc = root.lookupService(serviceName);
   if (!svc) throw new Error(`service not found: ${serviceName}`);
 
@@ -56,12 +67,31 @@ export async function createGrpcJsonClient({
     const path = `/${svc.fullName.replace(/^\./, '')}/${m.name}`;
     client[m.name] = (reqObj, { timeoutMs = 30000 } = {}) =>
       new Promise((resolve, reject) => {
-        // Validate request
-        const errMsg = reqType.verify(reqObj);
-        if (errMsg)
-          return reject(new Error(`request validation failed: ${errMsg}`));
-        // For JSON codec, we send plain JSON matching the message shape
-        const jsonBytes = Buffer.from(JSON.stringify(reqObj));
+        // Validate/coerce request.
+        // protobufjs reflection can be strict for google.protobuf.Value (input). We validate other fields
+        // and allow native JSON for input by skipping its strict validation when necessary.
+        let jsonPayload;
+        try {
+          const msg = reqType.fromObject(reqObj || {});
+          jsonPayload = reqType.toObject(msg, { json: true });
+        } catch (e1) {
+          // Verify without the 'input' field; if any remaining problems, surface them.
+          const shallow = { ...(reqObj || {}) };
+          delete shallow.input;
+          const vmsg = reqType.verify(shallow);
+          if (vmsg && String(vmsg).trim() !== '') {
+            return reject(
+              new Error(
+                `request validation failed: ${vmsg}; cause: ${
+                  e1?.message || e1
+                }`,
+              ),
+            );
+          }
+          jsonPayload = reqObj || {};
+        }
+        // For JSON codec, send JSON mapping of the proto message
+        const jsonBytes = Buffer.from(JSON.stringify(jsonPayload));
         const framed = frameMessage(jsonBytes);
 
         const session = openSession();
@@ -101,13 +131,14 @@ export async function createGrpcJsonClient({
             return done(new Error(`grpc error ${status}: ${message}`));
           try {
             const obj = parseUnaryResponse(chunks);
-            // Validate response
-            const errResp = resType.verify(obj);
-            if (errResp)
-              return done(new Error(`response validation failed: ${errResp}`));
-            return done(null, obj);
+            // Coerce + validate response
+            const msg = resType.fromObject(obj || {});
+            const normalized = resType.toObject(msg, { json: true });
+            return done(null, normalized);
           } catch (e) {
-            return done(e);
+            return done(
+              new Error(`response validation failed: ${e?.message || e}`),
+            );
           }
         });
 
