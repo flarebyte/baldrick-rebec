@@ -1,14 +1,15 @@
 package server
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"net"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
+    "context"
+    "errors"
+    "fmt"
+    "net/http"
+    "net"
+    "os"
+    "os/signal"
+    "path/filepath"
+    "syscall"
 
 	"github.com/flarebyte/baldrick-rebec/internal/config"
 	pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
@@ -18,7 +19,9 @@ import (
 	responsesvc "github.com/flarebyte/baldrick-rebec/internal/service/responses"
 	factorypkg "github.com/flarebyte/baldrick-rebec/internal/service/responses/factory"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
+    "google.golang.org/grpc/reflection"
+    "golang.org/x/net/http2"
+    "golang.org/x/net/http2/h2c"
 )
 
 func DefaultPIDPath() string {
@@ -33,38 +36,41 @@ func RunForeground(addr, pidPath string) error {
 	}
 	defer removePID(pidPath)
 
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("listen: %w", err)
-	}
-	s := grpc.NewServer()
-	reflection.Register(s)
+    lis, err := net.Listen("tcp", addr)
+    if err != nil {
+        return fmt.Errorf("listen: %w", err)
+    }
+    // Create gRPC server, and an HTTP mux for Connect endpoints
+    gs := grpc.NewServer()
+    reflection.Register(gs)
+    mux := http.NewServeMux()
 
-	// Register PromptService backed by DAOs and services
-	if cfg, err := config.Load(); err == nil {
-		// Open DB with default timeout
-		// Note: keep pool for process lifetime; server will close on shutdown.
-		if db, e := pgdao.OpenApp(context.Background(), cfg); e == nil {
-			svc := &promptsvc.Service{
-				ToolDAO:          toolingdao.NewPGToolDAOAdapter(db),
-				VaultDAO:         toolingdao.NewVaultDAOAdapter(),
-				LLMFactory:       factorypkg.New(),
-				ResponsesService: responsesvc.New(),
-			}
-			svc.Register(s)
-		}
-	}
+    // Register PromptService backed by DAOs and services
+    if cfg, err := config.Load(); err == nil {
+        // Open DB with default timeout
+        // Note: keep pool for process lifetime; server will close on shutdown.
+        if db, e := pgdao.OpenApp(context.Background(), cfg); e == nil {
+            svc := &promptsvc.Service{
+                ToolDAO:          toolingdao.NewPGToolDAOAdapter(db),
+                VaultDAO:         toolingdao.NewVaultDAOAdapter(),
+                LLMFactory:       factorypkg.New(),
+                ResponsesService: responsesvc.New(),
+            }
+            svc.Register(gs)
+            mux.Handle("/prompt.v1.PromptService/Run", svc.ConnectHandler())
+        }
+    }
 
-	// Graceful shutdown on SIGTERM/SIGINT and config reload on SIGHUP
-	sigCh := make(chan os.Signal, 1)
+    // Graceful shutdown on SIGTERM/SIGINT and config reload on SIGHUP
+    sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 	go func() {
 		for {
 			sig := <-sigCh
 			switch sig {
-			case syscall.SIGTERM, syscall.SIGINT:
-				s.GracefulStop()
-				return
+            case syscall.SIGTERM, syscall.SIGINT:
+                gs.GracefulStop()
+                return
 			case syscall.SIGHUP:
 				// Reload config; dynamic settings (like ports) require restart; we just refresh values.
 				if _, err := config.Load(); err != nil {
@@ -76,10 +82,20 @@ func RunForeground(addr, pidPath string) error {
 		}
 	}()
 
-	if err := s.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-		return err
-	}
-	return nil
+    // Serve a single HTTP/2 cleartext server that routes gRPC vs HTTP based on content-type
+    handler := h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        ct := r.Header.Get("Content-Type")
+        if r.ProtoMajor == 2 && ct != "" && (ct == "application/grpc" || (len(ct) >= len("application/grpc") && ct[:len("application/grpc")] == "application/grpc")) {
+            gs.ServeHTTP(w, r)
+            return
+        }
+        mux.ServeHTTP(w, r)
+    }), &http2.Server{})
+
+    if err := http.Serve(lis, handler); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+        return err
+    }
+    return nil
 }
 
 func writePID(pidPath string) error {

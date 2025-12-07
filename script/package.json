@@ -9,8 +9,18 @@
     "undici-types": "^7.16.0",
     "zod": "^4.1.13"
   },
+  "devDependencies": {
+    "@bufbuild/protobuf": "^2.0.0",
+    "@connectrpc/connect": "^2.0.0",
+    "@connectrpc/connect-node": "^2.0.0",
+    "@bufbuild/protoc-gen-es": "^2.0.0",
+    "@connectrpc/protoc-gen-connect-es": "^2.0.0"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "gen:prompt": "npx protoc -I ../proto --es_out=import_extension=js,target=js:../gen --connect-es_out=import_extension=js,target=js:../gen ../proto/prompt/v1/prompt.proto",
+    "gen:clean": "rm -rf ../gen/prompt/v1/*.js ../gen/prompt/v1/*.d.ts 2>/dev/null || true",
+    "gen": "npm run gen:clean && npm run gen:prompt"
   },
   "author": "Olivier Huin <npm.olivier.huin@flarebyte.com> (http://flarebyte.com/)",
   "license": "MIT"

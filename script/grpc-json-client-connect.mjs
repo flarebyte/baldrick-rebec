@@ -22,7 +22,7 @@
 //   wrapper; wiring depends on server protocol alignment.
 
 import { createPromiseClient } from '@connectrpc/connect';
-import { createGrpcTransport } from '@connectrpc/connect-node';
+import { createConnectTransport } from '@connectrpc/connect-node';
 
 // Optional: interceptor to add/override headers (e.g., force JSON content-type for experiments)
 function headerInterceptor(extraHeaders = {}) {
@@ -40,10 +40,7 @@ export function createConnectGrpcJsonClient({ baseUrl, service, headers = {} }) 
   if (!baseUrl || !service) {
     throw new Error('baseUrl and service are required');
   }
-  const transport = createGrpcTransport({
-    baseUrl,
-    interceptors: Object.keys(headers).length ? [headerInterceptor(headers)] : undefined,
-  });
+  const transport = createConnectTransport({ baseUrl, interceptors: Object.keys(headers).length ? [headerInterceptor(headers)] : undefined });
   const c = createPromiseClient(service, transport);
 
   // Build a thin JSON wrapper around the Connect client using runtime metadata.
@@ -77,4 +74,3 @@ export function createConnectGrpcJsonClient({ baseUrl, service, headers = {} }) 
   }
   return api;
 }
-
