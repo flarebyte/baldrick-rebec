@@ -4,7 +4,7 @@
 // - Sends application/grpc+json requests framed per gRPC over HTTP/2
 
 import http2 from 'node:http2';
-import { load } from 'protobufjs';
+import * as protobuf from 'protobufjs';
 
 const CONTENT_TYPE = 'application/grpc+json';
 
@@ -35,13 +35,13 @@ export async function createGrpcJsonClient({
   if (!baseUrl || !protoPath || !serviceName) {
     throw new Error('baseUrl, protoPath, serviceName are required');
   }
-  const root = await load(protoPath);
+  const root = await protobuf.load(protoPath);
   const svc = root.lookupService(serviceName);
   if (!svc) throw new Error(`service not found: ${serviceName}`);
 
   function openSession() {
     const u = new URL(baseUrl);
-    const authority = `${u.hostname}${u.port ? ':' + u.port : ''}`;
+    const authority = `${u.hostname}${u.port ? `:${u.port}` : ''}`;
     const session = http2.connect(`${u.protocol}//${authority}`);
     session.on('error', () => {
       /* surface per-call */
