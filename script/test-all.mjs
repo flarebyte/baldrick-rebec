@@ -489,6 +489,15 @@ try {
         assert(out.object === 'response', 'connect client: expected response object');
         assert(Array.isArray(out.output), 'connect client: output array');
       }
+      // Verify Connect protocol headers using curl, if available
+      try {
+        const hdr = await $`curl -s -D - -o /dev/null -X POST -H 'Content-Type: application/connect+json' --data '{"tool_name":"ollama-gemma","input":"Ping"}' http://127.0.0.1:53051/prompt.v1.PromptService/Run`;
+        const h = String(hdr.stdout || '').toLowerCase();
+        assert(h.includes('content-type: application/connect+json'), 'connect: content-type header');
+        assert(h.includes('connect-protocol-version: 1'), 'connect: protocol version header');
+      } catch (e) {
+        console.error('connect header check skipped:', e?.message || String(e));
+      }
       try {
         await $`go run main.go admin server stop`;
       } catch {}

@@ -19,21 +19,38 @@ func (s *Service) ConnectHandler() http.Handler {
         var req PromptRunRequest
         dec := json.NewDecoder(r.Body)
         if err := dec.Decode(&req); err != nil {
-            http.Error(w, "invalid JSON", http.StatusBadRequest)
+            writeConnectError(w, "invalid_argument", "invalid JSON body")
             return
         }
         resp, err := s.Run(r.Context(), &req)
         if err != nil {
-            // For simplicity, surface as 500 with error text. Connect typically encodes structured errors.
-            http.Error(w, err.Error(), http.StatusInternalServerError)
+            code, msg := mapError(err)
+            writeConnectError(w, code, msg)
             return
         }
-        w.Header().Set("Content-Type", "application/connect+json")
-        enc := json.NewEncoder(w)
-        if err := enc.Encode(resp); err != nil {
-            http.Error(w, "encode error", http.StatusInternalServerError)
-            return
-        }
+        writeConnectJSON(w, resp)
     })
 }
 
+// writeConnectJSON writes a successful Connect JSON response.
+func writeConnectJSON(w http.ResponseWriter, v any) {
+    w.Header().Set("Content-Type", "application/connect+json")
+    w.Header().Set("Connect-Protocol-Version", "1")
+    _ = json.NewEncoder(w).Encode(v)
+}
+
+// writeConnectError writes a Connect-style JSON error envelope with protocol header.
+func writeConnectError(w http.ResponseWriter, code, message string) {
+    w.Header().Set("Content-Type", "application/connect+json")
+    w.Header().Set("Connect-Protocol-Version", "1")
+    w.Header().Set("Connect-Error-Code", code)
+    // Per Connect protocol, unary errors can be 200 with error body.
+    // We choose 200 to maximize compatibility with clients.
+    _ = json.NewEncoder(w).Encode(map[string]any{
+        "error": map[string]any{
+            "code":    code,
+            "message": message,
+            "details": []any{},
+        },
+    })
+}

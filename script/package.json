@@ -19,6 +19,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "gen:prompt": "npx protoc -I ../proto --es_out=import_extension=js,target=js:../gen --connect-es_out=import_extension=js,target=js:../gen ../proto/prompt/v1/prompt.proto",
+    "buf:gen": "npx buf generate ..",
     "gen:clean": "rm -rf ../gen/prompt/v1/*.js ../gen/prompt/v1/*.d.ts 2>/dev/null || true",
     "gen": "npm run gen:clean && npm run gen:prompt"
   },
