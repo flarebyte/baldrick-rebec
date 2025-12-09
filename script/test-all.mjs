@@ -709,6 +709,50 @@ try {
     assert(!!gotMisspell, 'missing testcase: misspell');
   }
 
+  // 11.6) Testcases via gRPC JSON (start server, create+list+delete one)
+  step++;
+  logStep(step, TOTAL, 'Testcases via gRPC JSON service');
+  try {
+    await $`go run main.go admin server start --detach`;
+    await sleep(800);
+    let createGrpcJsonClient;
+    try {
+      ({ createGrpcJsonClient } = await import('./grpc-json-client.mjs'));
+    } catch (e) {
+      // Ensure deps are installed (protobufjs)
+      await $`npm --prefix script install --silent`;
+      ({ createGrpcJsonClient } = await import('./grpc-json-client.mjs'));
+    }
+    const tcClient = await createGrpcJsonClient({
+      baseUrl: 'http://127.0.0.1:53051',
+      protoPath: 'script/proto/testcase/v1/testcase.proto',
+      serviceName: 'testcase.v1.TestcaseService',
+    });
+    // Create a temporary testcase via gRPC JSON
+    const created = await tcClient.Create({
+      title: 'GRPC: smoke',
+      role: TEST_ROLE_USER,
+      experiment: expID,
+      status: 'OK',
+      file: 'grpc.json',
+      line: 1,
+    });
+    assert(created && created.id, 'grpc testcase create missing id');
+    // List and assert presence
+    const listed = await tcClient.List({ role: TEST_ROLE_USER, experiment: expID, limit: 10, offset: 0 });
+    assert(listed && Array.isArray(listed.items), 'grpc testcase list missing items');
+    const found = (listed.items || []).find((x) => x && x.id === created.id);
+    assert(!!found, 'grpc testcase not found in list');
+    // Delete
+    const del = await tcClient.Delete({ id: created.id });
+    assert(del && (del.deleted === 1 || del.deleted === '1'), 'grpc delete did not report 1');
+  } catch (e) {
+    console.error('grpc testcase step failed:', e?.message || String(e));
+    throw e;
+  } finally {
+    try { await $`go run main.go admin server stop`; } catch {}
+  }
+
   const q1 = idFrom(
     await queueAdd({
       description: 'Run quick unit subset',

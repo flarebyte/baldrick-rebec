@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package testcase.v1;
+
+import "google/protobuf/struct.proto";
+
+message CreateTestcaseRequest {
+  string title = 1;
+  string role = 2;
+  string experiment = 3;
+  string status = 4;
+  string name = 5;
+  string package = 6;
+  string classname = 7;
+  string error = 8;
+  google.protobuf.Struct tags = 9;
+  string level = 10;
+  string file = 11;
+  int32 line = 12;
+  double execution_time = 13;
+}
+
+message CreateTestcaseResponse {
+  string id = 1;
+  string title = 2;
+  string status = 3;
+  string created = 4;
+}
+
+message ListTestcasesRequest {
+  string role = 1;
+  string experiment = 2;
+  string status = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message TestcaseItem {
+  string id = 1;
+  string title = 2;
+  string status = 3;
+  string created = 4;
+  string name = 5;
+  string package = 6;
+  string classname = 7;
+  string experiment_id = 8;
+  google.protobuf.Struct tags = 9;
+  string file = 10;
+  int32 line = 11;
+  double execution_time = 12;
+}
+
+message ListTestcasesResponse {
+  repeated TestcaseItem items = 1;
+}
+
+message DeleteTestcaseRequest {
+  string id = 1;
+}
+
+message DeleteTestcaseResponse {
+  int32 deleted = 1;
+}
+
+service TestcaseService {
+  rpc Create (CreateTestcaseRequest) returns (CreateTestcaseResponse);
+  rpc List (ListTestcasesRequest) returns (ListTestcasesResponse);
+  rpc Delete (DeleteTestcaseRequest) returns (DeleteTestcaseResponse);
+}
+
