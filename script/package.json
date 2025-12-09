@@ -2,6 +2,7 @@
   "name": "script",
   "version": "1.0.0",
   "description": "Local scripting for rebec",
+  "type": "module",
   "main": "test-all.mjs",
   "dependencies": {
     "@bufbuild/buf": "^1.61.0",
