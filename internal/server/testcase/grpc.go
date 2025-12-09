@@ -4,6 +4,7 @@ import (
     "context"
     "encoding/json"
     "fmt"
+    "database/sql"
 
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
     grpcjson "github.com/flarebyte/baldrick-rebec/internal/transport/grpcjson"
@@ -16,12 +17,19 @@ type Service struct {
     DB *pgxpool.Pool
 }
 
+// TestcaseServiceServer defines the interface used by gRPC registration.
+type TestcaseServiceServer interface {
+    Create(context.Context, *CreateTestcaseRequest) (*CreateTestcaseResponse, error)
+    List(context.Context, *ListTestcasesRequest) (*ListTestcasesResponse, error)
+    Delete(context.Context, *DeleteTestcaseRequest) (*DeleteTestcaseResponse, error)
+}
+
 // Register registers the service with the provided gRPC server using a JSON codec.
 func (s *Service) Register(gs *grpc.Server) {
     grpcjson.Register()
     gs.RegisterService(&grpc.ServiceDesc{
         ServiceName: "testcase.v1.TestcaseService",
-        HandlerType: (*Service)(nil),
+        HandlerType: (*TestcaseServiceServer)(nil),
         Methods: []grpc.MethodDesc{
             {MethodName: "Create", Handler: s.handleCreate},
             {MethodName: "List", Handler: s.handleList},
@@ -42,16 +50,16 @@ func (s *Service) handleCreate(srv interface{}, ctx context.Context, dec func(in
     }
     // Build DAO entity
     tc := &pgdao.Testcase{Title: in.Title, RoleName: orDefault(in.Role, "user"), Status: orDefault(in.Status, "OK")}
-    if in.Name != "" { tc.Name.Valid, tc.Name.String = true, in.Name }
-    if in.Package != "" { tc.Package.Valid, tc.Package.String = true, in.Package }
-    if in.Classname != "" { tc.Classname.Valid, tc.Classname.String = true, in.Classname }
-    if in.Experiment != "" { tc.ExperimentID.Valid, tc.ExperimentID.String = true, in.Experiment }
-    if in.ErrorMessage != "" { tc.ErrorMessage.Valid, tc.ErrorMessage.String = true, in.ErrorMessage }
+    if in.Name != "" { tc.Name = sqlString(in.Name) }
+    if in.Package != "" { tc.Package = sqlString(in.Package) }
+    if in.Classname != "" { tc.Classname = sqlString(in.Classname) }
+    if in.Experiment != "" { tc.ExperimentID = sqlString(in.Experiment) }
+    if in.ErrorMessage != "" { tc.ErrorMessage = sqlString(in.ErrorMessage) }
     if len(in.Tags) > 0 { tc.Tags = in.Tags }
-    if in.Level != "" { tc.Level.Valid, tc.Level.String = true, in.Level }
-    if in.File != "" { tc.File.Valid, tc.File.String = true, in.File }
-    if in.Line > 0 { tc.Line.Valid, tc.Line.Int64 = true, int64(in.Line) }
-    if in.ExecutionTime > 0 { tc.ExecutionTime.Valid, tc.ExecutionTime.Float64 = true, in.ExecutionTime }
+    if in.Level != "" { tc.Level = sqlString(in.Level) }
+    if in.File != "" { tc.File = sqlString(in.File) }
+    if in.Line > 0 { tc.Line = sqlInt64(int64(in.Line)) }
+    if in.ExecutionTime > 0 { tc.ExecutionTime = sqlFloat64(in.ExecutionTime) }
 
     if err := pgdao.InsertTestcase(ctx, s.DB, tc); err != nil {
         return nil, err
@@ -106,3 +114,6 @@ func orDefault(v, def string) string {
     return v
 }
 
+func sqlString(s string) sql.NullString { return sql.NullString{String: s, Valid: true} }
+func sqlInt64(n int64) sql.NullInt64 { return sql.NullInt64{Int64: n, Valid: true} }
+func sqlFloat64(f float64) sql.NullFloat64 { return sql.NullFloat64{Float64: f, Valid: true} }
