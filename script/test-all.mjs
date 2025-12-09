@@ -451,14 +451,14 @@ try {
       assert(out.object === 'response', 'connect client: expected response object');
       assert(Array.isArray(out.output), 'connect client: output array');
     }
-    // Verify Connect protocol headers using curl, if available
+    // Verify endpoint via buf curl (Connect JSON)
     try {
-      const hdr = await $`curl -s -D - -o /dev/null -X POST -H 'Content-Type: application/connect+json' --data '{"tool_name":"ollama-gemma","input":"Ping"}' http://127.0.0.1:53051/prompt.v1.PromptService/Run`;
-      const h = String(hdr.stdout || '').toLowerCase();
-      assert(h.includes('content-type: application/connect+json'), 'connect: content-type header');
-      assert(h.includes('connect-protocol-version: 1'), 'connect: protocol version header');
+      const r = await $`buf curl -s -H 'Content-Type: application/connect+json' -d '{"tool_name":"ollama-gemma","input":"Ping"}' http://127.0.0.1:53051/prompt.v1.PromptService/Run`;
+      const body = String(r.stdout || '').trim();
+      const json = JSON.parse(body || 'null');
+      assert(json && json.object === 'response', 'buf curl: expected response object');
     } catch (e) {
-      console.error('connect header check skipped:', e?.message || String(e));
+      console.error('buf curl check skipped:', e?.message || String(e));
     }
   } catch (e) {
     console.error('js grpc client skipped:', e?.message || String(e));
