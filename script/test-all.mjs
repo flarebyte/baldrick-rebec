@@ -103,14 +103,14 @@ import {
   validateVaultShowContract,
   validateWorkflowListContract,
 } from './contract-helper.mjs';
-import { createGrpcJsonClient } from './grpc-json-client.mjs';
+import { createConnectGrpcJsonClient } from './grpc-json-client-connect.mjs';
 
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 19;
+const TOTAL = 18;
 let step = 0;
 
 try {
@@ -433,26 +433,31 @@ try {
     console.error('prompt (ollama) skipped:', e?.message || String(e));
   }
 
-  // 7.7) JS gRPC JSON client (optional)
+  // 7.7) Connect client (optional)
   step++;
-  logStep(step, TOTAL, 'Prompt via JS gRPC JSON client (if server available)');
+  logStep(step, TOTAL, 'Prompt via Connect client (if server available)');
   try {
     // Start server in background if not running
     await $`go run main.go admin server start --detach`;
     await sleep(1000);
-    const client = await createGrpcJsonClient({
-      baseUrl: 'http://127.0.0.1:53051',
-      protoPath: 'proto/prompt/v1/prompt.proto',
-      serviceName: 'prompt.v1.PromptService',
-    });
+    const client = createConnectGrpcJsonClient({ baseUrl: 'http://127.0.0.1:53051' });
     const out = await client.Run({
       tool_name: 'ollama-gemma',
       input: 'Say "hello" in one short line.',
       max_output_tokens: 64,
     });
     if (out) {
-      assert(out.object === 'response', 'js client: expected response object');
-      assert(Array.isArray(out.output), 'js client: output array');
+      assert(out.object === 'response', 'connect client: expected response object');
+      assert(Array.isArray(out.output), 'connect client: output array');
+    }
+    // Verify Connect protocol headers using curl, if available
+    try {
+      const hdr = await $`curl -s -D - -o /dev/null -X POST -H 'Content-Type: application/connect+json' --data '{"tool_name":"ollama-gemma","input":"Ping"}' http://127.0.0.1:53051/prompt.v1.PromptService/Run`;
+      const h = String(hdr.stdout || '').toLowerCase();
+      assert(h.includes('content-type: application/connect+json'), 'connect: content-type header');
+      assert(h.includes('connect-protocol-version: 1'), 'connect: protocol version header');
+    } catch (e) {
+      console.error('connect header check skipped:', e?.message || String(e));
     }
   } catch (e) {
     console.error('js grpc client skipped:', e?.message || String(e));
@@ -462,49 +467,7 @@ try {
     } catch {}
   }
 
-  // 7.8) Connect-Node client (optional, requires generated service stubs)
-  step++;
-  logStep(step, TOTAL, 'Prompt via Connect-Node client (if stubs available)');
-  try {
-    const connectClient = await import('./grpc-json-client-connect.mjs');
-    let svcMod = null;
-    try {
-      svcMod = await import('../gen/prompt/v1/prompt_connect.js');
-    } catch {}
-    if (!svcMod || !svcMod.PromptService) {
-      console.error('connect client skipped: generated service not found');
-    } else {
-      await $`go run main.go admin server start --detach`;
-      await sleep(1000);
-      const client = connectClient.createConnectGrpcJsonClient({
-        baseUrl: 'http://127.0.0.1:53051',
-        service: svcMod.PromptService,
-      });
-      const out = await client.Run({
-        tool_name: 'ollama-gemma',
-        input: 'Say "hello" in one short line.',
-        max_output_tokens: 64,
-      });
-      if (out) {
-        assert(out.object === 'response', 'connect client: expected response object');
-        assert(Array.isArray(out.output), 'connect client: output array');
-      }
-      // Verify Connect protocol headers using curl, if available
-      try {
-        const hdr = await $`curl -s -D - -o /dev/null -X POST -H 'Content-Type: application/connect+json' --data '{"tool_name":"ollama-gemma","input":"Ping"}' http://127.0.0.1:53051/prompt.v1.PromptService/Run`;
-        const h = String(hdr.stdout || '').toLowerCase();
-        assert(h.includes('content-type: application/connect+json'), 'connect: content-type header');
-        assert(h.includes('connect-protocol-version: 1'), 'connect: protocol version header');
-      } catch (e) {
-        console.error('connect header check skipped:', e?.message || String(e));
-      }
-      try {
-        await $`go run main.go admin server stop`;
-      } catch {}
-    }
-  } catch (e) {
-    console.error('connect client skipped:', e?.message || String(e));
-  }
+  
 
   // 8) Stores & Blackboards
   step++;
