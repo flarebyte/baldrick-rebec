@@ -466,7 +466,8 @@ try {
     }
     // Verify endpoint via buf curl (Connect JSON)
     try {
-      const r = await $`buf curl --http2-prior-knowledge --data '{"tool_name":"ollama-gemma","input":"Ping"}' http://127.0.0.1:53051/prompt.v1.PromptService/Run`;
+      // Use buf curl with Connect protocol, providing schema rooted at script/ (contains buf.yaml + proto/)
+      const r = await $`buf curl --connect --http2-prior-knowledge --schema script http://127.0.0.1:53051 prompt.v1.PromptService/Run --data '{"tool_name":"ollama-gemma","input":"Ping"}'`;
       const body = String(r.stdout || '').trim();
       const json = JSON.parse(body || 'null');
       assert(json && json.object === 'response', 'buf curl: expected response object');
