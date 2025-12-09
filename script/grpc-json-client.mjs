@@ -18,7 +18,14 @@ function frameMessage(jsonBytes) {
 
 function parseUnaryResponse(chunks) {
   const buf = Buffer.concat(chunks);
-  if (buf.length < 5) throw new Error('grpc: short response');
+  if (buf.length < 5) {
+    // Fallback: some servers may return plain JSON without gRPC framing
+    try {
+      return JSON.parse(buf.toString('utf8') || 'null');
+    } catch (e) {
+      throw new Error('grpc: short response');
+    }
+  }
   const flag = buf.readUInt8(0);
   const len = buf.readUInt32BE(1);
   if (flag !== 0) throw new Error('grpc: compression not supported');
