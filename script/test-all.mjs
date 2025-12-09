@@ -709,23 +709,25 @@ try {
     assert(!!gotMisspell, 'missing testcase: misspell');
   }
 
-  // 11.6) Testcases via gRPC JSON (start server, create+list+delete one)
+  // 11.6) Testcases via Connect JSON (start server, create+list+delete one)
   step++;
-  logStep(step, TOTAL, 'Testcases via gRPC JSON service');
+  logStep(step, TOTAL, 'Testcases via Connect JSON service');
   try {
     await $`go run main.go admin server start --detach`;
     await sleep(800);
-    // Ensure deps (protobufjs) are installed before importing low-level gRPC client
-    try { await $`npm --prefix script ls protobufjs --silent`; } catch { await $`npm --prefix script install protobufjs --silent`; }
-    let createGrpcJsonClient;
-    ({ createGrpcJsonClient } = await import('./grpc-json-client.mjs'));
-    const tcClient = await createGrpcJsonClient({
-      baseUrl: 'http://127.0.0.1:53051',
-      protoPath: 'script/proto/testcase/v1/testcase.proto',
-      serviceName: 'testcase.v1.TestcaseService',
-    });
-    // Create a temporary testcase via gRPC JSON
-    const created = await tcClient.Create({
+    // Use fetch against Connect JSON endpoints
+    const endpoint = (m) => `http://127.0.0.1:53051/testcase.v1.TestcaseService/${m}`;
+    const post = async (m, body) => {
+      const res = await fetch(endpoint(m), {
+        method: 'POST',
+        headers: { 'content-type': 'application/connect+json' },
+        body: JSON.stringify(body || {}),
+      });
+      const txt = await res.text();
+      try { return JSON.parse(txt || 'null'); } catch { throw new Error(`invalid json: ${txt}`); }
+    };
+    // Create a temporary testcase via Connect JSON
+    const created = await post('Create', {
       title: 'GRPC: smoke',
       role: TEST_ROLE_USER,
       experiment: expID,
@@ -735,12 +737,12 @@ try {
     });
     assert(created && created.id, 'grpc testcase create missing id');
     // List and assert presence
-    const listed = await tcClient.List({ role: TEST_ROLE_USER, experiment: expID, limit: 10, offset: 0 });
+    const listed = await post('List', { role: TEST_ROLE_USER, experiment: expID, limit: 10, offset: 0 });
     assert(listed && Array.isArray(listed.items), 'grpc testcase list missing items');
     const found = (listed.items || []).find((x) => x && x.id === created.id);
     assert(!!found, 'grpc testcase not found in list');
     // Delete
-    const del = await tcClient.Delete({ id: created.id });
+    const del = await post('Delete', { id: created.id });
     assert(del && (del.deleted === 1 || del.deleted === '1'), 'grpc delete did not report 1');
   } catch (e) {
     console.error('grpc testcase step failed:', e?.message || String(e));
