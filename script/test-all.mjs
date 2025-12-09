@@ -440,7 +440,20 @@ try {
     // Start server in background if not running
     await $`go run main.go admin server start --detach`;
     await sleep(1000);
-    const { createConnectGrpcJsonClient } = await import('./grpc-json-client-connect.mjs');
+    // Import connect client; if dependency missing, install script deps and retry
+    let createConnectGrpcJsonClient;
+    try {
+      ({ createConnectGrpcJsonClient } = await import('./grpc-json-client-connect.mjs'));
+    } catch (e) {
+      const msg = e?.message || String(e || '');
+      if (msg.includes("'@connectrpc/connect-node'")) {
+        // Install dependencies declared in script/package.json
+        await $`npm --prefix script install --silent`;
+        ({ createConnectGrpcJsonClient } = await import('./grpc-json-client-connect.mjs'));
+      } else {
+        throw e;
+      }
+    }
     const client = createConnectGrpcJsonClient({ baseUrl: 'http://127.0.0.1:53051' });
     const out = await client.Run({
       tool_name: 'ollama-gemma',
@@ -461,7 +474,8 @@ try {
       console.error('buf curl check skipped:', e?.message || String(e));
     }
   } catch (e) {
-    console.error('js grpc client skipped:', e?.message || String(e));
+    // Surface as a hard failure since server is expected to be available
+    throw e;
   } finally {
     try {
       await $`go run main.go admin server stop`;
