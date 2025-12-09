@@ -103,7 +103,7 @@ import {
   validateVaultShowContract,
   validateWorkflowListContract,
 } from './contract-helper.mjs';
-import { createConnectGrpcJsonClient } from './grpc-json-client-connect.mjs';
+// Connect client imported dynamically in the step to avoid hard failure
 
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 
@@ -440,6 +440,7 @@ try {
     // Start server in background if not running
     await $`go run main.go admin server start --detach`;
     await sleep(1000);
+    const { createConnectGrpcJsonClient } = await import('./grpc-json-client-connect.mjs');
     const client = createConnectGrpcJsonClient({ baseUrl: 'http://127.0.0.1:53051' });
     const out = await client.Run({
       tool_name: 'ollama-gemma',
