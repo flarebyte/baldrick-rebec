@@ -5,6 +5,7 @@
 // - Returns plain JSON normalized via response schema
 //
 import * as promptpb from './gen/prompt/v1/prompt_pb.js';
+import { fromJson, toJson } from '@bufbuild/protobuf';
 
 // Optional: interceptor to add/override headers (e.g., force JSON content-type for experiments)
 // No interceptors; simple fetch-based client
@@ -16,7 +17,7 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
   return {
     async Run(jsonReq = {}) {
       // Validate request via schema
-      try { promptpb.PromptRunRequestSchema.fromJson(jsonReq, { ignoreUnknownFields: false }); } catch (e) {
+      try { fromJson(promptpb.PromptRunRequestSchema, jsonReq); } catch (e) {
         const detail = e?.message || String(e);
         throw new Error(`request validation failed: ${detail}`);
       }
@@ -37,8 +38,8 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
       }
       // Validate response via schema; normalize to JSON mapping
       try {
-        const msg = promptpb.PromptRunResponseSchema.fromJson(obj, { ignoreUnknownFields: false });
-        return promptpb.PromptRunResponseSchema.toJson(msg, { emitDefaultValues: false });
+        const msg = fromJson(promptpb.PromptRunResponseSchema, obj);
+        return toJson(promptpb.PromptRunResponseSchema, msg, { emitDefaultValues: false });
       } catch (e) {
         const detail = e?.message || String(e);
         throw new Error(`response validation failed: ${detail}`);
