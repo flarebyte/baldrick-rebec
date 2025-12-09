@@ -466,7 +466,7 @@ try {
     }
     // Verify endpoint via buf curl (Connect JSON)
     try {
-      const r = await $`buf curl --http-header 'Content-Type: application/connect+json' --data '{"tool_name":"ollama-gemma","input":"Ping"}' http://127.0.0.1:53051/prompt.v1.PromptService/Run`;
+      const r = await $`buf curl -H 'Content-Type: application/connect+json' --data '{"tool_name":"ollama-gemma","input":"Ping"}' http://127.0.0.1:53051/prompt.v1.PromptService/Run`;
       const body = String(r.stdout || '').trim();
       const json = JSON.parse(body || 'null');
       assert(json && json.object === 'response', 'buf curl: expected response object');
