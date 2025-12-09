@@ -16,6 +16,7 @@ import (
 	toolingdao "github.com/flarebyte/baldrick-rebec/internal/dao/tooling"
 	"github.com/flarebyte/baldrick-rebec/internal/paths"
 	promptsvc "github.com/flarebyte/baldrick-rebec/internal/server/prompt"
+	testcasesvc "github.com/flarebyte/baldrick-rebec/internal/server/testcase"
 	responsesvc "github.com/flarebyte/baldrick-rebec/internal/service/responses"
 	factorypkg "github.com/flarebyte/baldrick-rebec/internal/service/responses/factory"
 	"google.golang.org/grpc"
@@ -45,7 +46,7 @@ func RunForeground(addr, pidPath string) error {
     reflection.Register(gs)
     mux := http.NewServeMux()
 
-    // Register PromptService backed by DAOs and services
+    // Register services backed by DAOs and services
     if cfg, err := config.Load(); err == nil {
         // Open DB with default timeout
         // Note: keep pool for process lifetime; server will close on shutdown.
@@ -58,6 +59,10 @@ func RunForeground(addr, pidPath string) error {
             }
             svc.Register(gs)
             mux.Handle("/prompt.v1.PromptService/Run", svc.ConnectHandler())
+
+            // Testcase gRPC JSON service
+            tsvc := &testcasesvc.Service{DB: db}
+            tsvc.Register(gs)
         }
     }
 
