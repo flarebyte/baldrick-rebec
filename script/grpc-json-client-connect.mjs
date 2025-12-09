@@ -4,7 +4,7 @@
 // - Builds a Connect ServiceType at runtime (no connect-es required)
 // - Validates inputs via Schema.fromJson and returns outputs via Schema.toJson
 //
-import { createPromiseClient, MethodKind } from '@connectrpc/connect';
+import { createPromiseClient } from '@connectrpc/connect';
 import { createConnectTransport } from '@connectrpc/connect-node';
 import * as promptpb from './gen/prompt/v1/prompt_pb.js';
 
@@ -28,7 +28,7 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
     methods: [
       {
         name: 'Run',
-        kind: MethodKind.Unary,
+        kind: 'unary',
         I: promptpb.PromptRunRequestSchema,
         O: promptpb.PromptRunResponseSchema,
       },
