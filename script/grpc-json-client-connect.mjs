@@ -1,63 +1,47 @@
-// Connect-Node based client using generated ES descriptors in script/gen.
+// Minimal Connect JSON client using generated ES descriptors in script/gen.
 //
-// - Uses @bufbuild/protoc-gen-es output at script/gen/prompt/v1/prompt_pb.js
-// - Builds a Connect ServiceType at runtime (no connect-es required)
-// - Validates inputs via Schema.fromJson and returns outputs via Schema.toJson
+// - Uses ES output at script/gen/prompt/v1/prompt_pb.js for validation/coercion
+// - Sends HTTP POST application/connect+json to the Connect endpoint
+// - Returns plain JSON normalized via response schema
 //
-import { createPromiseClient } from '@connectrpc/connect';
-import { createConnectTransport } from '@connectrpc/connect-node';
 import * as promptpb from './gen/prompt/v1/prompt_pb.js';
 
 // Optional: interceptor to add/override headers (e.g., force JSON content-type for experiments)
-function headerInterceptor(extraHeaders = {}) {
-  return (next) => async (req) => {
-    // Merge headers (case-insensitive keys by convention)
-    for (const [k, v] of Object.entries(extraHeaders)) {
-      req.header.set(k, String(v));
-    }
-    return await next(req);
-  };
-}
+// No interceptors; simple fetch-based client
 
 // Creates a Connect client and exposes RPCs that accept/return plain JSON.
 export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
   if (!baseUrl) throw new Error('baseUrl is required');
-  // Build a Connect ServiceType from ES descriptors
-  const ServiceType = {
-    typeName: 'prompt.v1.PromptService',
-    methods: [
-      {
-        name: 'Run',
-        kind: 'unary',
-        I: promptpb.PromptRunRequestSchema,
-        O: promptpb.PromptRunResponseSchema,
-      },
-    ],
-  };
-
-  const transport = createConnectTransport({
-    baseUrl,
-    interceptors: Object.keys(headers).length ? [headerInterceptor(headers)] : undefined,
-  });
-  const c = createPromiseClient(ServiceType, transport);
-
+  const endpoint = `${baseUrl.replace(/\/$/, '')}/prompt.v1.PromptService/Run`;
   return {
-    async Run(jsonReq = {}, options = {}) {
-      // Validate/coerce input JSON into a Message via fromJson
-      let msgIn;
-      try {
-        msgIn = promptpb.PromptRunRequestSchema.fromJson(jsonReq, { ignoreUnknownFields: false });
-      } catch (e) {
+    async Run(jsonReq = {}) {
+      // Validate request via schema
+      try { promptpb.PromptRunRequestSchema.fromJson(jsonReq, { ignoreUnknownFields: false }); } catch (e) {
         const detail = e?.message || String(e);
         throw new Error(`request validation failed: ${detail}`);
       }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/connect+json', ...headers },
+        body: JSON.stringify(jsonReq),
+      });
+      const text = await res.text();
+      let obj;
+      try { obj = JSON.parse(text || 'null'); } catch (e) {
+        throw new Error(`invalid JSON response: ${text.slice(0, 200)}`);
+      }
+      if (obj && obj.error) {
+        const code = obj.error?.code || 'unknown';
+        const msg = obj.error?.message || 'error';
+        throw new Error(`connect error ${code}: ${msg}`);
+      }
+      // Validate response via schema; normalize to JSON mapping
       try {
-        const res = await c.Run(msgIn, options);
-        return promptpb.PromptRunResponseSchema.toJson(res, { emitDefaultValues: false });
+        const msg = promptpb.PromptRunResponseSchema.fromJson(obj, { ignoreUnknownFields: false });
+        return promptpb.PromptRunResponseSchema.toJson(msg, { emitDefaultValues: false });
       } catch (e) {
-        const code = e?.code !== undefined ? ` code=${e.code}` : '';
-        const msg = e?.message || String(e);
-        throw new Error(`rpc Run failed:${code} ${msg}`);
+        const detail = e?.message || String(e);
+        throw new Error(`response validation failed: ${detail}`);
       }
     },
   };
