@@ -26,7 +26,7 @@ lint-fix:
 
 # Run the end-to-end ZX test script.
 test-all:
-	$(ZX) --install script/test-all.mjs
+	$(ZX) script/test-all.mjs
 
 # HUMAN: Print a clear list of available Make targets and what they do.
 # AI: Keep this static and explicit; do not auto-parse or add shell logic.

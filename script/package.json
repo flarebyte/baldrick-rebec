@@ -4,25 +4,23 @@
   "description": "Local scripting for rebec",
   "main": "test-all.mjs",
   "dependencies": {
+    "@bufbuild/buf": "^1.61.0",
+    "@bufbuild/protobuf": "^2.10.1",
+    "@connectrpc/connect": "^2.1.1",
+    "@connectrpc/validate": "^0.2.0",
     "long": "^5.3.2",
-    "protobufjs": "^7.5.4",
     "undici-types": "^7.16.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@bufbuild/protobuf": "^2.0.0",
-    "@connectrpc/connect": "^2.0.0",
-    "@connectrpc/connect-node": "^2.0.0",
-    "@bufbuild/protoc-gen-es": "^2.0.0",
-    "@connectrpc/protoc-gen-connect-es": "^2.0.0"
+    "@bufbuild/protoc-gen-es": "^2.10.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "gen:prompt": "npx protoc -I ../proto --es_out=import_extension=js,target=js:../gen --connect-es_out=import_extension=js,target=js:../gen ../proto/prompt/v1/prompt.proto",
-    "buf:gen": "npx buf generate ..",
-    "gen:clean": "rm -rf ../gen/prompt/v1/*.js ../gen/prompt/v1/*.d.ts 2>/dev/null || true",
-    "gen": "npm run gen:clean && npm run gen:prompt"
+    "buf:gen": "buf generate",
+    "gen:clean": "rm -rf gen/prompt/v1/*.js gen/prompt/v1/*.d.ts 2>/dev/null || true",
+    "gen": "npm run gen:clean && npm run buf:gen"
   },
   "author": "Olivier Huin <npm.olivier.huin@flarebyte.com> (http://flarebyte.com/)",
-  "license": "MIT"
+  "license": "MIT" 
 }
