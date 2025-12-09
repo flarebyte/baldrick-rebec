@@ -714,7 +714,7 @@ try {
   logStep(step, TOTAL, 'Testcases via Connect JSON service');
   try {
     await $`go run main.go admin server start --detach`;
-    await sleep(800);
+    await sleep(1500);
     // Use fetch against Connect JSON endpoints
     const endpoint = (m) => `http://127.0.0.1:53051/testcase.v1.TestcaseService/${m}`;
     const post = async (m, body) => {
