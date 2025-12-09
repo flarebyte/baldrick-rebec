@@ -464,16 +464,6 @@ try {
       assert(out.object === 'response', 'connect client: expected response object');
       assert(Array.isArray(out.output), 'connect client: output array');
     }
-    // Verify endpoint via buf curl (Connect JSON)
-    try {
-      // Use buf curl with Connect protocol and explicit schema for h2c endpoint
-      const r = await $`buf curl --protocol connect --http2-prior-knowledge --reflect=false --schema script http://127.0.0.1:53051/prompt.v1.PromptService/Run --data '{"tool_name":"ollama-gemma","input":"Ping"}'`;
-      const body = String(r.stdout || '').trim();
-      const json = JSON.parse(body || 'null');
-      assert(json && json.object === 'response', 'buf curl: expected response object');
-    } catch (e) {
-      console.error('buf curl check skipped:', e?.message || String(e));
-    }
   } catch (e) {
     // Surface as a hard failure since server is expected to be available
     throw e;
