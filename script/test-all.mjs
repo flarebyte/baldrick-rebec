@@ -37,6 +37,8 @@ import {
   logStep,
   messageListJSON,
   messageSet,
+  testcaseCreate,
+  testcaseListJSON,
   packageSet,
   projectListJSON,
   projectSet,
@@ -110,7 +112,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 18;
+const TOTAL = 19;
 let step = 0;
 
 try {
@@ -657,6 +659,55 @@ try {
     tags: 'docs,update',
     role: TEST_ROLE_USER,
   });
+
+  // 11.5) Testcases
+  step++;
+  logStep(step, TOTAL, 'Creating testcases and verifying listing');
+  await testcaseCreate({
+    title: 'Unit: go vet',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'OK',
+    name: 'vet-basic',
+    pkg: 'acme/build',
+    classname: 'lint.Vet',
+    file: 'main.go',
+    line: 12,
+    executionTime: 1.23,
+  });
+  await testcaseCreate({
+    title: 'Unit: go fmt',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'OK',
+    name: 'fmt-style',
+    pkg: 'acme/build',
+    classname: 'format.Fmt',
+    file: 'util.go',
+    line: 7,
+    executionTime: 0.42,
+  });
+  await testcaseCreate({
+    title: 'Lint: misspell',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'KO',
+    name: 'misspell',
+    pkg: 'acme/build',
+    classname: 'lint.Misspell',
+    error: 'found “teh” in README.md',
+    file: 'README.md',
+    line: 3,
+    executionTime: 0.33,
+  });
+  {
+    const tcs = await testcaseListJSON({ role: TEST_ROLE_USER, experiment: expID, limit: 50 });
+    assert(Array.isArray(tcs) && tcs.length >= 3, 'expected at least 3 testcases');
+    const gotVet = tcs.find((x) => x && x.title === 'Unit: go vet' && x.status === 'OK');
+    const gotMisspell = tcs.find((x) => x && x.title === 'Lint: misspell' && x.status === 'KO');
+    assert(!!gotVet, 'missing testcase: go vet');
+    assert(!!gotMisspell, 'missing testcase: misspell');
+  }
 
   const q1 = idFrom(
     await queueAdd({

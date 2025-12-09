@@ -921,6 +921,45 @@ export async function vaultDoctor() {
 }
 
 // -----------------------------
+// Testcase helpers
+// -----------------------------
+export async function testcaseCreate({
+  title,
+  role = 'user',
+  experiment = '',
+  status = 'OK',
+  name = '',
+  pkg = '',
+  classname = '',
+  error = '',
+  tags = '',
+  level = '',
+  file = '',
+  line = 0,
+  executionTime = 0,
+}) {
+  const args = ['admin', 'testcase', 'create', '--title', title, '--role', role, '--status', status];
+  if (experiment) args.push('--experiment', experiment);
+  if (name) args.push('--name', name);
+  if (pkg) args.push('--package', pkg);
+  if (classname) args.push('--classname', classname);
+  if (error) args.push('--error', error);
+  if (tags) args.push('--tags', tags);
+  if (level) args.push('--level', level);
+  if (file) args.push('--file', file);
+  if (line) args.push('--line', String(line));
+  if (executionTime) args.push('--execution-time', String(executionTime));
+  return await runRbcJSON(...args);
+}
+
+export async function testcaseListJSON({ role, experiment = '', status = '', limit = 100, offset = 0 }) {
+  const args = ['admin', 'testcase', 'list', '--role', role, '--output', 'json', '--limit', String(limit), '--offset', String(offset)];
+  if (experiment) args.push('--experiment', experiment);
+  if (status) args.push('--status', status);
+  return await runRbcJSON(...args);
+}
+
+// -----------------------------
 // Prompt helpers
 // -----------------------------
 export async function promptRun({
