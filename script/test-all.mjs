@@ -715,14 +715,10 @@ try {
   try {
     await $`go run main.go admin server start --detach`;
     await sleep(800);
+    // Ensure deps (protobufjs) are installed before importing low-level gRPC client
+    try { await $`npm --prefix script ls protobufjs --silent`; } catch { await $`npm --prefix script install protobufjs --silent`; }
     let createGrpcJsonClient;
-    try {
-      ({ createGrpcJsonClient } = await import('./grpc-json-client.mjs'));
-    } catch (e) {
-      // Ensure deps are installed (protobufjs)
-      await $`npm --prefix script install --silent`;
-      ({ createGrpcJsonClient } = await import('./grpc-json-client.mjs'));
-    }
+    ({ createGrpcJsonClient } = await import('./grpc-json-client.mjs'));
     const tcClient = await createGrpcJsonClient({
       baseUrl: 'http://127.0.0.1:53051',
       protoPath: 'script/proto/testcase/v1/testcase.proto',
