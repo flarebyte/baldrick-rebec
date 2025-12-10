@@ -20,7 +20,7 @@ format:
 	npx @biomejs/biome check script --write
 
 # Generic test: end-to-end script
-test:
+test: gen
 	$(ZX) script/test-all.mjs
 
 # Generate artifacts (e.g., client stubs)
