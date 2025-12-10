@@ -21,7 +21,7 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
       try {
         fromJson(promptpb.PromptRunRequestSchema, jsonReq);
       } catch (e) {
-        const detail = e?.message || String(e);
+        const detail = e?.message ?? String(e);
         throw new Error(`request validation failed: ${detail}`);
       }
       const res = await fetch(endpoint, {
@@ -33,7 +33,7 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
       let obj;
       try {
         obj = JSON.parse(text || 'null');
-      } catch (e) {
+      } catch {
         throw new Error(`invalid JSON response: ${text.slice(0, 200)}`);
       }
       if (obj && obj.error) {
@@ -48,7 +48,7 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
           emitDefaultValues: false,
         });
       } catch (e) {
-        const detail = e?.message || String(e);
+        const detail = e?.message ?? String(e);
         throw new Error(`response validation failed: ${detail}`);
       }
     },

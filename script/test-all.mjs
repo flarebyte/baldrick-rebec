@@ -488,9 +488,6 @@ try {
       );
       assert(Array.isArray(out.output), 'connect client: output array');
     }
-  } catch (e) {
-    // Surface as a hard failure since server is expected to be available
-    throw e;
   } finally {
     try {
       await $`go run main.go admin server stop`;
@@ -731,10 +728,10 @@ try {
       'expected at least 3 testcases',
     );
     const gotVet = tcs.find(
-      (x) => x && x.title === 'Unit: go vet' && x.status === 'OK',
+      (x) => x?.title === 'Unit: go vet' && x?.status === 'OK',
     );
     const gotMisspell = tcs.find(
-      (x) => x && x.title === 'Lint: misspell' && x.status === 'KO',
+      (x) => x?.title === 'Lint: misspell' && x?.status === 'KO',
     );
     assert(!!gotVet, 'missing testcase: go vet');
     assert(!!gotMisspell, 'missing testcase: misspell');
@@ -783,7 +780,7 @@ try {
       listed && Array.isArray(listed.items),
       'grpc testcase list missing items',
     );
-    const found = (listed.items || []).find((x) => x && x.id === created.id);
+    const found = (listed?.items ?? []).find((x) => x?.id === created.id);
     assert(!!found, 'grpc testcase not found in list');
     // Delete
     const del = await post('Delete', { id: created.id });

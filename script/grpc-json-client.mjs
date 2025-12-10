@@ -22,7 +22,7 @@ function parseUnaryResponse(chunks) {
     // Fallback: some servers may return plain JSON without gRPC framing
     try {
       return JSON.parse(buf.toString('utf8') || 'null');
-    } catch (e) {
+    } catch {
       throw new Error('grpc: short response');
     }
   }
