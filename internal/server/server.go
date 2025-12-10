@@ -45,6 +45,11 @@ func RunForeground(addr, pidPath string) error {
     gs := grpc.NewServer()
     reflection.Register(gs)
     mux := http.NewServeMux()
+    // Lightweight health endpoint for readiness checks
+    mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        _, _ = w.Write([]byte(`{"status":"ok"}`))
+    })
 
     // Register services backed by DAOs and services
     if cfg, err := config.Load(); err == nil {

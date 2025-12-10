@@ -441,7 +441,8 @@ try {
   try {
     // Start server in background if not running
     await $`go run main.go admin server start --detach`;
-    await sleep(1000);
+    // Wait for health endpoint instead of fixed sleep to avoid race conditions
+    try { await (async function waitHealth(){ for (let i=0;i<50;i++){ try{ const r=await fetch('http://127.0.0.1:53051/health'); if (r && r.ok) return; }catch{} await sleep(100);} throw new Error('health timeout'); })(); } catch {}
     // Import connect client; if dependency missing, install script deps and retry
     let createConnectGrpcJsonClient;
     try {
