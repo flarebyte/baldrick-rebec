@@ -4,8 +4,9 @@
 // - Sends HTTP POST application/connect+json to the Connect endpoint
 // - Returns plain JSON normalized via response schema
 //
-import * as promptpb from './gen/prompt/v1/prompt_pb.js';
+
 import { fromJson, toJson } from '@bufbuild/protobuf';
+import * as promptpb from './gen/prompt/v1/prompt_pb.js';
 
 // Optional: interceptor to add/override headers (e.g., force JSON content-type for experiments)
 // No interceptors; simple fetch-based client
@@ -17,7 +18,9 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
   return {
     async Run(jsonReq = {}) {
       // Validate request via schema
-      try { fromJson(promptpb.PromptRunRequestSchema, jsonReq); } catch (e) {
+      try {
+        fromJson(promptpb.PromptRunRequestSchema, jsonReq);
+      } catch (e) {
         const detail = e?.message || String(e);
         throw new Error(`request validation failed: ${detail}`);
       }
@@ -28,7 +31,9 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
       });
       const text = await res.text();
       let obj;
-      try { obj = JSON.parse(text || 'null'); } catch (e) {
+      try {
+        obj = JSON.parse(text || 'null');
+      } catch (e) {
         throw new Error(`invalid JSON response: ${text.slice(0, 200)}`);
       }
       if (obj && obj.error) {
@@ -39,7 +44,9 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
       // Validate response via schema; normalize to JSON mapping
       try {
         const msg = fromJson(promptpb.PromptRunResponseSchema, obj);
-        return toJson(promptpb.PromptRunResponseSchema, msg, { emitDefaultValues: false });
+        return toJson(promptpb.PromptRunResponseSchema, msg, {
+          emitDefaultValues: false,
+        });
       } catch (e) {
         const detail = e?.message || String(e);
         throw new Error(`response validation failed: ${detail}`);

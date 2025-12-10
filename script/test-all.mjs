@@ -37,8 +37,6 @@ import {
   logStep,
   messageListJSON,
   messageSet,
-  testcaseCreate,
-  testcaseListJSON,
   packageSet,
   projectListJSON,
   projectSet,
@@ -77,6 +75,8 @@ import {
   tagSet,
   taskListJSON,
   taskSetReplacement,
+  testcaseCreate,
+  testcaseListJSON,
   toolGetJSON,
   toolListJSON,
   toolSet,
@@ -105,6 +105,7 @@ import {
   validateVaultShowContract,
   validateWorkflowListContract,
 } from './contract-helper.mjs';
+
 // Connect client imported dynamically in the step to avoid hard failure
 
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
@@ -442,29 +443,49 @@ try {
     // Start server in background if not running
     await $`go run main.go admin server start --detach`;
     // Wait for health endpoint instead of fixed sleep to avoid race conditions
-    try { await (async function waitHealth(){ for (let i=0;i<50;i++){ try{ const r=await fetch('http://127.0.0.1:53051/health'); if (r && r.ok) return; }catch{} await sleep(100);} throw new Error('health timeout'); })(); } catch {}
+    try {
+      await (async function waitHealth() {
+        for (let i = 0; i < 50; i++) {
+          try {
+            const r = await fetch('http://127.0.0.1:53051/health');
+            if (r && r.ok) return;
+          } catch {}
+          await sleep(100);
+        }
+        throw new Error('health timeout');
+      })();
+    } catch {}
     // Import connect client; if dependency missing, install script deps and retry
     let createConnectGrpcJsonClient;
     try {
-      ({ createConnectGrpcJsonClient } = await import('./grpc-json-client-connect.mjs'));
+      ({ createConnectGrpcJsonClient } = await import(
+        './grpc-json-client-connect.mjs'
+      ));
     } catch (e) {
       const msg = e?.message || String(e || '');
       if (msg.includes("'@connectrpc/connect-node'")) {
         // Install dependencies declared in script/package.json
         await $`npm --prefix script install --silent`;
-        ({ createConnectGrpcJsonClient } = await import('./grpc-json-client-connect.mjs'));
+        ({ createConnectGrpcJsonClient } = await import(
+          './grpc-json-client-connect.mjs'
+        ));
       } else {
         throw e;
       }
     }
-    const client = createConnectGrpcJsonClient({ baseUrl: 'http://127.0.0.1:53051' });
+    const client = createConnectGrpcJsonClient({
+      baseUrl: 'http://127.0.0.1:53051',
+    });
     const out = await client.Run({
       tool_name: 'ollama-gemma',
       input: 'Say "hello" in one short line.',
       max_output_tokens: 64,
     });
     if (out) {
-      assert(out.object === 'response', 'connect client: expected response object');
+      assert(
+        out.object === 'response',
+        'connect client: expected response object',
+      );
       assert(Array.isArray(out.output), 'connect client: output array');
     }
   } catch (e) {
@@ -475,8 +496,6 @@ try {
       await $`go run main.go admin server stop`;
     } catch {}
   }
-
-  
 
   // 8) Stores & Blackboards
   step++;
@@ -702,10 +721,21 @@ try {
     executionTime: 0.33,
   });
   {
-    const tcs = await testcaseListJSON({ role: TEST_ROLE_USER, experiment: expID, limit: 50 });
-    assert(Array.isArray(tcs) && tcs.length >= 3, 'expected at least 3 testcases');
-    const gotVet = tcs.find((x) => x && x.title === 'Unit: go vet' && x.status === 'OK');
-    const gotMisspell = tcs.find((x) => x && x.title === 'Lint: misspell' && x.status === 'KO');
+    const tcs = await testcaseListJSON({
+      role: TEST_ROLE_USER,
+      experiment: expID,
+      limit: 50,
+    });
+    assert(
+      Array.isArray(tcs) && tcs.length >= 3,
+      'expected at least 3 testcases',
+    );
+    const gotVet = tcs.find(
+      (x) => x && x.title === 'Unit: go vet' && x.status === 'OK',
+    );
+    const gotMisspell = tcs.find(
+      (x) => x && x.title === 'Lint: misspell' && x.status === 'KO',
+    );
     assert(!!gotVet, 'missing testcase: go vet');
     assert(!!gotMisspell, 'missing testcase: misspell');
   }
@@ -717,7 +747,8 @@ try {
     await $`go run main.go admin server start --detach`;
     await sleep(1500);
     // Use fetch against Connect JSON endpoints
-    const endpoint = (m) => `http://127.0.0.1:53051/testcase.v1.TestcaseService/${m}`;
+    const endpoint = (m) =>
+      `http://127.0.0.1:53051/testcase.v1.TestcaseService/${m}`;
     const post = async (m, body) => {
       const res = await fetch(endpoint(m), {
         method: 'POST',
@@ -725,7 +756,11 @@ try {
         body: JSON.stringify(body || {}),
       });
       const txt = await res.text();
-      try { return JSON.parse(txt || 'null'); } catch { throw new Error(`invalid json: ${txt}`); }
+      try {
+        return JSON.parse(txt || 'null');
+      } catch {
+        throw new Error(`invalid json: ${txt}`);
+      }
     };
     // Create a temporary testcase via Connect JSON
     const created = await post('Create', {
@@ -738,13 +773,24 @@ try {
     });
     assert(created && created.id, 'grpc testcase create missing id');
     // List and assert presence
-    const listed = await post('List', { role: TEST_ROLE_USER, experiment: expID, limit: 10, offset: 0 });
-    assert(listed && Array.isArray(listed.items), 'grpc testcase list missing items');
+    const listed = await post('List', {
+      role: TEST_ROLE_USER,
+      experiment: expID,
+      limit: 10,
+      offset: 0,
+    });
+    assert(
+      listed && Array.isArray(listed.items),
+      'grpc testcase list missing items',
+    );
     const found = (listed.items || []).find((x) => x && x.id === created.id);
     assert(!!found, 'grpc testcase not found in list');
     // Delete
     const del = await post('Delete', { id: created.id });
-    assert(del && (del.deleted === 1 || del.deleted === '1'), 'grpc delete did not report 1');
+    assert(
+      del && (del.deleted === 1 || del.deleted === '1'),
+      'grpc delete did not report 1',
+    );
   } catch (e) {
     const msg = e?.message || String(e);
     if (msg && msg.includes('404')) {
@@ -754,7 +800,9 @@ try {
       throw e;
     }
   } finally {
-    try { await $`go run main.go admin server stop`; } catch {}
+    try {
+      await $`go run main.go admin server stop`;
+    } catch {}
   }
 
   const q1 = idFrom(
