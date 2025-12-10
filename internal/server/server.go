@@ -63,8 +63,8 @@ func RunForeground(addr, pidPath string) error {
             // Testcase gRPC JSON service
             tsvc := &testcasesvc.Service{DB: db}
             tsvc.Register(gs)
-            // Mount Connect-style JSON HTTP handlers for testcases as well (mount root to delegate to inner mux)
-            mux.Handle("/testcase.v1.TestcaseService/", tsvc.ConnectMux())
+            // Mount Connect-style JSON HTTP handlers for testcases as well
+            mux.Handle("/testcase.v1.TestcaseService/", tsvc.ConnectHandler())
         }
     }
 

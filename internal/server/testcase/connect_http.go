@@ -8,13 +8,20 @@ import (
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
 )
 
-// Connect-style JSON handlers (application/connect+json) for simple HTTP tests.
-func (s *Service) ConnectMux() http.Handler {
-    mux := http.NewServeMux()
-    mux.HandleFunc("/testcase.v1.TestcaseService/Create", s.httpCreate)
-    mux.HandleFunc("/testcase.v1.TestcaseService/List", s.httpList)
-    mux.HandleFunc("/testcase.v1.TestcaseService/Delete", s.httpDelete)
-    return mux
+// Connect-style JSON handler that routes by path.
+func (s *Service) ConnectHandler() http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        switch r.URL.Path {
+        case "/testcase.v1.TestcaseService/Create":
+            s.httpCreate(w, r)
+        case "/testcase.v1.TestcaseService/List":
+            s.httpList(w, r)
+        case "/testcase.v1.TestcaseService/Delete":
+            s.httpDelete(w, r)
+        default:
+            http.NotFound(w, r)
+        }
+    })
 }
 
 func (s *Service) httpCreate(w http.ResponseWriter, r *http.Request) {
@@ -85,4 +92,3 @@ func writeErr(w http.ResponseWriter, code, msg string) {
     w.Header().Set("Connect-Error-Code", code)
     _ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": code, "message": msg}})
 }
-
