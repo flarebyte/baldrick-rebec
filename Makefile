@@ -5,33 +5,41 @@
 # - Avoid variables that compute values; keep only stable constants.
 # - Do not add pattern rules, arguments, or conditionals.
 
-.PHONY: biome-check biome-format test-all help
+.PHONY: lint format test gen clean help
 
-# Tool to run. Keep as a simple constant so humans can override via environment if needed.
-# Use npx to avoid requiring a global install.
-BIOME := npx @biomejs/biome
-
-# Scope to lint/format. Biome uses biome.json to include only script/*.mjs
-SCRIPTS_DIR := script
 ZX := npx zx
 
-# Run Biome via wrapper script to avoid logic here.
-lint-check:
+# Generic lint (abstract across languages): delegate to project script
+lint:
 	bash script/biome-check.sh
 
-# Write formatting changes for scripts managed by Biome (script/*.mjs via biome.json)
-lint-format:
+# Generic format: keep it simple and fast
+format:
 	gofmt -w .
-	$(BIOME) format $(SCRIPTS_DIR) --write
+	npx @biomejs/biome format script --write
+	npx @biomejs/biome check script --write
 
-# Run the end-to-end ZX test script.
-test-all:
-	$(ZX) --install script/test-all.mjs
+# Generic test: end-to-end script
+test: gen
+	$(ZX) script/test-all.mjs
+
+# Generate artifacts (e.g., client stubs)
+gen:
+	cd script && npm run gen
+
+# Clean generated artifacts
+clean:
+	cd script && npm run gen:clean
 
 # HUMAN: Print a clear list of available Make targets and what they do.
 # AI: Keep this static and explicit; do not auto-parse or add shell logic.
 help:
-	@printf "Make targets:\n  biome-check   Run Biome twice (AI rdjson, then colored human).\n  biome-format  Apply Biome formatting to script/*.mjs.\n  test-all      Run ZX E2E script via npx zx (script/test-all.mjs).\n"
+	@printf "Make targets (generic):\n"
+	@printf "  lint    Run project linters (fast, generic).\n"
+	@printf "  format  Apply basic formatting.\n"
+	@printf "  test    Run end-to-end tests.\n"
+	@printf "  gen     Generate artifacts (e.g., client stubs).\n"
+	@printf "  clean   Clean generated artifacts.\n"
 
 # --- HUMAN VERSION BELOW ---
 # Goal:

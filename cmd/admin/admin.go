@@ -9,6 +9,7 @@ import (
 	"github.com/flarebyte/baldrick-rebec/cmd/admin/message"
 	pkgcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/package"
 	prjcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/project"
+	promptcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/prompt"
 	qcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/queue"
 	"github.com/flarebyte/baldrick-rebec/cmd/admin/role"
 	scripcmd "github.com/flarebyte/baldrick-rebec/cmd/admin/script"
@@ -58,4 +59,5 @@ func init() {
 	AdminCmd.AddCommand(snapcmd.SnapshotCmd)
 	AdminCmd.AddCommand(vaultcmd.VaultCmd)
 	AdminCmd.AddCommand(toolcmd.ToolCmd)
+	AdminCmd.AddCommand(promptcmd.PromptCmd)
 }

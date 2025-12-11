@@ -40,6 +40,7 @@ import {
   packageSet,
   projectListJSON,
   projectSet,
+  promptRunJSON,
   queueAdd,
   queuePeek,
   queueSize,
@@ -74,6 +75,8 @@ import {
   tagSet,
   taskListJSON,
   taskSetReplacement,
+  testcaseCreate,
+  testcaseListJSON,
   toolGetJSON,
   toolListJSON,
   toolSet,
@@ -103,12 +106,14 @@ import {
   validateWorkflowListContract,
 } from './contract-helper.mjs';
 
+// Connect client imported dynamically in the step to avoid hard failure
+
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 17;
+const TOTAL = 19;
 let step = 0;
 
 try {
@@ -398,6 +403,97 @@ try {
     );
   }
 
+  // 7.6) Prompt (Ollama gemma3:1b) — optional
+  step++;
+  logStep(step, TOTAL, 'Prompt run via Ollama (gemma3:1b), if available');
+  try {
+    const OLLAMA_BASE_URL =
+      process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+    await toolSet({
+      name: 'ollama-gemma',
+      title: 'Ollama Gemma 1B',
+      role: TEST_ROLE_USER,
+      description: 'Local small model for tests',
+      settings: JSON.stringify({
+        provider: 'ollama',
+        model: 'gemma3:1b',
+        base_url: OLLAMA_BASE_URL,
+      }),
+      type: 'llm',
+    });
+    const out = await promptRunJSON({
+      toolName: 'ollama-gemma',
+      input: 'Say "hello" in one short line.',
+      maxOutputTokens: 64,
+    });
+    // Basic shape assertions when available
+    if (out) {
+      assert(out.object === 'response', 'prompt: expected response object');
+      assert(typeof out.model === 'string', 'prompt: model string');
+      assert(Array.isArray(out.output), 'prompt: output array');
+    }
+  } catch (e) {
+    console.error('prompt (ollama) skipped:', e?.message || String(e));
+  }
+
+  // 7.7) Connect client (optional)
+  step++;
+  logStep(step, TOTAL, 'Prompt via Connect client (if server available)');
+  try {
+    // Start server in background if not running
+    await $`go run main.go admin server start --detach`;
+    // Wait for health endpoint instead of fixed sleep to avoid race conditions
+    try {
+      await (async function waitHealth() {
+        for (let i = 0; i < 50; i++) {
+          try {
+            const r = await fetch('http://127.0.0.1:53051/health');
+            if (r?.ok) return;
+          } catch {}
+          await sleep(100);
+        }
+        throw new Error('health timeout');
+      })();
+    } catch {}
+    // Import connect client; if dependency missing, install script deps and retry
+    let createConnectGrpcJsonClient;
+    try {
+      ({ createConnectGrpcJsonClient } = await import(
+        './grpc-json-client-connect.mjs'
+      ));
+    } catch (e) {
+      const msg = e?.message || String(e || '');
+      if (msg.includes("'@connectrpc/connect-node'")) {
+        // Install dependencies declared in script/package.json
+        await $`npm --prefix script install --silent`;
+        ({ createConnectGrpcJsonClient } = await import(
+          './grpc-json-client-connect.mjs'
+        ));
+      } else {
+        throw e;
+      }
+    }
+    const client = createConnectGrpcJsonClient({
+      baseUrl: 'http://127.0.0.1:53051',
+    });
+    const out = await client.Run({
+      tool_name: 'ollama-gemma',
+      input: 'Say "hello" in one short line.',
+      max_output_tokens: 64,
+    });
+    if (out) {
+      assert(
+        out.object === 'response',
+        'connect client: expected response object',
+      );
+      assert(Array.isArray(out.output), 'connect client: output array');
+    }
+  } finally {
+    try {
+      await $`go run main.go admin server stop`;
+    } catch {}
+  }
+
   // 8) Stores & Blackboards
   step++;
   logStep(step, TOTAL, 'Creating stores and blackboards');
@@ -580,6 +676,131 @@ try {
     tags: 'docs,update',
     role: TEST_ROLE_USER,
   });
+
+  // 11.5) Testcases
+  step++;
+  logStep(step, TOTAL, 'Creating testcases and verifying listing');
+  await testcaseCreate({
+    title: 'Unit: go vet',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'OK',
+    name: 'vet-basic',
+    pkg: 'acme/build',
+    classname: 'lint.Vet',
+    file: 'main.go',
+    line: 12,
+    executionTime: 1.23,
+  });
+  await testcaseCreate({
+    title: 'Unit: go fmt',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'OK',
+    name: 'fmt-style',
+    pkg: 'acme/build',
+    classname: 'format.Fmt',
+    file: 'util.go',
+    line: 7,
+    executionTime: 0.42,
+  });
+  await testcaseCreate({
+    title: 'Lint: misspell',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'KO',
+    name: 'misspell',
+    pkg: 'acme/build',
+    classname: 'lint.Misspell',
+    error: 'found “teh” in README.md',
+    file: 'README.md',
+    line: 3,
+    executionTime: 0.33,
+  });
+  {
+    const tcs = await testcaseListJSON({
+      role: TEST_ROLE_USER,
+      experiment: expID,
+      limit: 50,
+    });
+    assert(
+      Array.isArray(tcs) && tcs.length >= 3,
+      'expected at least 3 testcases',
+    );
+    const gotVet = tcs.find(
+      (x) => x?.title === 'Unit: go vet' && x?.status === 'OK',
+    );
+    const gotMisspell = tcs.find(
+      (x) => x?.title === 'Lint: misspell' && x?.status === 'KO',
+    );
+    assert(!!gotVet, 'missing testcase: go vet');
+    assert(!!gotMisspell, 'missing testcase: misspell');
+  }
+
+  // 11.6) Testcases via Connect JSON (start server, create+list+delete one)
+  step++;
+  logStep(step, TOTAL, 'Testcases via Connect JSON service');
+  try {
+    await $`go run main.go admin server start --detach`;
+    await sleep(1500);
+    // Use fetch against Connect JSON endpoints
+    const endpoint = (m) =>
+      `http://127.0.0.1:53051/testcase.v1.TestcaseService/${m}`;
+    const post = async (m, body) => {
+      const res = await fetch(endpoint(m), {
+        method: 'POST',
+        headers: { 'content-type': 'application/connect+json' },
+        body: JSON.stringify(body || {}),
+      });
+      const txt = await res.text();
+      try {
+        return JSON.parse(txt || 'null');
+      } catch {
+        throw new Error(`invalid json: ${txt}`);
+      }
+    };
+    // Create a temporary testcase via Connect JSON
+    const created = await post('Create', {
+      title: 'GRPC: smoke',
+      role: TEST_ROLE_USER,
+      experiment: expID,
+      status: 'OK',
+      file: 'grpc.json',
+      line: 1,
+    });
+    assert(created?.id, 'grpc testcase create missing id');
+    // List and assert presence
+    const listed = await post('List', {
+      role: TEST_ROLE_USER,
+      experiment: expID,
+      limit: 10,
+      offset: 0,
+    });
+    assert(
+      listed && Array.isArray(listed.items),
+      'grpc testcase list missing items',
+    );
+    const found = (listed?.items ?? []).find((x) => x?.id === created.id);
+    assert(!!found, 'grpc testcase not found in list');
+    // Delete
+    const del = await post('Delete', { id: created.id });
+    assert(
+      del && (del.deleted === 1 || del.deleted === '1'),
+      'grpc delete did not report 1',
+    );
+  } catch (e) {
+    const msg = e?.message ?? String(e);
+    if (msg?.includes('404')) {
+      console.error('grpc testcase step skipped:', msg);
+    } else {
+      console.error('grpc testcase step failed:', msg);
+      throw e;
+    }
+  } finally {
+    try {
+      await $`go run main.go admin server stop`;
+    } catch {}
+  }
 
   const q1 = idFrom(
     await queueAdd({

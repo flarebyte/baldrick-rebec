@@ -919,3 +919,116 @@ export async function vaultDoctor() {
   const p = await runRbc('admin', 'vault', 'doctor');
   return { stdout: String(p.stdout || ''), stderr: String(p.stderr || '') };
 }
+
+// -----------------------------
+// Testcase helpers
+// -----------------------------
+export async function testcaseCreate({
+  title,
+  role = 'user',
+  experiment = '',
+  status = 'OK',
+  name = '',
+  pkg = '',
+  classname = '',
+  error = '',
+  tags = '',
+  level = '',
+  file = '',
+  line = 0,
+  executionTime = 0,
+}) {
+  const args = [
+    'admin',
+    'testcase',
+    'create',
+    '--title',
+    title,
+    '--role',
+    role,
+    '--status',
+    status,
+  ];
+  if (experiment) args.push('--experiment', experiment);
+  if (name) args.push('--name', name);
+  if (pkg) args.push('--package', pkg);
+  if (classname) args.push('--classname', classname);
+  if (error) args.push('--error', error);
+  if (tags) args.push('--tags', tags);
+  if (level) args.push('--level', level);
+  if (file) args.push('--file', file);
+  if (line) args.push('--line', String(line));
+  if (executionTime) args.push('--execution-time', String(executionTime));
+  return await runRbcJSON(...args);
+}
+
+export async function testcaseListJSON({
+  role,
+  experiment = '',
+  status = '',
+  limit = 100,
+  offset = 0,
+}) {
+  const args = [
+    'admin',
+    'testcase',
+    'list',
+    '--role',
+    role,
+    '--output',
+    'json',
+    '--limit',
+    String(limit),
+    '--offset',
+    String(offset),
+  ];
+  if (experiment) args.push('--experiment', experiment);
+  if (status) args.push('--status', status);
+  return await runRbcJSON(...args);
+}
+
+// -----------------------------
+// Prompt helpers
+// -----------------------------
+export async function promptRun({
+  toolName,
+  input = '',
+  inputFile = '',
+  toolsPath = '',
+  temperature = undefined,
+  maxOutputTokens = undefined,
+  json = false,
+}) {
+  const args = ['admin', 'prompt', 'run', '--tool-name', toolName];
+  if (input) args.push('--input', input);
+  if (inputFile) args.push('--input-file', inputFile);
+  if (toolsPath) args.push('--tools', toolsPath);
+  if (typeof temperature === 'number')
+    args.push('--temperature', String(temperature));
+  if (typeof maxOutputTokens === 'number')
+    args.push('--max-output-tokens', String(maxOutputTokens));
+  if (json) args.push('--json');
+  return await runRbc(...args);
+}
+
+export async function promptRunJSON(opts) {
+  return await runRbcJSON(
+    'admin',
+    'prompt',
+    'run',
+    ...(() => {
+      const args = [];
+      if (!opts || !opts.toolName) throw new Error('toolName is required');
+      args.push('--tool-name', opts.toolName);
+      if (opts.input) args.push('--input', opts.input);
+      if (opts.inputFile) args.push('--input-file', opts.inputFile);
+      if (opts.toolsPath) args.push('--tools', opts.toolsPath);
+      if (typeof opts.temperature === 'number')
+        args.push('--temperature', String(opts.temperature));
+      if (typeof opts.maxOutputTokens === 'number')
+        args.push('--max-output-tokens', String(opts.maxOutputTokens));
+      args.push('--json');
+      return args;
+    })(),
+  );
+}

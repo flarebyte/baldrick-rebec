@@ -6,7 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["script/*.mjs"],
+		"includes": ["script/*.mjs", "clients/js/*.mjs"],
 		"ignoreUnknown": false
 	},
 	"formatter": {
