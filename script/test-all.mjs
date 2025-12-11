@@ -448,7 +448,7 @@ try {
         for (let i = 0; i < 50; i++) {
           try {
             const r = await fetch('http://127.0.0.1:53051/health');
-            if (r && r.ok) return;
+            if (r?.ok) return;
           } catch {}
           await sleep(100);
         }
@@ -768,7 +768,7 @@ try {
       file: 'grpc.json',
       line: 1,
     });
-    assert(created && created.id, 'grpc testcase create missing id');
+    assert(created?.id, 'grpc testcase create missing id');
     // List and assert presence
     const listed = await post('List', {
       role: TEST_ROLE_USER,
@@ -789,8 +789,8 @@ try {
       'grpc delete did not report 1',
     );
   } catch (e) {
-    const msg = e?.message || String(e);
-    if (msg && msg.includes('404')) {
+    const msg = e?.message ?? String(e);
+    if (msg?.includes('404')) {
       console.error('grpc testcase step skipped:', msg);
     } else {
       console.error('grpc testcase step failed:', msg);

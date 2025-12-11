@@ -36,7 +36,7 @@ export function createConnectGrpcJsonClient({ baseUrl, headers = {} }) {
       } catch {
         throw new Error(`invalid JSON response: ${text.slice(0, 200)}`);
       }
-      if (obj && obj.error) {
+      if (obj?.error) {
         const code = obj.error?.code || 'unknown';
         const msg = obj.error?.message || 'error';
         throw new Error(`connect error ${code}: ${msg}`);
