@@ -88,6 +88,7 @@ type activeModel struct {
 	testcases    []pgdao.Testcase
 	cursor       int
 	quitting     bool
+	err          string
 }
 
 func newActiveModel(conversation, role, experiment string, testcases []pgdao.Testcase) activeModel {
@@ -113,7 +114,24 @@ func (m activeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "enter":
 			// Reserved for future: open a detail pane or actions. No-op for now.
+		case "r":
+			// Refresh testcases for latest experiment of the conversation
+			m.err = ""
+			return m, refreshCmd(m.conversation, m.role)
 		}
+	case refreshMsg:
+		m.testcases = msg.testcases
+		m.experiment = msg.experiment
+		if m.cursor >= len(m.testcases) {
+			m.cursor = len(m.testcases) - 1
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+		}
+		return m, nil
+	case errMsg:
+		m.err = msg.err.Error()
+		return m, nil
 	}
 	return m, nil
 }
@@ -127,7 +145,7 @@ func (m activeModel) View() string {
 		b.WriteString("No testcases found. Press q to quit.\n")
 		return b.String()
 	}
-	b.WriteString("Testcases (↑/k, ↓/j, enter, q):\n")
+	b.WriteString("Testcases (↑/k, ↓/j, enter, r=refresh, q):\n")
 	for i, tc := range m.testcases {
 		cursor := "  "
 		if i == m.cursor {
@@ -135,6 +153,12 @@ func (m activeModel) View() string {
 		}
 		statusIcon := formatStatus(tc.Status)
 		fmt.Fprintf(&b, "%s%s %s\n", cursor, statusIcon, tc.Title)
+	}
+	if m.err != "" {
+		b.WriteString("\n")
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render("Error: "))
+		b.WriteString(m.err)
+		b.WriteString("\n")
 	}
 	// Details section for selected testcase
 	if m.cursor >= 0 && m.cursor < len(m.testcases) {
@@ -170,6 +194,46 @@ func (m activeModel) View() string {
 		}
 	}
 	return b.String()
+}
+
+// Messages
+type refreshMsg struct {
+	testcases  []pgdao.Testcase
+	experiment string
+}
+
+type errMsg struct{ err error }
+
+// Commands
+func refreshCmd(conversationID, role string) tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return errMsg{err}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		db, err := pgdao.OpenApp(ctx, cfg)
+		if err != nil {
+			return errMsg{err}
+		}
+		defer db.Close()
+		// Get latest experiment for the conversation
+		exps, err := pgdao.ListExperiments(ctx, db, conversationID, 1, 0)
+		if err != nil {
+			return errMsg{err}
+		}
+		if len(exps) == 0 {
+			return errMsg{fmt.Errorf("no experiment found for conversation %s", conversationID)}
+		}
+		exp := exps[0]
+		// Fetch testcases with the same role filter
+		tcs, err := pgdao.ListTestcases(ctx, db, role, exp.ID, "", 100, 0)
+		if err != nil {
+			return errMsg{err}
+		}
+		return refreshMsg{testcases: tcs, experiment: exp.ID}
+	}
 }
 
 // formatStatus renders a colored status icon or text.
