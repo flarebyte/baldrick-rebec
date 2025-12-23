@@ -20,6 +20,17 @@ var (
 	flagTCActiveConversation string
 )
 
+// UI styles
+var (
+	styleHeader  = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)   // cyan
+	styleLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Bold(true)    // gray
+	styleValue   = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))               // white-ish
+	styleHelp    = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Italic(true)  // dim italic
+	styleCursor  = lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true)   // magenta
+	styleDivider = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))               // gray line
+	styleNewest  = lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true) // yellow italic
+)
+
 // activeCmd is an interactive variant of list (dummy implementation).
 // For now, it validates required flags and returns a mock payload.
 var activeCmd = &cobra.Command{
@@ -168,8 +179,10 @@ func (m activeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m activeModel) View() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Conversation: %s\n", m.conversation)
-	fmt.Fprintf(&b, "Role: %s\n", m.role)
+	// Header
+	b.WriteString(styleHeader.Render("Testcases Viewer") + "\n")
+	b.WriteString(styleLabel.Render("Conversation: ") + styleValue.Render(m.conversation) + "\n")
+	b.WriteString(styleLabel.Render("Role: ") + styleValue.Render(m.role) + "\n")
 	// Experiment header
 	expID := ""
 	expCreated := ""
@@ -184,16 +197,29 @@ func (m activeModel) View() string {
 		newest = " (newest ✨)"
 	}
 	if expCreated != "" {
-		fmt.Fprintf(&b, "Experiment [%d/%d]: %s (created %s)%s\n", m.expIdx+1, len(m.experiments), expID, expCreated, newest)
+		b.WriteString(styleLabel.Render("Experiment: "))
+		b.WriteString(styleValue.Render(fmt.Sprintf("[%d/%d] %s (created %s)", m.expIdx+1, len(m.experiments), expID, expCreated)))
+		if newest != "" {
+			b.WriteString(styleNewest.Render(" " + newest))
+		}
+		b.WriteString("\n")
 	} else {
-		fmt.Fprintf(&b, "Experiment [%d/%d]: %s%s\n", m.expIdx+1, len(m.experiments), expID, newest)
+		b.WriteString(styleLabel.Render("Experiment: "))
+		b.WriteString(styleValue.Render(fmt.Sprintf("[%d/%d] %s", m.expIdx+1, len(m.experiments), expID)))
+		if newest != "" {
+			b.WriteString(styleNewest.Render(" " + newest))
+		}
+		b.WriteString("\n")
 	}
 	// Filter status line
 	filterLbl := "all"
 	if m.errorsOnly {
 		filterLbl = "errors-only"
 	}
-	fmt.Fprintf(&b, "Filter: %s\n\n", filterLbl)
+	b.WriteString(styleLabel.Render("Filter: ") + styleValue.Render(filterLbl) + "\n")
+
+	// Divider
+	b.WriteString(styleDivider.Render(strings.Repeat("─", 60)) + "\n")
 
 	filtered := m.filteredIndices()
 	if len(m.testcases) == 0 || len(filtered) == 0 {
@@ -204,16 +230,16 @@ func (m activeModel) View() string {
 		}
 		return b.String()
 	}
-	b.WriteString("Testcases (↑/k, ↓/j, enter, n=next exp, r=refresh, e=errors-only, q):\n")
+	b.WriteString(styleHelp.Render("Keys: ↑/k, ↓/j, enter, n=next exp, r=refresh, e=errors-only, q") + "\n")
 	for i, idx := range filtered {
 		tc := m.testcases[idx]
 		cursor := "  "
 		if i == m.cursor {
-			cursor = "> "
+			cursor = styleCursor.Render("> ")
 		}
 		statusIcon := formatStatus(tc.Status)
 		indent := indentForLevel(levelFromTestcase(tc))
-		fmt.Fprintf(&b, "%s%s%s %s\n", cursor, indent, statusIcon, tc.Title)
+		fmt.Fprintf(&b, "%s%s%s %s\n", cursor, indent, statusIcon, styleValue.Render(tc.Title))
 	}
 	if m.err != "" {
 		b.WriteString("\n")
@@ -224,34 +250,36 @@ func (m activeModel) View() string {
 	// Details section for selected testcase
 	if m.cursor >= 0 && m.cursor < len(filtered) {
 		tc := m.testcases[filtered[m.cursor]]
-		b.WriteString("\nDetails:\n")
-		fmt.Fprintf(&b, "ID: %s\n", tc.ID)
-		fmt.Fprintf(&b, "Title: %s\n", tc.Title)
-		fmt.Fprintf(&b, "Status: %s\n", tc.Status)
+		// Divider before details
+		b.WriteString(styleDivider.Render(strings.Repeat("─", 60)) + "\n")
+		b.WriteString(styleHeader.Render("Details") + "\n")
+		b.WriteString(styleLabel.Render("ID: ") + styleValue.Render(tc.ID) + "\n")
+		b.WriteString(styleLabel.Render("Title: ") + styleValue.Render(tc.Title) + "\n")
+		b.WriteString(styleLabel.Render("Status: ") + styleValue.Render(tc.Status) + "\n")
 		if tc.Name.Valid {
-			fmt.Fprintf(&b, "Name: %s\n", tc.Name.String)
+			b.WriteString(styleLabel.Render("Name: ") + styleValue.Render(tc.Name.String) + "\n")
 		}
 		if tc.Package.Valid {
-			fmt.Fprintf(&b, "Package: %s\n", tc.Package.String)
+			b.WriteString(styleLabel.Render("Package: ") + styleValue.Render(tc.Package.String) + "\n")
 		}
 		if tc.Classname.Valid {
-			fmt.Fprintf(&b, "Classname: %s\n", tc.Classname.String)
+			b.WriteString(styleLabel.Render("Classname: ") + styleValue.Render(tc.Classname.String) + "\n")
 		}
 		if tc.File.Valid {
 			if tc.Line.Valid {
-				fmt.Fprintf(&b, "File: %s:%d\n", tc.File.String, tc.Line.Int64)
+				b.WriteString(styleLabel.Render("File: ") + styleValue.Render(fmt.Sprintf("%s:%d", tc.File.String, tc.Line.Int64)) + "\n")
 			} else {
-				fmt.Fprintf(&b, "File: %s\n", tc.File.String)
+				b.WriteString(styleLabel.Render("File: ") + styleValue.Render(tc.File.String) + "\n")
 			}
 		}
 		if tc.ExecutionTime.Valid {
-			fmt.Fprintf(&b, "Execution: %.3fs\n", tc.ExecutionTime.Float64)
+			b.WriteString(styleLabel.Render("Execution: ") + styleValue.Render(fmt.Sprintf("%.3fs", tc.ExecutionTime.Float64)) + "\n")
 		}
 		if tc.ErrorMessage.Valid {
-			fmt.Fprintf(&b, "Error: %s\n", tc.ErrorMessage.String)
+			b.WriteString(styleLabel.Render("Error: ") + styleValue.Render(tc.ErrorMessage.String) + "\n")
 		}
 		if tc.Created.Valid {
-			fmt.Fprintf(&b, "Created: %s\n", tc.Created.Time.Format(time.RFC3339))
+			b.WriteString(styleLabel.Render("Created: ") + styleValue.Render(tc.Created.Time.Format(time.RFC3339)) + "\n")
 		}
 	}
 	return b.String()
