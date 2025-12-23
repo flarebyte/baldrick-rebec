@@ -2,7 +2,6 @@ package testcase
 
 import (
     "context"
-    "encoding/json"
     "errors"
     "fmt"
     "os"
@@ -11,6 +10,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
+    tea "github.com/charmbracelet/bubbletea"
     "github.com/spf13/cobra"
 )
 
@@ -67,54 +67,80 @@ var activeCmd = &cobra.Command{
             return err
         }
 
-        // Output
-        fmt.Fprintf(os.Stderr, "testcase active: conversation=%s role=%s experiment=%s count=%d\n", conv.ID, role, exp.ID, len(tcs))
-
-        // Minimal JSON payload with items
-        arr := make([]map[string]any, 0, len(tcs))
+        // Build list of titles for the TUI
+        titles := make([]string, 0, len(tcs))
         for _, t := range tcs {
-            m := map[string]any{"id": t.ID, "title": t.Title, "status": t.Status}
-            if t.Created.Valid {
-                m["created"] = t.Created.Time.Format(time.RFC3339Nano)
-            }
-            if t.Name.Valid {
-                m["name"] = t.Name.String
-            }
-            if t.Package.Valid {
-                m["package"] = t.Package.String
-            }
-            if t.Classname.Valid {
-                m["classname"] = t.Classname.String
-            }
-            if t.File.Valid {
-                m["file"] = t.File.String
-            }
-            if t.Line.Valid {
-                m["line"] = t.Line.Int64
-            }
-            if t.ExecutionTime.Valid {
-                m["execution_time"] = t.ExecutionTime.Float64
-            }
-            if t.ErrorMessage.Valid {
-                m["error"] = t.ErrorMessage.String
-            }
-            if len(t.Tags) > 0 {
-                m["tags"] = t.Tags
-            }
-            arr = append(arr, m)
+            titles = append(titles, t.Title)
         }
-        out := map[string]any{
-            "status":       "ok",
-            "mode":         "interactive",
-            "conversation": conv.ID,
-            "role":         role,
-            "experiment":   exp.ID,
-            "items":        arr,
+
+        // Launch Bubble Tea TUI (list of titles)
+        fmt.Fprintf(os.Stderr, "testcase active: conversation=%s role=%s experiment=%s count=%d\n", conv.ID, role, exp.ID, len(titles))
+        m := newActiveModel(conv.ID, role, exp.ID, titles)
+        if _, err := tea.NewProgram(m).Run(); err != nil {
+            return err
         }
-        enc := json.NewEncoder(os.Stdout)
-        enc.SetIndent("", "  ")
-        return enc.Encode(out)
+        return nil
     },
+}
+
+// Bubble Tea model for interactive testcase list
+type activeModel struct {
+    conversation string
+    role         string
+    experiment   string
+    items        []string
+    cursor       int
+    quitting     bool
+}
+
+func newActiveModel(conversation, role, experiment string, items []string) activeModel {
+    return activeModel{conversation: conversation, role: role, experiment: experiment, items: items}
+}
+
+func (m activeModel) Init() tea.Cmd { return nil }
+
+func (m activeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    switch msg := msg.(type) {
+    case tea.KeyMsg:
+        switch msg.String() {
+        case "ctrl+c", "q":
+            m.quitting = true
+            return m, tea.Quit
+        case "up", "k":
+            if m.cursor > 0 {
+                m.cursor--
+            }
+        case "down", "j":
+            if m.cursor < len(m.items)-1 {
+                m.cursor++
+            }
+        case "enter":
+            // In future: open details. For now, just quit.
+            m.quitting = true
+            return m, tea.Quit
+        }
+    }
+    return m, nil
+}
+
+func (m activeModel) View() string {
+    var b strings.Builder
+    fmt.Fprintf(&b, "Conversation: %s\n", m.conversation)
+    fmt.Fprintf(&b, "Role: %s\n", m.role)
+    fmt.Fprintf(&b, "Experiment: %s\n\n", m.experiment)
+    if len(m.items) == 0 {
+        b.WriteString("No testcases found. Press q to quit.\n")
+        return b.String()
+    }
+    b.WriteString("Testcases (↑/k, ↓/j, enter, q):\n")
+    for i, it := range m.items {
+        cursor := "  "
+        if i == m.cursor {
+            cursor = "> "
+        }
+        fmt.Fprintf(&b, "%s%s\n", cursor, it)
+    }
+    return b.String()
 }
 
 func init() {
