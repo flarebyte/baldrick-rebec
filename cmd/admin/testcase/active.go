@@ -178,7 +178,7 @@ func (m activeModel) View() string {
 		}
 		statusIcon := formatStatus(tc.Status)
 		indent := indentForLevel(levelFromTestcase(tc))
-		fmt.Fprintf(&b, "%s%s %s%s\n", cursor, statusIcon, indent, tc.Title)
+		fmt.Fprintf(&b, "%s%s%s %s\n", cursor, indent, statusIcon, tc.Title)
 	}
 	if m.err != "" {
 		b.WriteString("\n")
