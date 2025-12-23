@@ -10,6 +10,7 @@ import (
 
     cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
     pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
+    "github.com/charmbracelet/lipgloss"
     tea "github.com/charmbracelet/bubbletea"
     "github.com/spf13/cobra"
 )
@@ -141,6 +142,25 @@ func (m activeModel) View() string {
         fmt.Fprintf(&b, "%s%s\n", cursor, it)
     }
     return b.String()
+}
+
+// formatStatus renders a colored status icon or text.
+func formatStatus(status string) string {
+    s := strings.ToLower(strings.TrimSpace(status))
+    green := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+    red := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+    yellow := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+    grey := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+    switch s {
+    case "ok":
+        return green.Render("✔")
+    case "ko":
+        return red.Render("✗")
+    case "todo":
+        return yellow.Render("⏳")
+    default:
+        return grey.Render(status)
+    }
 }
 
 func init() {
