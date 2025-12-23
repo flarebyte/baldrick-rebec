@@ -50,16 +50,16 @@ func UpsertConversation(ctx context.Context, db *pgxpool.Pool, c *Conversation) 
 
 // GetConversationByID returns a conversation by its id.
 func GetConversationByID(ctx context.Context, db *pgxpool.Pool, id string) (*Conversation, error) {
-    q := `SELECT id::text, title, description, project, role_name, tags, notes, created, updated FROM conversations WHERE id=$1::uuid`
-    var c Conversation
-    var tagsJSON []byte
-    if err := db.QueryRow(ctx, q, id).Scan(&c.ID, &c.Title, &c.Description, &c.Project, &c.RoleName, &tagsJSON, &c.Notes, &c.Created, &c.Updated); err != nil {
-        return nil, dbutil.ErrWrap("conversation.get", err, dbutil.ParamSummary("id", id))
-    }
-    if len(tagsJSON) > 0 {
-        _ = json.Unmarshal(tagsJSON, &c.Tags)
-    }
-    return &c, nil
+	q := `SELECT id::text, title, description, project, role_name, tags, notes, created, updated FROM conversations WHERE id=$1::uuid`
+	var c Conversation
+	var tagsJSON []byte
+	if err := db.QueryRow(ctx, q, id).Scan(&c.ID, &c.Title, &c.Description, &c.Project, &c.RoleName, &tagsJSON, &c.Notes, &c.Created, &c.Updated); err != nil {
+		return nil, dbutil.ErrWrap("conversation.get", err, dbutil.ParamSummary("id", id))
+	}
+	if len(tagsJSON) > 0 {
+		_ = json.Unmarshal(tagsJSON, &c.Tags)
+	}
+	return &c, nil
 }
 
 // ListConversations lists conversations, optionally filtered by project, with pagination.
