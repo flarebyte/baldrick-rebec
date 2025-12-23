@@ -53,8 +53,8 @@ var activeCmd = &cobra.Command{
 			return errors.New("conversation has no role_name")
 		}
 
-		// Fetch last experiment for the conversation
-		exps, err := pgdao.ListExperiments(ctx, db, conv.ID, 1, 0)
+		// Fetch recent experiments for the conversation (up to 6)
+		exps, err := pgdao.ListExperiments(ctx, db, conv.ID, 6, 0)
 		if err != nil {
 			return err
 		}
@@ -72,8 +72,8 @@ var activeCmd = &cobra.Command{
 		// Build model with full testcase records
 
 		// Launch Bubble Tea TUI (list of titles)
-		fmt.Fprintf(os.Stderr, "testcase active: conversation=%s role=%s experiment=%s count=%d\n", conv.ID, role, exp.ID, len(tcs))
-		m := newActiveModel(conv.ID, role, exp.ID, tcs)
+		fmt.Fprintf(os.Stderr, "testcase active: conversation=%s role=%s experiments=%d current=%s count=%d\n", conv.ID, role, len(exps), exp.ID, len(tcs))
+		m := newActiveModel(conv.ID, role, exps, 0, tcs)
 		if _, err := tea.NewProgram(m).Run(); err != nil {
 			return err
 		}
@@ -85,7 +85,8 @@ var activeCmd = &cobra.Command{
 type activeModel struct {
 	conversation string
 	role         string
-	experiment   string
+	experiments  []pgdao.Experiment
+	expIdx       int
 	testcases    []pgdao.Testcase
 	cursor       int
 	quitting     bool
@@ -93,8 +94,11 @@ type activeModel struct {
 	errorsOnly   bool
 }
 
-func newActiveModel(conversation, role, experiment string, testcases []pgdao.Testcase) activeModel {
-	return activeModel{conversation: conversation, role: role, experiment: experiment, testcases: testcases}
+func newActiveModel(conversation, role string, experiments []pgdao.Experiment, expIdx int, testcases []pgdao.Testcase) activeModel {
+	if expIdx < 0 || expIdx >= len(experiments) {
+		expIdx = 0
+	}
+	return activeModel{conversation: conversation, role: role, experiments: experiments, expIdx: expIdx, testcases: testcases}
 }
 
 func (m activeModel) Init() tea.Cmd { return nil }
@@ -118,9 +122,25 @@ func (m activeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			// Reserved for future: open a detail pane or actions. No-op for now.
 		case "r":
-			// Refresh testcases for latest experiment of the conversation
+			// Refresh testcases for current experiment
 			m.err = ""
-			return m, refreshCmd(m.conversation, m.role)
+			return m, refreshForExpCmd(m.role, m.experiments[m.expIdx].ID)
+		case "h", "left":
+			// Previous experiment (cycle)
+			if len(m.experiments) > 0 {
+				m.err = ""
+				m.expIdx = (m.expIdx - 1 + len(m.experiments)) % len(m.experiments)
+				m.cursor = 0
+				return m, refreshForExpCmd(m.role, m.experiments[m.expIdx].ID)
+			}
+		case "l", "right":
+			// Next experiment (cycle)
+			if len(m.experiments) > 0 {
+				m.err = ""
+				m.expIdx = (m.expIdx + 1) % len(m.experiments)
+				m.cursor = 0
+				return m, refreshForExpCmd(m.role, m.experiments[m.expIdx].ID)
+			}
 		case "e":
 			// Toggle errors-only view
 			m.errorsOnly = !m.errorsOnly
@@ -132,7 +152,13 @@ func (m activeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case refreshMsg:
 		m.testcases = msg.testcases
-		m.experiment = msg.experiment
+		// find index of experiment in list, if provided
+		for i, e := range m.experiments {
+			if e.ID == msg.experiment {
+				m.expIdx = i
+				break
+			}
+		}
 		// Clamp cursor against filtered length after refresh
 		if m.cursor >= len(m.filteredIndices()) {
 			m.cursor = len(m.filteredIndices()) - 1
@@ -152,7 +178,20 @@ func (m activeModel) View() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Conversation: %s\n", m.conversation)
 	fmt.Fprintf(&b, "Role: %s\n", m.role)
-	fmt.Fprintf(&b, "Experiment: %s\n", m.experiment)
+	// Experiment header
+	expID := ""
+	expCreated := ""
+	if len(m.experiments) > 0 && m.expIdx >= 0 && m.expIdx < len(m.experiments) {
+		expID = m.experiments[m.expIdx].ID
+		if c := strings.TrimSpace(m.experiments[m.expIdx].Created); c != "" {
+			expCreated = c
+		}
+	}
+	if expCreated != "" {
+		fmt.Fprintf(&b, "Experiment [%d/%d]: %s (created %s)\n", m.expIdx+1, len(m.experiments), expID, expCreated)
+	} else {
+		fmt.Fprintf(&b, "Experiment [%d/%d]: %s\n", m.expIdx+1, len(m.experiments), expID)
+	}
 	// Filter status line
 	filterLbl := "all"
 	if m.errorsOnly {
@@ -169,7 +208,7 @@ func (m activeModel) View() string {
 		}
 		return b.String()
 	}
-	b.WriteString("Testcases (↑/k, ↓/j, enter, r=refresh, e=errors-only, q):\n")
+	b.WriteString("Testcases (↑/k, ↓/j, enter, h/← prev exp, l/→ next exp, r=refresh, e=errors-only, q):\n")
 	for i, idx := range filtered {
 		tc := m.testcases[idx]
 		cursor := "  "
@@ -253,7 +292,7 @@ type refreshMsg struct {
 type errMsg struct{ err error }
 
 // Commands
-func refreshCmd(conversationID, role string) tea.Cmd {
+func refreshForExpCmd(role, experimentID string) tea.Cmd {
 	return func() tea.Msg {
 		cfg, err := cfgpkg.Load()
 		if err != nil {
@@ -266,21 +305,12 @@ func refreshCmd(conversationID, role string) tea.Cmd {
 			return errMsg{err}
 		}
 		defer db.Close()
-		// Get latest experiment for the conversation
-		exps, err := pgdao.ListExperiments(ctx, db, conversationID, 1, 0)
+		// Fetch testcases for the provided experiment
+		tcs, err := pgdao.ListTestcases(ctx, db, role, experimentID, "", 100, 0)
 		if err != nil {
 			return errMsg{err}
 		}
-		if len(exps) == 0 {
-			return errMsg{fmt.Errorf("no experiment found for conversation %s", conversationID)}
-		}
-		exp := exps[0]
-		// Fetch testcases with the same role filter
-		tcs, err := pgdao.ListTestcases(ctx, db, role, exp.ID, "", 100, 0)
-		if err != nil {
-			return errMsg{err}
-		}
-		return refreshMsg{testcases: tcs, experiment: exp.ID}
+		return refreshMsg{testcases: tcs, experiment: experimentID}
 	}
 }
 
