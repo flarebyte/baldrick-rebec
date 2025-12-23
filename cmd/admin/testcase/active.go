@@ -179,10 +179,14 @@ func (m activeModel) View() string {
 			expCreated = c
 		}
 	}
+	newest := ""
+	if m.expIdx == 0 {
+		newest = " (newest ✨)"
+	}
 	if expCreated != "" {
-		fmt.Fprintf(&b, "Experiment [%d/%d]: %s (created %s)\n", m.expIdx+1, len(m.experiments), expID, expCreated)
+		fmt.Fprintf(&b, "Experiment [%d/%d]: %s (created %s)%s\n", m.expIdx+1, len(m.experiments), expID, expCreated, newest)
 	} else {
-		fmt.Fprintf(&b, "Experiment [%d/%d]: %s\n", m.expIdx+1, len(m.experiments), expID)
+		fmt.Fprintf(&b, "Experiment [%d/%d]: %s%s\n", m.expIdx+1, len(m.experiments), expID, newest)
 	}
 	// Filter status line
 	filterLbl := "all"
