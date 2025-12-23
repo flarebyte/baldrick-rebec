@@ -88,13 +88,13 @@ type activeModel struct {
     conversation string
     role         string
     experiment   string
-    items        []string
+    testcaseTitles []string
     cursor       int
     quitting     bool
 }
 
-func newActiveModel(conversation, role, experiment string, items []string) activeModel {
-    return activeModel{conversation: conversation, role: role, experiment: experiment, items: items}
+func newActiveModel(conversation, role, experiment string, testcaseTitles []string) activeModel {
+    return activeModel{conversation: conversation, role: role, experiment: experiment, testcaseTitles: testcaseTitles}
 }
 
 func (m activeModel) Init() tea.Cmd { return nil }
@@ -111,7 +111,7 @@ func (m activeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
                 m.cursor--
             }
         case "down", "j":
-            if m.cursor < len(m.items)-1 {
+            if m.cursor < len(m.testcaseTitles)-1 {
                 m.cursor++
             }
         case "enter":
@@ -128,12 +128,12 @@ func (m activeModel) View() string {
     fmt.Fprintf(&b, "Conversation: %s\n", m.conversation)
     fmt.Fprintf(&b, "Role: %s\n", m.role)
     fmt.Fprintf(&b, "Experiment: %s\n\n", m.experiment)
-    if len(m.items) == 0 {
+    if len(m.testcaseTitles) == 0 {
         b.WriteString("No testcases found. Press q to quit.\n")
         return b.String()
     }
     b.WriteString("Testcases (↑/k, ↓/j, enter, q):\n")
-    for i, it := range m.items {
+    for i, it := range m.testcaseTitles {
         cursor := "  "
         if i == m.cursor {
             cursor = "> "
