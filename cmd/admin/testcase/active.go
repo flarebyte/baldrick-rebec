@@ -41,22 +41,75 @@ var activeCmd = &cobra.Command{
         }
         defer db.Close()
 
-        var role string
-        if err := db.QueryRow(ctx, `SELECT role_name FROM conversations WHERE id=$1::uuid`, flagTCActiveConversation).Scan(&role); err != nil {
+        // Resolve conversation and role via DAO
+        conv, err := pgdao.GetConversationByID(ctx, db, flagTCActiveConversation)
+        if err != nil {
+            return err
+        }
+        role := strings.TrimSpace(conv.RoleName)
+        if role == "" {
+            return errors.New("conversation has no role_name")
+        }
+
+        // Fetch last experiment for the conversation
+        exps, err := pgdao.ListExperiments(ctx, db, conv.ID, 1, 0)
+        if err != nil {
+            return err
+        }
+        if len(exps) == 0 {
+            return fmt.Errorf("no experiment found for conversation %s", conv.ID)
+        }
+        exp := exps[0]
+
+        // Fetch testcases for that experiment and role
+        tcs, err := pgdao.ListTestcases(ctx, db, role, exp.ID, "", 100, 0)
+        if err != nil {
             return err
         }
 
-        // Dummy interactive behavior: just print a mock JSON payload
-        fmt.Fprintf(os.Stderr, "testcase active: interactive mode (mock)\n")
+        // Output
+        fmt.Fprintf(os.Stderr, "testcase active: conversation=%s role=%s experiment=%s count=%d\n", conv.ID, role, exp.ID, len(tcs))
+
+        // Minimal JSON payload with items
+        arr := make([]map[string]any, 0, len(tcs))
+        for _, t := range tcs {
+            m := map[string]any{"id": t.ID, "title": t.Title, "status": t.Status}
+            if t.Created.Valid {
+                m["created"] = t.Created.Time.Format(time.RFC3339Nano)
+            }
+            if t.Name.Valid {
+                m["name"] = t.Name.String
+            }
+            if t.Package.Valid {
+                m["package"] = t.Package.String
+            }
+            if t.Classname.Valid {
+                m["classname"] = t.Classname.String
+            }
+            if t.File.Valid {
+                m["file"] = t.File.String
+            }
+            if t.Line.Valid {
+                m["line"] = t.Line.Int64
+            }
+            if t.ExecutionTime.Valid {
+                m["execution_time"] = t.ExecutionTime.Float64
+            }
+            if t.ErrorMessage.Valid {
+                m["error"] = t.ErrorMessage.String
+            }
+            if len(t.Tags) > 0 {
+                m["tags"] = t.Tags
+            }
+            arr = append(arr, m)
+        }
         out := map[string]any{
             "status":       "ok",
-            "mode":         "interactive-mock",
+            "mode":         "interactive",
+            "conversation": conv.ID,
             "role":         role,
-            "conversation": flagTCActiveConversation,
-            "items": []map[string]any{
-                {"id": "tc-mock-1", "title": "Sample Testcase", "status": "OK"},
-                {"id": "tc-mock-2", "title": "Another Testcase", "status": "KO"},
-            },
+            "experiment":   exp.ID,
+            "items":        arr,
         }
         enc := json.NewEncoder(os.Stdout)
         enc.SetIndent("", "  ")
