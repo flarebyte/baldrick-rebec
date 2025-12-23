@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -176,7 +177,8 @@ func (m activeModel) View() string {
 			cursor = "> "
 		}
 		statusIcon := formatStatus(tc.Status)
-		fmt.Fprintf(&b, "%s%s %s\n", cursor, statusIcon, tc.Title)
+		indent := indentForLevel(levelFromTestcase(tc))
+		fmt.Fprintf(&b, "%s%s %s%s\n", cursor, statusIcon, indent, tc.Title)
 	}
 	if m.err != "" {
 		b.WriteString("\n")
@@ -304,4 +306,35 @@ func formatStatus(status string) string {
 func init() {
 	TestcaseCmd.AddCommand(activeCmd)
 	activeCmd.Flags().StringVar(&flagTCActiveConversation, "conversation", "", "Conversation ID (required)")
+}
+
+// levelFromTestcase returns the raw level string (e.g., "h1") or empty if unset.
+func levelFromTestcase(tc pgdao.Testcase) string {
+	if tc.Level.Valid {
+		return tc.Level.String
+	}
+	return ""
+}
+
+// indentForLevel computes indentation spaces based on level.
+// - Default when empty/invalid: h1 (0 spaces)
+// - hN indents (N-1)*2 spaces, capped at h6
+func indentForLevel(level string) string {
+	s := strings.ToLower(strings.TrimSpace(level))
+	n := 1
+	if s != "" {
+		if strings.HasPrefix(s, "h") {
+			s = s[1:]
+		}
+		if v, err := strconv.Atoi(s); err == nil && v >= 1 {
+			n = v
+		}
+	}
+	if n > 6 {
+		n = 6
+	}
+	if n < 1 {
+		n = 1
+	}
+	return strings.Repeat(" ", (n-1)*2)
 }
