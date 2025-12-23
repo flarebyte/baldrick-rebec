@@ -685,6 +685,7 @@ try {
     role: TEST_ROLE_USER,
     experiment: expID,
     status: 'OK',
+    level: 'h1',
     name: 'vet-basic',
     pkg: 'acme/build',
     classname: 'lint.Vet',
@@ -697,6 +698,7 @@ try {
     role: TEST_ROLE_USER,
     experiment: expID,
     status: 'OK',
+    level: 'h2',
     name: 'fmt-style',
     pkg: 'acme/build',
     classname: 'format.Fmt',
@@ -709,6 +711,7 @@ try {
     role: TEST_ROLE_USER,
     experiment: expID,
     status: 'KO',
+    level: 'h3',
     name: 'misspell',
     pkg: 'acme/build',
     classname: 'lint.Misspell',
@@ -717,6 +720,32 @@ try {
     line: 3,
     executionTime: 0.33,
   });
+  // Additional cases including TODO and mixed levels
+  await testcaseCreate({
+    title: 'Integration: DB connect smoke',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'TODO',
+    level: 'h1',
+    name: 'db-connect',
+    pkg: 'acme/integration',
+    classname: 'integration.DB',
+    file: 'db_test.go',
+    line: 5,
+  });
+  await testcaseCreate({
+    title: 'Unit: edge cases',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'OK',
+    level: 'h3',
+    name: 'edge-cases',
+    pkg: 'acme/build',
+    classname: 'unit.Edge',
+    file: 'edge_test.go',
+    line: 21,
+    executionTime: 0.05,
+  });
   {
     const tcs = await testcaseListJSON({
       role: TEST_ROLE_USER,
@@ -724,8 +753,8 @@ try {
       limit: 50,
     });
     assert(
-      Array.isArray(tcs) && tcs.length >= 3,
-      'expected at least 3 testcases',
+      Array.isArray(tcs) && tcs.length >= 5,
+      'expected at least 5 testcases',
     );
     const gotVet = tcs.find(
       (x) => x?.title === 'Unit: go vet' && x?.status === 'OK',
@@ -733,8 +762,14 @@ try {
     const gotMisspell = tcs.find(
       (x) => x?.title === 'Lint: misspell' && x?.status === 'KO',
     );
+    const gotTodo = tcs.find(
+      (x) =>
+        x?.title === 'Integration: DB connect smoke' &&
+        x?.status?.toUpperCase() === 'TODO',
+    );
     assert(!!gotVet, 'missing testcase: go vet');
     assert(!!gotMisspell, 'missing testcase: misspell');
+    assert(!!gotTodo, 'missing testcase: integration DB connect (TODO)');
   }
 
   // 11.6) Testcases via Connect JSON (start server, create+list+delete one)
