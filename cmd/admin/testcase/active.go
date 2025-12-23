@@ -89,6 +89,7 @@ type activeModel struct {
 	cursor       int
 	quitting     bool
 	err          string
+	errorsOnly   bool
 }
 
 func newActiveModel(conversation, role, experiment string, testcases []pgdao.Testcase) activeModel {
@@ -109,7 +110,8 @@ func (m activeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor--
 			}
 		case "down", "j":
-			if m.cursor < len(m.testcases)-1 {
+			// move within filtered list
+			if m.cursor < len(m.filteredIndices())-1 {
 				m.cursor++
 			}
 		case "enter":
@@ -118,12 +120,21 @@ func (m activeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Refresh testcases for latest experiment of the conversation
 			m.err = ""
 			return m, refreshCmd(m.conversation, m.role)
+		case "e":
+			// Toggle errors-only view
+			m.errorsOnly = !m.errorsOnly
+			// Normalize cursor against new filtered length
+			if m.cursor >= len(m.filteredIndices()) {
+				m.cursor = 0
+			}
+			return m, nil
 		}
 	case refreshMsg:
 		m.testcases = msg.testcases
 		m.experiment = msg.experiment
-		if m.cursor >= len(m.testcases) {
-			m.cursor = len(m.testcases) - 1
+		// Clamp cursor against filtered length after refresh
+		if m.cursor >= len(m.filteredIndices()) {
+			m.cursor = len(m.filteredIndices()) - 1
 			if m.cursor < 0 {
 				m.cursor = 0
 			}
@@ -140,13 +151,26 @@ func (m activeModel) View() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Conversation: %s\n", m.conversation)
 	fmt.Fprintf(&b, "Role: %s\n", m.role)
-	fmt.Fprintf(&b, "Experiment: %s\n\n", m.experiment)
-	if len(m.testcases) == 0 {
-		b.WriteString("No testcases found. Press q to quit.\n")
+	fmt.Fprintf(&b, "Experiment: %s\n", m.experiment)
+	// Filter status line
+	filterLbl := "all"
+	if m.errorsOnly {
+		filterLbl = "errors-only"
+	}
+	fmt.Fprintf(&b, "Filter: %s\n\n", filterLbl)
+
+	filtered := m.filteredIndices()
+	if len(m.testcases) == 0 || len(filtered) == 0 {
+		if m.errorsOnly {
+			b.WriteString("No error testcases. Press 'e' to show all; 'q' to quit.\n")
+		} else {
+			b.WriteString("No testcases found. Press q to quit.\n")
+		}
 		return b.String()
 	}
-	b.WriteString("Testcases (↑/k, ↓/j, enter, r=refresh, q):\n")
-	for i, tc := range m.testcases {
+	b.WriteString("Testcases (↑/k, ↓/j, enter, r=refresh, e=errors-only, q):\n")
+	for i, idx := range filtered {
+		tc := m.testcases[idx]
 		cursor := "  "
 		if i == m.cursor {
 			cursor = "> "
@@ -161,8 +185,8 @@ func (m activeModel) View() string {
 		b.WriteString("\n")
 	}
 	// Details section for selected testcase
-	if m.cursor >= 0 && m.cursor < len(m.testcases) {
-		tc := m.testcases[m.cursor]
+	if m.cursor >= 0 && m.cursor < len(filtered) {
+		tc := m.testcases[filtered[m.cursor]]
 		b.WriteString("\nDetails:\n")
 		fmt.Fprintf(&b, "ID: %s\n", tc.ID)
 		fmt.Fprintf(&b, "Title: %s\n", tc.Title)
@@ -194,6 +218,28 @@ func (m activeModel) View() string {
 		}
 	}
 	return b.String()
+}
+
+// Helpers
+func (m activeModel) filteredIndices() []int {
+	if !m.errorsOnly {
+		out := make([]int, len(m.testcases))
+		for i := range m.testcases {
+			out[i] = i
+		}
+		return out
+	}
+	out := make([]int, 0, len(m.testcases))
+	for i, tc := range m.testcases {
+		if isErrorStatus(tc.Status) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+func isErrorStatus(status string) bool {
+	return strings.ToLower(strings.TrimSpace(status)) == "ko"
 }
 
 // Messages
