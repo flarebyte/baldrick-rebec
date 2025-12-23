@@ -772,6 +772,69 @@ try {
     assert(!!gotTodo, 'missing testcase: integration DB connect (TODO)');
   }
 
+  // Create a second experiment and attach a different set of testcases
+  logStep(step, TOTAL, 'Creating additional testcases under a new experiment');
+  const expMeta2 = await experimentCreate({ conversation: convID });
+  const expID2 = idFrom(expMeta2);
+  await testcaseCreate({
+    title: 'Unit: string utils',
+    role: TEST_ROLE_USER,
+    experiment: expID2,
+    status: 'OK',
+    level: 'h2',
+    name: 'string-utils',
+    pkg: 'acme/build',
+    classname: 'unit.Strings',
+    file: 'strings_test.go',
+    line: 15,
+    executionTime: 0.11,
+  });
+  await testcaseCreate({
+    title: 'Integration: API smoke',
+    role: TEST_ROLE_USER,
+    experiment: expID2,
+    status: 'KO',
+    level: 'h2',
+    name: 'api-smoke',
+    pkg: 'acme/integration',
+    classname: 'integration.API',
+    error: 'timeout contacting service',
+    file: 'api_test.go',
+    line: 27,
+    executionTime: 2.5,
+  });
+  await testcaseCreate({
+    title: 'Unit: parsing basics',
+    role: TEST_ROLE_USER,
+    experiment: expID2,
+    status: 'TODO',
+    level: 'h1',
+    name: 'parsing-basics',
+    pkg: 'acme/build',
+    classname: 'unit.Parser',
+    file: 'parse_test.go',
+    line: 3,
+  });
+  {
+    const tcs2 = await testcaseListJSON({
+      role: TEST_ROLE_USER,
+      experiment: expID2,
+      limit: 50,
+    });
+    assert(
+      Array.isArray(tcs2) && tcs2.length >= 3,
+      'expected at least 3 testcases in second experiment',
+    );
+    const gotAPI = tcs2.find(
+      (x) => x?.title === 'Integration: API smoke' && x?.status === 'KO',
+    );
+    const gotStrings = tcs2.find(
+      (x) => x?.title === 'Unit: string utils' && x?.status === 'OK',
+    );
+    assert(!!gotAPI, 'missing testcase in exp2: API smoke');
+    assert(!!gotStrings, 'missing testcase in exp2: string utils');
+  }
+
   // 11.6) Testcases via Connect JSON (start server, create+list+delete one)
   step++;
   logStep(step, TOTAL, 'Testcases via Connect JSON service');
