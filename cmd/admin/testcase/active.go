@@ -68,15 +68,17 @@ var activeCmd = &cobra.Command{
             return err
         }
 
-        // Build list of titles for the TUI
+        // Build lists for the TUI
         titles := make([]string, 0, len(tcs))
+        statuses := make([]string, 0, len(tcs))
         for _, t := range tcs {
             titles = append(titles, t.Title)
+            statuses = append(statuses, t.Status)
         }
 
         // Launch Bubble Tea TUI (list of titles)
         fmt.Fprintf(os.Stderr, "testcase active: conversation=%s role=%s experiment=%s count=%d\n", conv.ID, role, exp.ID, len(titles))
-        m := newActiveModel(conv.ID, role, exp.ID, titles)
+        m := newActiveModel(conv.ID, role, exp.ID, titles, statuses)
         if _, err := tea.NewProgram(m).Run(); err != nil {
             return err
         }
@@ -90,12 +92,13 @@ type activeModel struct {
     role         string
     experiment   string
     testcaseTitles []string
+    testcaseStatuses []string
     cursor       int
     quitting     bool
 }
 
-func newActiveModel(conversation, role, experiment string, testcaseTitles []string) activeModel {
-    return activeModel{conversation: conversation, role: role, experiment: experiment, testcaseTitles: testcaseTitles}
+func newActiveModel(conversation, role, experiment string, testcaseTitles []string, testcaseStatuses []string) activeModel {
+    return activeModel{conversation: conversation, role: role, experiment: experiment, testcaseTitles: testcaseTitles, testcaseStatuses: testcaseStatuses}
 }
 
 func (m activeModel) Init() tea.Cmd { return nil }
@@ -139,7 +142,15 @@ func (m activeModel) View() string {
         if i == m.cursor {
             cursor = "> "
         }
-        fmt.Fprintf(&b, "%s%s\n", cursor, it)
+        var statusIcon string
+        if i < len(m.testcaseStatuses) {
+            statusIcon = formatStatus(m.testcaseStatuses[i])
+        }
+        if statusIcon != "" {
+            fmt.Fprintf(&b, "%s%s %s\n", cursor, statusIcon, it)
+        } else {
+            fmt.Fprintf(&b, "%s%s\n", cursor, it)
+        }
     }
     return b.String()
 }
