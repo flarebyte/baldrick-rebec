@@ -125,15 +125,7 @@ func (m activeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Refresh testcases for current experiment
 			m.err = ""
 			return m, refreshForExpCmd(m.role, m.experiments[m.expIdx].ID)
-		case "h", "left":
-			// Previous experiment (cycle)
-			if len(m.experiments) > 0 {
-				m.err = ""
-				m.expIdx = (m.expIdx - 1 + len(m.experiments)) % len(m.experiments)
-				m.cursor = 0
-				return m, refreshForExpCmd(m.role, m.experiments[m.expIdx].ID)
-			}
-		case "l", "right":
+		case "n":
 			// Next experiment (cycle)
 			if len(m.experiments) > 0 {
 				m.err = ""
@@ -208,7 +200,7 @@ func (m activeModel) View() string {
 		}
 		return b.String()
 	}
-	b.WriteString("Testcases (↑/k, ↓/j, enter, h/← prev exp, l/→ next exp, r=refresh, e=errors-only, q):\n")
+	b.WriteString("Testcases (↑/k, ↓/j, enter, n=next exp, r=refresh, e=errors-only, q):\n")
 	for i, idx := range filtered {
 		tc := m.testcases[idx]
 		cursor := "  "
