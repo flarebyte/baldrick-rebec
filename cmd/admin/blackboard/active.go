@@ -97,6 +97,7 @@ type bbActiveModel struct {
 	searchInput string
 	inBoard     bool
 	boardID     string
+	boardTitle  string
 	stickies    []pgdao.Stickie
 	stickCursor int
 }
@@ -188,7 +189,12 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.cursor >= 0 && m.cursor < len(m.boards) {
 				m.inBoard = true
-				m.boardID = m.boards[m.cursor].ID
+				bb := m.boards[m.cursor]
+				m.boardID = bb.ID
+				m.boardTitle = firstNonEmpty(strOrNull(bb.ProjectName), strOrNull(bb.ConversationTitle), strOrNull(bb.StoreTitle), bb.StoreID)
+				if strings.TrimSpace(m.boardTitle) == "" {
+					m.boardTitle = m.boardID
+				}
 				m.stickCursor = 0
 				return m, refreshStickiesCmd(m.boardID)
 			}
@@ -240,7 +246,8 @@ func (m bbActiveModel) View() string {
 	}
 	b.WriteString(bStyleLabel.Render("Role: ") + bStyleValue.Render(fmt.Sprintf("[%d/%d] %s", m.roleIdx+1, len(m.roles), currentRole)) + "\n")
 	if m.inBoard {
-		b.WriteString(bStyleLabel.Render("Board: ") + bStyleValue.Render(m.boardID) + "\n")
+		b.WriteString(bStyleLabel.Render("Board: ") + bStyleValue.Render(m.boardTitle) + "\n")
+		b.WriteString(bStyleHelp.Render("ID: ") + bStyleValue.Render(m.boardID) + "\n")
 		b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 		b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, b/esc=back, r=refresh, q") + "\n")
 		if len(m.stickies) == 0 {
