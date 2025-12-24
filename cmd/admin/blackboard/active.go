@@ -23,6 +23,11 @@ var (
 	bStyleHelp    = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Italic(true) // dim italic
 	bStyleCursor  = lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true)  // magenta
 	bStyleDivider = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))              // gray line
+	// Related entity labels (distinct colors)
+	bStyleStoreLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
+	bStyleTaskLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
+	bStyleConvLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true)
+	bStyleProjLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true)
 )
 
 var activeCmd = &cobra.Command{
@@ -192,16 +197,39 @@ func (m bbActiveModel) View() string {
 		b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 		b.WriteString(bStyleHeader.Render("Details") + "\n")
 		b.WriteString(bStyleLabel.Render("ID: ") + bStyleValue.Render(bb.ID) + "\n")
-		b.WriteString(bStyleLabel.Render("Store: ") + bStyleValue.Render(bb.StoreID) + "\n")
+		// Store (distinct style)
+		b.WriteString(bStyleStoreLabel.Render("Store: ") + bStyleValue.Render(bb.StoreID) + "\n")
+		if bb.StoreName.Valid {
+			b.WriteString(bStyleStoreLabel.Render("Store.name: ") + bStyleValue.Render(bb.StoreName.String) + "\n")
+		}
+		if bb.StoreTitle.Valid {
+			b.WriteString(bStyleStoreLabel.Render("Store.title: ") + bStyleValue.Render(bb.StoreTitle.String) + "\n")
+		}
+		// Role
 		b.WriteString(bStyleLabel.Render("Role: ") + bStyleValue.Render(bb.RoleName) + "\n")
+		// Project (distinct style)
 		if bb.ProjectName.Valid {
-			b.WriteString(bStyleLabel.Render("Project: ") + bStyleValue.Render(bb.ProjectName.String) + "\n")
+			b.WriteString(bStyleProjLabel.Render("Project: ") + bStyleValue.Render(bb.ProjectName.String) + "\n")
 		}
+		if bb.ProjectDesc.Valid {
+			b.WriteString(bStyleProjLabel.Render("Project.desc: ") + bStyleValue.Render(bb.ProjectDesc.String) + "\n")
+		}
+		// Conversation (distinct style)
 		if bb.ConversationID.Valid {
-			b.WriteString(bStyleLabel.Render("Conversation: ") + bStyleValue.Render(bb.ConversationID.String) + "\n")
+			b.WriteString(bStyleConvLabel.Render("Conversation: ") + bStyleValue.Render(bb.ConversationID.String) + "\n")
 		}
+		if bb.ConversationTitle.Valid {
+			b.WriteString(bStyleConvLabel.Render("Conversation.title: ") + bStyleValue.Render(bb.ConversationTitle.String) + "\n")
+		}
+		// Task (distinct style)
 		if bb.TaskID.Valid {
-			b.WriteString(bStyleLabel.Render("Task: ") + bStyleValue.Render(bb.TaskID.String) + "\n")
+			b.WriteString(bStyleTaskLabel.Render("Task: ") + bStyleValue.Render(bb.TaskID.String) + "\n")
+		}
+		if bb.TaskVariant.Valid {
+			b.WriteString(bStyleTaskLabel.Render("Task.variant: ") + bStyleValue.Render(bb.TaskVariant.String) + "\n")
+		}
+		if bb.TaskTitle.Valid {
+			b.WriteString(bStyleTaskLabel.Render("Task.title: ") + bStyleValue.Render(bb.TaskTitle.String) + "\n")
 		}
 		if bb.Background.Valid {
 			b.WriteString(bStyleLabel.Render("Background: ") + bStyleValue.Render(bb.Background.String) + "\n")
