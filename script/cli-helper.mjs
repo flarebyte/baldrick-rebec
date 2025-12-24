@@ -520,10 +520,12 @@ export async function projectSet({
   name,
   role = 'user',
   description = '',
+  notes = '',
   tags = '',
 }) {
   const args = ['admin', 'project', 'set', '--name', name, '--role', role];
   if (description) args.push('--description', description);
+  if (notes) args.push('--notes', notes);
   if (tags) args.push('--tags', tags);
   return await runRbc(...args);
 }
@@ -594,6 +596,10 @@ export async function storeSet({
   role = 'user',
   title = '',
   description = '',
+  motivation = '',
+  security = '',
+  privacy = '',
+  notes = '',
   type = '',
   scope = '',
   lifecycle = '',
@@ -602,6 +608,10 @@ export async function storeSet({
   const args = ['admin', 'store', 'set', '--name', name, '--role', role];
   if (title) args.push('--title', title);
   if (description) args.push('--description', description);
+  if (motivation) args.push('--motivation', motivation);
+  if (security) args.push('--security', security);
+  if (privacy) args.push('--privacy', privacy);
+  if (notes) args.push('--notes', notes);
   if (type) args.push('--type', type);
   if (scope) args.push('--scope', scope);
   if (lifecycle) args.push('--lifecycle', lifecycle);
@@ -855,6 +865,17 @@ export async function conversationListJSON({
 }
 export async function conversationGetJSON({ id }) {
   return await runRbcJSON('admin', 'conversation', 'get', '--id', id);
+}
+export async function projectGetJSON({ name, role }) {
+  return await runRbcJSON(
+    'admin',
+    'project',
+    'get',
+    '--name',
+    name,
+    '--role',
+    role,
+  );
 }
 export async function messageListJSON({
   role,

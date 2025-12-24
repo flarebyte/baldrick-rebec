@@ -40,6 +40,7 @@ import {
   messageSet,
   packageSet,
   projectListJSON,
+  projectGetJSON,
   projectSet,
   promptRunJSON,
   queueAdd,
@@ -345,14 +346,42 @@ try {
     name: 'acme/build-system',
     role: TEST_ROLE_USER,
     description: 'Build system and CI pipeline',
+    notes: 'Notes: CI with Go and Docker',
     tags: 'status=active,type=ci',
   });
   await projectSet({
     name: 'acme/product',
     role: TEST_ROLE_USER,
     description: 'Main product',
+    notes: 'Notes: App repo',
     tags: 'status=active,type=app',
   });
+  // Ensure one project has all fields populated
+  await projectSet({
+    name: 'acme/complete',
+    role: TEST_ROLE_USER,
+    description: 'Complete metadata project',
+    notes: 'Project notes filled',
+    tags: 'area=complete,stage=alpha',
+  });
+  {
+    const pj = await projectGetJSON({
+      name: 'acme/complete',
+      role: TEST_ROLE_USER,
+    });
+    assert(
+      pj && pj.name === 'acme/complete',
+      'project complete: name mismatch',
+    );
+    assert(
+      pj.description === 'Complete metadata project',
+      'project complete: description missing',
+    );
+    assert(
+      pj.notes === 'Project notes filled',
+      'project complete: notes missing',
+    );
+  }
   {
     const prj = await projectListJSON({ role: TEST_ROLE_USER, limit: 50 });
     validateProjectListContract(prj);
@@ -641,6 +670,53 @@ try {
     description: 'Local product workspace',
     tags: 'status=active',
   });
+
+  // Ensure one store has all fields populated
+  await storeSet({
+    name: 'complete-store',
+    role: TEST_ROLE_USER,
+    title: 'Complete Store',
+    description: 'Store with all fields',
+    motivation: 'Centralize artifacts',
+    security: 'Internal only',
+    privacy: 'No PII',
+    notes: 'Markdown: some details here',
+    type: 'journal',
+    scope: 'shared',
+    lifecycle: 'weekly',
+    tags: 'env=dev,owner=qa',
+  });
+  {
+    const sfull = await storeGet({
+      name: 'complete-store',
+      role: TEST_ROLE_USER,
+    });
+    assert(
+      sfull && (sfull.id || sfull.ID || sfull.name === 'complete-store'),
+      'store complete: not found',
+    );
+    assert(sfull.title === 'Complete Store', 'store complete: title mismatch');
+    assert(
+      sfull.description === 'Store with all fields',
+      'store complete: description missing',
+    );
+    assert(
+      sfull.motivation === 'Centralize artifacts',
+      'store complete: motivation missing',
+    );
+    assert(
+      sfull.security === 'Internal only',
+      'store complete: security missing',
+    );
+    assert(sfull.privacy === 'No PII', 'store complete: privacy missing');
+    assert(
+      sfull.notes === 'Markdown: some details here',
+      'store complete: notes missing',
+    );
+    assert(sfull.type === 'journal', 'store complete: type missing');
+    assert(sfull.scope === 'shared', 'store complete: scope missing');
+    assert(sfull.lifecycle === 'weekly', 'store complete: lifecycle missing');
+  }
 
   await packageSet({ role: TEST_ROLE_USER, variant: 'unit/go' });
   await packageSet({ role: TEST_ROLE_QA, variant: 'integration' });
