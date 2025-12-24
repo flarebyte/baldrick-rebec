@@ -262,6 +262,56 @@ func (m bbActiveModel) View() string {
 			title := stickieTitle(s)
 			fmt.Fprintf(&b, "%s%s\n", cursor, bStyleValue.Render(title))
 		}
+		// Details for selected stickie
+		if m.stickCursor >= 0 && m.stickCursor < len(m.stickies) {
+			st := m.stickies[m.stickCursor]
+			b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
+			b.WriteString(bStyleHeader.Render("Stickie Details") + "\n")
+			b.WriteString(bStyleLabel.Render("ID: ") + bStyleValue.Render(st.ID) + "\n")
+			// Complex name
+			if strings.TrimSpace(st.ComplexName.Name) != "" {
+				name := st.ComplexName.Name
+				if strings.TrimSpace(st.ComplexName.Variant) != "" {
+					name += "/" + st.ComplexName.Variant
+				}
+				b.WriteString(bStyleLabel.Render("Name: ") + bStyleValue.Render(name) + "\n")
+			}
+			// Topic
+			if st.TopicName.Valid {
+				b.WriteString(bStyleLabel.Render("Topic: ") + bStyleValue.Render(st.TopicName.String) + "\n")
+			}
+			if st.TopicRoleName.Valid {
+				b.WriteString(bStyleLabel.Render("Topic.role: ") + bStyleValue.Render(st.TopicRoleName.String) + "\n")
+			}
+			// Note
+			if st.Note.Valid && strings.TrimSpace(st.Note.String) != "" {
+				b.WriteString(bStyleLabel.Render("Note: ") + bStyleValue.Render(st.Note.String) + "\n")
+			}
+			// Labels
+			if len(st.Labels) > 0 {
+				b.WriteString(bStyleLabel.Render("Labels: ") + bStyleValue.Render(strings.Join(st.Labels, ", ")) + "\n")
+			}
+			// Priority / Score
+			if st.PriorityLevel.Valid {
+				b.WriteString(bStyleLabel.Render("Priority: ") + bStyleValue.Render(st.PriorityLevel.String) + "\n")
+			}
+			if st.Score.Valid {
+				b.WriteString(bStyleLabel.Render("Score: ") + bStyleValue.Render(fmt.Sprintf("%.3f", st.Score.Float64)) + "\n")
+			}
+			// Created by task
+			if st.CreatedByTaskID.Valid {
+				b.WriteString(bStyleLabel.Render("Created.by.task: ") + bStyleValue.Render(st.CreatedByTaskID.String) + "\n")
+			}
+			// Timestamps / edit count / archived
+			if st.Created.Valid {
+				b.WriteString(bStyleLabel.Render("Created: ") + bStyleValue.Render(st.Created.Time.Format(time.RFC3339)) + "\n")
+			}
+			if st.Updated.Valid {
+				b.WriteString(bStyleLabel.Render("Updated: ") + bStyleValue.Render(st.Updated.Time.Format(time.RFC3339)) + "\n")
+			}
+			b.WriteString(bStyleLabel.Render("Edits: ") + bStyleValue.Render(fmt.Sprintf("%d", st.EditCount)) + "\n")
+			b.WriteString(bStyleLabel.Render("Archived: ") + bStyleValue.Render(fmt.Sprintf("%v", st.Archived)) + "\n")
+		}
 		return b.String()
 	}
 	// Search line
