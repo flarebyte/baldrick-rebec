@@ -56,7 +56,7 @@ var activeCmd = &cobra.Command{
 		role := roleNames[0]
 
 		// Fetch most recent blackboards for current role (max 10)
-		boards, err := pgdao.ListBlackboards(ctx, db, role, 10, 0)
+		boards, err := pgdao.ListBlackboardsWithRefs(ctx, db, role, 10, 0)
 		if err != nil {
 			return err
 		}
@@ -76,13 +76,13 @@ func init() { BlackboardCmd.AddCommand(activeCmd) }
 type bbActiveModel struct {
 	roles    []string
 	roleIdx  int
-	boards   []pgdao.Blackboard
+	boards   []pgdao.BlackboardWithRefs
 	cursor   int
 	quitting bool
 	err      string
 }
 
-func newBBActiveModel(roles []string, currentRole string, boards []pgdao.Blackboard) bbActiveModel {
+func newBBActiveModel(roles []string, currentRole string, boards []pgdao.BlackboardWithRefs) bbActiveModel {
 	idx := -1
 	for i, r := range roles {
 		if r == currentRole {
@@ -161,17 +161,22 @@ func (m bbActiveModel) View() string {
 		return b.String()
 	}
 
-	// List rows: show a concise label (project or conversation or store)
+	// List rows: show a concise label (project or conversation title, else store)
 	for i, bb := range m.boards {
 		cursor := "  "
 		if i == m.cursor {
 			cursor = bStyleCursor.Render("> ")
 		}
-		label := firstNonEmpty(strOrNull(bb.ProjectName), strOrNull(bb.ConversationID), bb.StoreID)
-		if label == "" {
-			label = bb.ID
+		primary := firstNonEmpty(strOrNull(bb.ProjectName), strOrNull(bb.ConversationTitle), strOrNull(bb.StoreTitle), bb.StoreID)
+		if primary == "" {
+			primary = bb.ID
 		}
-		fmt.Fprintf(&b, "%s%s\n", cursor, bStyleValue.Render(label))
+		chips := relatedChips(bb)
+		if chips != "" {
+			fmt.Fprintf(&b, "%s%s %s\n", cursor, bStyleValue.Render(primary), chips)
+		} else {
+			fmt.Fprintf(&b, "%s%s\n", cursor, bStyleValue.Render(primary))
+		}
 	}
 
 	if m.err != "" {
@@ -215,7 +220,7 @@ func (m bbActiveModel) View() string {
 }
 
 // Messages + commands
-type bbRefreshMsg struct{ boards []pgdao.Blackboard }
+type bbRefreshMsg struct{ boards []pgdao.BlackboardWithRefs }
 type bbErrMsg struct{ err error }
 
 func refreshBoardsCmd(role string) tea.Cmd {
@@ -231,7 +236,7 @@ func refreshBoardsCmd(role string) tea.Cmd {
 			return bbErrMsg{err}
 		}
 		defer db.Close()
-		rows, err := pgdao.ListBlackboards(ctx, db, role, 10, 0)
+		rows, err := pgdao.ListBlackboardsWithRefs(ctx, db, role, 10, 0)
 		if err != nil {
 			return bbErrMsg{err}
 		}
@@ -253,4 +258,34 @@ func strOrNull(ns sql.NullString) string {
 		return ns.String
 	}
 	return ""
+}
+
+// relatedChips builds a small inline string with joined fields, styled to stand out.
+func relatedChips(bb pgdao.BlackboardWithRefs) string {
+	var parts []string
+	if bb.StoreName.Valid {
+		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("store:"+bb.StoreName.String))
+	}
+	if bb.TaskVariant.Valid || bb.TaskTitle.Valid {
+		label := strOrNull(bb.TaskVariant)
+		if bb.TaskTitle.Valid && strings.TrimSpace(bb.TaskTitle.String) != "" {
+			if label != "" {
+				label += " · "
+			}
+			label += bb.TaskTitle.String
+		}
+		if label != "" {
+			parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("task:"+label))
+		}
+	}
+	if bb.ConversationTitle.Valid {
+		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("conv:"+bb.ConversationTitle.String))
+	}
+	if bb.ProjectName.Valid {
+		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Render("proj:"+bb.ProjectName.String))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(parts, "  ") + "]"
 }

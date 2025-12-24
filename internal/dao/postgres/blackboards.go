@@ -22,6 +22,30 @@ type Blackboard struct {
 	Updated        sql.NullTime
 }
 
+// BlackboardWithRefs flattens blackboard plus selected display fields from joined tables.
+// Related fields are prefixed with their table name for clarity.
+type BlackboardWithRefs struct {
+	// Base blackboard fields
+	ID             string
+	StoreID        string
+	RoleName       string
+	ConversationID sql.NullString
+	ProjectName    sql.NullString
+	TaskID         sql.NullString
+	Background     sql.NullString
+	Guidelines     sql.NullString
+	Created        sql.NullTime
+	Updated        sql.NullTime
+
+	// Related display fields (all optional)
+	StoreName         sql.NullString // store.name
+	StoreTitle        sql.NullString // store.title
+	TaskVariant       sql.NullString // tasks.variant
+	TaskTitle         sql.NullString // tasks.title
+	ProjectDesc       sql.NullString // projects.description
+	ConversationTitle sql.NullString // conversations.title
+}
+
 // UpsertBlackboard inserts a new blackboard if ID is empty, otherwise updates it.
 func UpsertBlackboard(ctx context.Context, db *pgxpool.Pool, b *Blackboard) error {
 	if b.ID != "" {
@@ -95,6 +119,59 @@ func ListBlackboards(ctx context.Context, db *pgxpool.Pool, roleName string, lim
 	}
 	if err := rows.Err(); err != nil {
 		return nil, dbutil.ErrWrap("blackboard.list", err, dbutil.ParamSummary("role", roleName))
+	}
+	return out, nil
+}
+
+// ListBlackboardsWithRefs returns recent blackboards for a role and joins display fields
+// from stores, tasks, projects, and conversations. Fields are returned flattened
+// with prefixes as documented in BlackboardWithRefs.
+func ListBlackboardsWithRefs(ctx context.Context, db *pgxpool.Pool, roleName string, limit, offset int) ([]BlackboardWithRefs, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	q := `SELECT 
+            b.id::text, b.store_id::text, b.role_name,
+            b.conversation_id::text, b.project_name, b.task_id::text,
+            b.background, b.guidelines, b.created, b.updated,
+            s.name, s.title,
+            t.variant, t.title,
+            p.description,
+            c.title
+          FROM blackboards b
+          LEFT JOIN stores s ON s.id = b.store_id
+          LEFT JOIN tasks t ON t.id = b.task_id
+          LEFT JOIN projects p ON p.name = b.project_name AND p.role_name = b.role_name
+          LEFT JOIN conversations c ON c.id = b.conversation_id
+          WHERE b.role_name=$1
+          ORDER BY b.updated DESC, b.created DESC
+          LIMIT $2 OFFSET $3`
+	rows, err := db.Query(ctx, q, roleName, limit, offset)
+	if err != nil {
+		return nil, dbutil.ErrWrap("blackboard.list_refs", err, dbutil.ParamSummary("role", roleName), fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset))
+	}
+	defer rows.Close()
+	var out []BlackboardWithRefs
+	for rows.Next() {
+		var r BlackboardWithRefs
+		if err := rows.Scan(
+			&r.ID, &r.StoreID, &r.RoleName,
+			&r.ConversationID, &r.ProjectName, &r.TaskID,
+			&r.Background, &r.Guidelines, &r.Created, &r.Updated,
+			&r.StoreName, &r.StoreTitle,
+			&r.TaskVariant, &r.TaskTitle,
+			&r.ProjectDesc,
+			&r.ConversationTitle,
+		); err != nil {
+			return nil, dbutil.ErrWrap("blackboard.list_refs.scan", err, dbutil.ParamSummary("role", roleName))
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, dbutil.ErrWrap("blackboard.list_refs", err, dbutil.ParamSummary("role", roleName))
 	}
 	return out, nil
 }
