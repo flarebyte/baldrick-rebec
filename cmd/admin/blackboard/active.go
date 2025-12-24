@@ -86,13 +86,15 @@ func init() {
 
 // Model
 type bbActiveModel struct {
-	roles    []string
-	roleIdx  int
-	boards   []pgdao.BlackboardWithRefs
-	cursor   int
-	quitting bool
-	err      string
-	search   string
+	roles       []string
+	roleIdx     int
+	boards      []pgdao.BlackboardWithRefs
+	cursor      int
+	quitting    bool
+	err         string
+	search      string
+	inSearch    bool
+	searchInput string
 }
 
 func newBBActiveModel(roles []string, currentRole string, boards []pgdao.BlackboardWithRefs, search string) bbActiveModel {
@@ -106,7 +108,7 @@ func newBBActiveModel(roles []string, currentRole string, boards []pgdao.Blackbo
 	if idx < 0 {
 		idx = 0
 	}
-	return bbActiveModel{roles: roles, roleIdx: idx, boards: boards, search: search}
+	return bbActiveModel{roles: roles, roleIdx: idx, boards: boards, search: search, inSearch: false, searchInput: search}
 }
 
 func (m bbActiveModel) Init() tea.Cmd { return nil }
@@ -114,6 +116,31 @@ func (m bbActiveModel) Init() tea.Cmd { return nil }
 func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.inSearch {
+			switch msg.Type {
+			case tea.KeyEnter:
+				m.search = m.searchInput
+				m.inSearch = false
+				m.cursor = 0
+				return m, refreshBoardsCmd(m.roles[m.roleIdx], m.search)
+			case tea.KeyEsc:
+				m.inSearch = false
+				m.searchInput = m.search
+				return m, nil
+			case tea.KeyBackspace, tea.KeyDelete, tea.KeyCtrlH:
+				if len(m.searchInput) > 0 {
+					m.searchInput = m.searchInput[:len(m.searchInput)-1]
+				}
+				return m, nil
+			case tea.KeyRunes:
+				if len(msg.Runes) > 0 {
+					m.searchInput += string(msg.Runes)
+				}
+				return m, nil
+			default:
+				return m, nil
+			}
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			m.quitting = true
@@ -126,6 +153,10 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.boards)-1 {
 				m.cursor++
 			}
+		case "/":
+			m.inSearch = true
+			m.searchInput = m.search
+			return m, nil
 		case "n":
 			// Next role (cycle)
 			if len(m.roles) > 0 {
@@ -164,10 +195,18 @@ func (m bbActiveModel) View() string {
 		currentRole = m.roles[m.roleIdx]
 	}
 	b.WriteString(bStyleLabel.Render("Role: ") + bStyleValue.Render(fmt.Sprintf("[%d/%d] %s", m.roleIdx+1, len(m.roles), currentRole)) + "\n")
+	// Search line
+	if m.inSearch {
+		b.WriteString(bStyleLabel.Render("Search*: "))
+		b.WriteString(bStyleValue.Render(m.searchInput) + "\n")
+		b.WriteString(bStyleHelp.Render("(editing) enter=apply, esc=cancel") + "\n")
+	} else {
+		b.WriteString(bStyleLabel.Render("Search: ") + bStyleValue.Render(m.search) + "\n")
+	}
 
 	// Divider and help
 	b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
-	b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, n=next role, r=refresh, enter, q") + "\n")
+	b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, /=search, n=next role, r=refresh, enter, q") + "\n")
 
 	if len(m.boards) == 0 {
 		b.WriteString("No blackboards.\n")
