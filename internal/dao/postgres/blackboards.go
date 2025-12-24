@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	dbutil "github.com/flarebyte/baldrick-rebec/internal/dao/dbutil"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -132,14 +133,15 @@ func ListBlackboards(ctx context.Context, db *pgxpool.Pool, roleName string, lim
 // ListBlackboardsWithRefs returns recent blackboards for a role and joins display fields
 // from stores, tasks, projects, and conversations. Fields are returned flattened
 // with prefixes as documented in BlackboardWithRefs.
-func ListBlackboardsWithRefs(ctx context.Context, db *pgxpool.Pool, roleName string, limit, offset int) ([]BlackboardWithRefs, error) {
+func ListBlackboardsWithRefs(ctx context.Context, db *pgxpool.Pool, roleName string, limit, offset int, search string) ([]BlackboardWithRefs, error) {
 	if limit <= 0 {
 		limit = 100
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	q := `SELECT 
+	// Base SELECT with joins
+	base := `SELECT 
             b.id::text, b.store_id::text, b.role_name,
             b.conversation_id::text, b.project_name, b.task_id::text,
             b.background, b.guidelines, b.created, b.updated,
@@ -152,10 +154,25 @@ func ListBlackboardsWithRefs(ctx context.Context, db *pgxpool.Pool, roleName str
           LEFT JOIN tasks t ON t.id = b.task_id
           LEFT JOIN projects p ON p.name = b.project_name AND p.role_name = b.role_name
           LEFT JOIN conversations c ON c.id = b.conversation_id
-          WHERE b.role_name=$1
-          ORDER BY b.updated DESC, b.created DESC
-          LIMIT $2 OFFSET $3`
-	rows, err := db.Query(ctx, q, roleName, limit, offset)
+          WHERE b.role_name=$1`
+	var rows pgxRows
+	var err error
+	if strings.TrimSpace(search) != "" {
+		// Case-insensitive pattern search across selected related fields
+		q := base + ` AND (
+              s.name ILIKE $2 OR s.title ILIKE $2 OR s.description ILIKE $2 OR s.motivation ILIKE $2 OR
+              p.name ILIKE $2 OR p.description ILIKE $2
+            )
+            ORDER BY b.updated DESC, b.created DESC
+            LIMIT $3 OFFSET $4`
+		pattern := "%" + strings.TrimSpace(search) + "%"
+		rows, err = db.Query(ctx, q, roleName, pattern, limit, offset)
+	} else {
+		q := base + `
+            ORDER BY b.updated DESC, b.created DESC
+            LIMIT $2 OFFSET $3`
+		rows, err = db.Query(ctx, q, roleName, limit, offset)
+	}
 	if err != nil {
 		return nil, dbutil.ErrWrap("blackboard.list_refs", err, dbutil.ParamSummary("role", roleName), fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset))
 	}

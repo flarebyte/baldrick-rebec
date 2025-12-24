@@ -30,6 +30,10 @@ var (
 	bStyleProjLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true)
 )
 
+var (
+	flagBBActiveSearch string
+)
+
 var activeCmd = &cobra.Command{
 	Use:   "active",
 	Short: "Interactive list of recent blackboards per role",
@@ -61,13 +65,13 @@ var activeCmd = &cobra.Command{
 		role := roleNames[0]
 
 		// Fetch most recent blackboards for current role (max 10)
-		boards, err := pgdao.ListBlackboardsWithRefs(ctx, db, role, 10, 0)
+		boards, err := pgdao.ListBlackboardsWithRefs(ctx, db, role, 10, 0, flagBBActiveSearch)
 		if err != nil {
 			return err
 		}
 
-		fmt.Fprintf(os.Stderr, "blackboard active: role=%s boards=%d roles=%d\n", role, len(boards), len(roleNames))
-		m := newBBActiveModel(roleNames, role, boards)
+		fmt.Fprintf(os.Stderr, "blackboard active: role=%s boards=%d roles=%d search=%q\n", role, len(boards), len(roleNames), flagBBActiveSearch)
+		m := newBBActiveModel(roleNames, role, boards, flagBBActiveSearch)
 		if _, err := tea.NewProgram(m).Run(); err != nil {
 			return err
 		}
@@ -75,7 +79,10 @@ var activeCmd = &cobra.Command{
 	},
 }
 
-func init() { BlackboardCmd.AddCommand(activeCmd) }
+func init() {
+	BlackboardCmd.AddCommand(activeCmd)
+	activeCmd.Flags().StringVar(&flagBBActiveSearch, "search", "", "Optional search string (matches store/project fields)")
+}
 
 // Model
 type bbActiveModel struct {
@@ -85,9 +92,10 @@ type bbActiveModel struct {
 	cursor   int
 	quitting bool
 	err      string
+	search   string
 }
 
-func newBBActiveModel(roles []string, currentRole string, boards []pgdao.BlackboardWithRefs) bbActiveModel {
+func newBBActiveModel(roles []string, currentRole string, boards []pgdao.BlackboardWithRefs, search string) bbActiveModel {
 	idx := -1
 	for i, r := range roles {
 		if r == currentRole {
@@ -98,7 +106,7 @@ func newBBActiveModel(roles []string, currentRole string, boards []pgdao.Blackbo
 	if idx < 0 {
 		idx = 0
 	}
-	return bbActiveModel{roles: roles, roleIdx: idx, boards: boards}
+	return bbActiveModel{roles: roles, roleIdx: idx, boards: boards, search: search}
 }
 
 func (m bbActiveModel) Init() tea.Cmd { return nil }
@@ -124,12 +132,12 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.err = ""
 				m.roleIdx = (m.roleIdx + 1) % len(m.roles)
 				m.cursor = 0
-				return m, refreshBoardsCmd(m.roles[m.roleIdx])
+				return m, refreshBoardsCmd(m.roles[m.roleIdx], m.search)
 			}
 		case "r":
 			// Refresh current role
 			m.err = ""
-			return m, refreshBoardsCmd(m.roles[m.roleIdx])
+			return m, refreshBoardsCmd(m.roles[m.roleIdx], m.search)
 		}
 	case bbRefreshMsg:
 		m.boards = msg.boards
@@ -269,7 +277,7 @@ func (m bbActiveModel) View() string {
 type bbRefreshMsg struct{ boards []pgdao.BlackboardWithRefs }
 type bbErrMsg struct{ err error }
 
-func refreshBoardsCmd(role string) tea.Cmd {
+func refreshBoardsCmd(role string, search string) tea.Cmd {
 	return func() tea.Msg {
 		cfg, err := cfgpkg.Load()
 		if err != nil {
@@ -282,7 +290,7 @@ func refreshBoardsCmd(role string) tea.Cmd {
 			return bbErrMsg{err}
 		}
 		defer db.Close()
-		rows, err := pgdao.ListBlackboardsWithRefs(ctx, db, role, 10, 0)
+		rows, err := pgdao.ListBlackboardsWithRefs(ctx, db, role, 10, 0, search)
 		if err != nil {
 			return bbErrMsg{err}
 		}
