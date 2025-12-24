@@ -23,6 +23,7 @@ import {
   assert,
   blackboardListJSON,
   blackboardSet,
+  conversationGetJSON,
   conversationListJSON,
   conversationSet,
   createScript,
@@ -676,6 +677,30 @@ try {
     tags: 'docs,update',
     role: TEST_ROLE_USER,
   });
+
+  // Create a second conversation with populated metadata fields
+  const convMeta2 = await conversationSet({
+    title: 'QA Discussion',
+    role: TEST_ROLE_QA,
+    description: 'Quality assurance planning and triage',
+    project: 'acme/quality',
+    tags: 'area=qa,priority=high,triage',
+    notes: 'Weekly QA sync notes',
+  });
+  const convID2 = idFrom(convMeta2);
+  {
+    const c2 = await conversationGetJSON({ id: convID2 });
+    assert(c2 && c2.id === convID2, 'conv2: id mismatch');
+    assert(c2.title === 'QA Discussion', 'conv2: title mismatch');
+    assert(
+      c2.description === 'Quality assurance planning and triage',
+      'conv2: description missing',
+    );
+    assert(c2.project === 'acme/quality', 'conv2: project missing');
+    assert(c2.notes === 'Weekly QA sync notes', 'conv2: notes missing');
+    assert(c2.tags && typeof c2.tags === 'object', 'conv2: tags missing');
+    assert(c2.tags.area === 'qa', 'conv2: tag area=qa missing');
+  }
 
   // 11.5) Testcases
   step++;

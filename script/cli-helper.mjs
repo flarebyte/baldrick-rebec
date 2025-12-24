@@ -210,8 +210,15 @@ export async function blackboardSet({
   return await runRbcJSON(...args);
 }
 
-export async function conversationSet({ title, role = 'user' }) {
-  return await runRbcJSON(
+export async function conversationSet({
+  title,
+  role = 'user',
+  description = '',
+  project = '',
+  tags = '',
+  notes = '',
+}) {
+  const args = [
     'admin',
     'conversation',
     'set',
@@ -219,7 +226,12 @@ export async function conversationSet({ title, role = 'user' }) {
     title,
     '--role',
     role,
-  );
+  ];
+  if (description) args.push('--description', description);
+  if (project) args.push('--project', project);
+  if (tags) args.push('--tags', tags);
+  if (notes) args.push('--notes', notes);
+  return await runRbcJSON(...args);
 }
 
 export async function experimentCreate({ conversation }) {
@@ -840,6 +852,9 @@ export async function conversationListJSON({
   ];
   if (project) args.push('--project', project);
   return await runRbcJSON(...args);
+}
+export async function conversationGetJSON({ id }) {
+  return await runRbcJSON('admin', 'conversation', 'get', '--id', id);
 }
 export async function messageListJSON({
   role,
