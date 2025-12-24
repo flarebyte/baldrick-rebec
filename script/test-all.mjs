@@ -126,6 +126,17 @@ try {
     await dbReset({ dropAppRole: false });
   } else {
     logStep(step, TOTAL, 'Skipping reset (--skip-reset)');
+    // Create a blackboard anchored to the complete-store to surface joined Store fields in the TUI
+    const storeIdFull = sfull.id || sfull.ID || '';
+    if (storeIdFull) {
+      await blackboardSet({
+        role: TEST_ROLE_USER,
+        storeId: storeIdFull,
+        project: 'acme/complete',
+        background: 'Board for complete-store demo',
+        guidelines: 'Keep entries consistent; test UI fields',
+      });
+    }
   }
 
   // 2) Scaffold
@@ -532,6 +543,10 @@ try {
     role: TEST_ROLE_USER,
     title: 'Ideas for acme/build-system',
     description: 'Idea backlog',
+    motivation: 'Capture and prioritize improvement ideas',
+    security: 'Internal only',
+    privacy: 'No PII expected',
+    notes: 'Markdown allowed: keep entries concise',
     type: 'journal',
     scope: 'project',
     lifecycle: 'monthly',
