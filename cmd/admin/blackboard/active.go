@@ -205,6 +205,21 @@ func (m bbActiveModel) View() string {
 		if bb.StoreTitle.Valid {
 			b.WriteString(bStyleStoreLabel.Render("Store.title: ") + bStyleValue.Render(bb.StoreTitle.String) + "\n")
 		}
+		if bb.StoreDesc.Valid {
+			b.WriteString(bStyleStoreLabel.Render("Store.desc: ") + bStyleValue.Render(bb.StoreDesc.String) + "\n")
+		}
+		if bb.StoreMotivation.Valid {
+			b.WriteString(bStyleStoreLabel.Render("Store.motivation: ") + bStyleValue.Render(bb.StoreMotivation.String) + "\n")
+		}
+		if bb.StoreSecurity.Valid {
+			b.WriteString(bStyleStoreLabel.Render("Store.security: ") + bStyleValue.Render(bb.StoreSecurity.String) + "\n")
+		}
+		if bb.StorePrivacy.Valid {
+			b.WriteString(bStyleStoreLabel.Render("Store.privacy: ") + bStyleValue.Render(bb.StorePrivacy.String) + "\n")
+		}
+		if bb.StoreNotes.Valid {
+			b.WriteString(bStyleStoreLabel.Render("Store.notes: ") + bStyleValue.Render(bb.StoreNotes.String) + "\n")
+		}
 		// Role
 		b.WriteString(bStyleLabel.Render("Role: ") + bStyleValue.Render(bb.RoleName) + "\n")
 		// Project (distinct style)
@@ -213,6 +228,9 @@ func (m bbActiveModel) View() string {
 		}
 		if bb.ProjectDesc.Valid {
 			b.WriteString(bStyleProjLabel.Render("Project.desc: ") + bStyleValue.Render(bb.ProjectDesc.String) + "\n")
+		}
+		if bb.ProjectNotes.Valid {
+			b.WriteString(bStyleProjLabel.Render("Project.notes: ") + bStyleValue.Render(bb.ProjectNotes.String) + "\n")
 		}
 		// Conversation (distinct style)
 		if bb.ConversationID.Valid {

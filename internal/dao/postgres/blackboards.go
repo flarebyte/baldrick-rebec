@@ -38,11 +38,17 @@ type BlackboardWithRefs struct {
 	Updated        sql.NullTime
 
 	// Related display fields (all optional)
-	StoreName         sql.NullString // store.name
-	StoreTitle        sql.NullString // store.title
+	StoreName         sql.NullString // stores.name
+	StoreTitle        sql.NullString // stores.title
+	StoreDesc         sql.NullString // stores.description
+	StoreMotivation   sql.NullString // stores.motivation
+	StoreSecurity     sql.NullString // stores.security
+	StorePrivacy      sql.NullString // stores.privacy
+	StoreNotes        sql.NullString // stores.notes
 	TaskVariant       sql.NullString // tasks.variant
 	TaskTitle         sql.NullString // tasks.title
 	ProjectDesc       sql.NullString // projects.description
+	ProjectNotes      sql.NullString // projects.notes
 	ConversationTitle sql.NullString // conversations.title
 }
 
@@ -137,9 +143,9 @@ func ListBlackboardsWithRefs(ctx context.Context, db *pgxpool.Pool, roleName str
             b.id::text, b.store_id::text, b.role_name,
             b.conversation_id::text, b.project_name, b.task_id::text,
             b.background, b.guidelines, b.created, b.updated,
-            s.name, s.title,
+            s.name, s.title, s.description, s.motivation, s.security, s.privacy, s.notes,
             t.variant, t.title,
-            p.description,
+            p.description, p.notes,
             c.title
           FROM blackboards b
           LEFT JOIN stores s ON s.id = b.store_id
@@ -161,9 +167,9 @@ func ListBlackboardsWithRefs(ctx context.Context, db *pgxpool.Pool, roleName str
 			&r.ID, &r.StoreID, &r.RoleName,
 			&r.ConversationID, &r.ProjectName, &r.TaskID,
 			&r.Background, &r.Guidelines, &r.Created, &r.Updated,
-			&r.StoreName, &r.StoreTitle,
+			&r.StoreName, &r.StoreTitle, &r.StoreDesc, &r.StoreMotivation, &r.StoreSecurity, &r.StorePrivacy, &r.StoreNotes,
 			&r.TaskVariant, &r.TaskTitle,
-			&r.ProjectDesc,
+			&r.ProjectDesc, &r.ProjectNotes,
 			&r.ConversationTitle,
 		); err != nil {
 			return nil, dbutil.ErrWrap("blackboard.list_refs.scan", err, dbutil.ParamSummary("role", roleName))
