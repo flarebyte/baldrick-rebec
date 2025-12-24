@@ -2,7 +2,6 @@ package conversation
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -15,9 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	flagConvActiveRole string
-)
+// no flags for now; role is discovered from DB list
 
 // UI styles (reused palette)
 var (
@@ -33,10 +30,6 @@ var activeCmd = &cobra.Command{
 	Use:   "active",
 	Short: "Interactive list of recent conversations for a role",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		role := strings.TrimSpace(flagConvActiveRole)
-		if role == "" {
-			return errors.New("--role is required")
-		}
 		cfg, err := cfgpkg.Load()
 		if err != nil {
 			return err
@@ -58,10 +51,10 @@ var activeCmd = &cobra.Command{
 		for _, r := range roles {
 			roleNames = append(roleNames, r.Name)
 		}
-		// Ensure current role exists in the cycle list
-		if idxOf(roleNames, role) < 0 {
-			roleNames = append([]string{role}, roleNames...)
+		if len(roleNames) == 0 {
+			return fmt.Errorf("no roles found")
 		}
+		role := roleNames[0]
 
 		// Fetch most recent conversations for current role (max 10)
 		convs, err := pgdao.ListConversations(ctx, db, "", role, 10, 0)
@@ -78,10 +71,7 @@ var activeCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	ConversationCmd.AddCommand(activeCmd)
-	activeCmd.Flags().StringVar(&flagConvActiveRole, "role", "", "Role name (required)")
-}
+func init() { ConversationCmd.AddCommand(activeCmd) }
 
 // Model
 type convActiveModel struct {
