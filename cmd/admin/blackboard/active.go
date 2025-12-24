@@ -95,6 +95,10 @@ type bbActiveModel struct {
 	search      string
 	inSearch    bool
 	searchInput string
+	inBoard     bool
+	boardID     string
+	stickies    []pgdao.Stickie
+	stickCursor int
 }
 
 func newBBActiveModel(roles []string, currentRole string, boards []pgdao.BlackboardWithRefs, search string) bbActiveModel {
@@ -116,6 +120,30 @@ func (m bbActiveModel) Init() tea.Cmd { return nil }
 func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.inBoard {
+			switch msg.String() {
+			case "ctrl+c", "q":
+				m.quitting = true
+				return m, tea.Quit
+			case "up", "k":
+				if m.stickCursor > 0 {
+					m.stickCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.stickCursor < len(m.stickies)-1 {
+					m.stickCursor++
+				}
+				return m, nil
+			case "r":
+				return m, refreshStickiesCmd(m.boardID)
+			case "b", "esc":
+				m.inBoard = false
+				return m, nil
+			default:
+				return m, nil
+			}
+		}
 		if m.inSearch {
 			switch msg.Type {
 			case tea.KeyEnter:
@@ -157,6 +185,13 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.inSearch = true
 			m.searchInput = m.search
 			return m, nil
+		case "enter":
+			if m.cursor >= 0 && m.cursor < len(m.boards) {
+				m.inBoard = true
+				m.boardID = m.boards[m.cursor].ID
+				m.stickCursor = 0
+				return m, refreshStickiesCmd(m.boardID)
+			}
 		case "n":
 			// Next role (cycle)
 			if len(m.roles) > 0 {
@@ -195,6 +230,24 @@ func (m bbActiveModel) View() string {
 		currentRole = m.roles[m.roleIdx]
 	}
 	b.WriteString(bStyleLabel.Render("Role: ") + bStyleValue.Render(fmt.Sprintf("[%d/%d] %s", m.roleIdx+1, len(m.roles), currentRole)) + "\n")
+	if m.inBoard {
+		b.WriteString(bStyleLabel.Render("Board: ") + bStyleValue.Render(m.boardID) + "\n")
+		b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
+		b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, b/esc=back, r=refresh, q") + "\n")
+		if len(m.stickies) == 0 {
+			b.WriteString("No stickies.\n")
+			return b.String()
+		}
+		for i, s := range m.stickies {
+			cursor := "  "
+			if i == m.stickCursor {
+				cursor = bStyleCursor.Render("> ")
+			}
+			title := stickieTitle(s)
+			fmt.Fprintf(&b, "%s%s\n", cursor, bStyleValue.Render(title))
+		}
+		return b.String()
+	}
 	// Search line
 	if m.inSearch {
 		b.WriteString(bStyleLabel.Render("Search*: "))
@@ -314,6 +367,7 @@ func (m bbActiveModel) View() string {
 
 // Messages + commands
 type bbRefreshMsg struct{ boards []pgdao.BlackboardWithRefs }
+type stickRefreshMsg struct{ stickies []pgdao.Stickie }
 type bbErrMsg struct{ err error }
 
 func refreshBoardsCmd(role string, search string) tea.Cmd {
@@ -334,6 +388,42 @@ func refreshBoardsCmd(role string, search string) tea.Cmd {
 			return bbErrMsg{err}
 		}
 		return bbRefreshMsg{boards: rows}
+	}
+}
+
+func stickieTitle(s pgdao.Stickie) string {
+	name := strings.TrimSpace(s.ComplexName.Name)
+	if name != "" {
+		v := strings.TrimSpace(s.ComplexName.Variant)
+		if v != "" {
+			return name + "/" + v
+		}
+		return name
+	}
+	if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
+		return s.Note.String
+	}
+	return s.ID
+}
+
+func refreshStickiesCmd(boardID string) tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return bbErrMsg{err}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		db, err := pgdao.OpenApp(ctx, cfg)
+		if err != nil {
+			return bbErrMsg{err}
+		}
+		defer db.Close()
+		rows, err := pgdao.ListStickies(ctx, db, boardID, "", "", 100, 0)
+		if err != nil {
+			return bbErrMsg{err}
+		}
+		return stickRefreshMsg{stickies: rows}
 	}
 }
 
