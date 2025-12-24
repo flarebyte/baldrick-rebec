@@ -214,6 +214,15 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case stickRefreshMsg:
+		m.stickies = msg.stickies
+		if m.stickCursor >= len(m.stickies) {
+			m.stickCursor = len(m.stickies) - 1
+			if m.stickCursor < 0 {
+				m.stickCursor = 0
+			}
+		}
+		return m, nil
 	case bbErrMsg:
 		m.err = msg.err.Error()
 		return m, nil
