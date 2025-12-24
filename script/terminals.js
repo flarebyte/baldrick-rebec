@@ -6,4 +6,8 @@ function launchTerminal({profileName, command}) {
   targetWindow.currentSettings = Terminal.settingsSets.byName(profileName);
 }
 
-launchTerminal({profileName: 'Basic', command: 'ls'})
+const app = Application.currentApplication();
+app.includeStandardAdditions = true;
+const rbcHome = app.systemAttribute('RBC_HOME');
+
+launchTerminal({profileName: 'Basic', command: `cd ${rbcHome};ls`})
