@@ -235,12 +235,7 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 			return m, nil
-		case "tab":
-			m.detailIdx = (m.detailIdx + 1) % 3
-			return m, nil
-		case "shift+tab":
-			m.detailIdx = (m.detailIdx + 2) % 3
-			return m, nil
+			// Removed tab/shift+tab field cycling to simplify UX
 		case "1":
 			// Add new h1 block
 			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindH1), Value: "", Disabled: false}
@@ -297,20 +292,22 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter", "e":
-			// Begin editing selected text field (value/id). Kind cannot be changed
+			// Edit value directly
 			if len(m.blocks) == 0 {
 				return m, nil
 			}
-			switch m.detailIdx {
-			case 0: // value
-				m.editing = true
-				m.editBuffer = m.blocks[m.cursor].Value
-			case 1: // id
-				m.editing = true
-				m.editBuffer = m.blocks[m.cursor].ID
-			default:
-				// no-op
+			m.detailIdx = 0
+			m.editing = true
+			m.editBuffer = m.blocks[m.cursor].Value
+			return m, nil
+		case "i":
+			// Edit ID directly
+			if len(m.blocks) == 0 {
+				return m, nil
 			}
+			m.detailIdx = 1
+			m.editing = true
+			m.editBuffer = m.blocks[m.cursor].ID
 			return m, nil
 		case "x":
 			// Toggle disable
@@ -378,7 +375,7 @@ func (m promptModel) View() string {
 		return b.String()
 	}
 	b.WriteString(pStyleHeader.Render("Prompt Designer") + "\n")
-	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, 1=h1, 2=body, 3=testcase, 4=stickie, d=del, [=up, ]=down, tab/shift+tab=field, e/enter=edit (value/id), x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
+	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, 1=h1, 2=body, 3=testcase, 4=stickie, d=del, [=up, ]=down, enter/e=edit value, i=edit id, x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
 	b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 	if m.inQuickAdd {
 		b.WriteString(pStyleLabel.Render("Quick add UUIDs*: "))
