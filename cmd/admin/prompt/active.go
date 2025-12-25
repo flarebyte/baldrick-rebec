@@ -43,11 +43,10 @@ var allKinds = []BlockKind{KindH1, KindBody, KindTestcase, KindStickie}
 
 // DesignBlock represents a prompt designer block
 type DesignBlock struct {
-	ID       string   `json:"id"`
-	Kind     string   `json:"kind"`
-	Value    string   `json:"value"`
-	Scripts  []string `json:"scripts"`
-	Disabled bool     `json:"disabled"`
+	ID       string `json:"id"`
+	Kind     string `json:"kind"`
+	Value    string `json:"value"`
+	Disabled bool   `json:"disabled"`
 }
 
 // Command
@@ -83,7 +82,7 @@ type promptModel struct {
 	export    bool // if true, print JSON on exit
 	inPreview bool
 
-	// detail pane selection 0..4 (id, kind, value, scripts, disabled)
+	// detail pane selection 0..3 (id, kind, value, disabled)
 	detailIdx int
 	// inline text editing state
 	editing    bool
@@ -113,7 +112,6 @@ func newDefaultBlock() DesignBlock {
 		ID:       uuid.NewString(),
 		Kind:     string(KindH1),
 		Value:    "",
-		Scripts:  []string{},
 		Disabled: false,
 	}
 }
@@ -188,10 +186,10 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "tab":
-			m.detailIdx = (m.detailIdx + 1) % 5
+			m.detailIdx = (m.detailIdx + 1) % 4
 			return m, nil
 		case "shift+tab":
-			m.detailIdx = (m.detailIdx + 4) % 5
+			m.detailIdx = (m.detailIdx + 3) % 4
 			return m, nil
 		case "a":
 			// Add after current
@@ -237,7 +235,7 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter", "e":
-			// Begin editing selected text field (id/value/scripts). Kind/bool handled via keys
+			// Begin editing selected text field (id/value). Kind/bool handled via keys
 			if len(m.blocks) == 0 {
 				return m, nil
 			}
@@ -248,9 +246,6 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case 2: // value
 				m.editing = true
 				m.editBuffer = m.blocks[m.cursor].Value
-			case 3: // scripts (CSV)
-				m.editing = true
-				m.editBuffer = strings.Join(m.blocks[m.cursor].Scripts, ", ")
 			default:
 				// no-op; for kind/bool use dedicated keys
 			}
@@ -356,8 +351,7 @@ func (m promptModel) View() string {
 		} else {
 			b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
 		}
-		b.WriteString(renderField(3, "Scripts: ", strings.Join(blk.Scripts, ", ")) + "\n")
-		b.WriteString(renderField(4, "Disabled: ", fmt.Sprintf("%v", blk.Disabled)) + "\n")
+		b.WriteString(renderField(3, "Disabled: ", fmt.Sprintf("%v", blk.Disabled)) + "\n")
 
 		if m.editing {
 			b.WriteString(pStyleHelp.Render("Editing: ") + pStyleValue.Render(m.editBuffer) + "\n")
@@ -543,21 +537,6 @@ func (m promptModel) commitEdit() promptModel {
 			case string(KindStickie):
 				m.pendingStickID = id
 			}
-		}
-	case 3: // scripts CSV
-		txt := strings.TrimSpace(m.editBuffer)
-		if txt == "" {
-			m.blocks[m.cursor].Scripts = []string{}
-		} else {
-			parts := strings.Split(txt, ",")
-			out := make([]string, 0, len(parts))
-			for _, p := range parts {
-				s := strings.TrimSpace(p)
-				if s != "" {
-					out = append(out, s)
-				}
-			}
-			m.blocks[m.cursor].Scripts = out
 		}
 	}
 	m.editing = false
