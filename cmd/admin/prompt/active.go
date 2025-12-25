@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	btextarea "github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
@@ -86,8 +87,10 @@ type promptModel struct {
 	// detail pane selection 0..2 (value, id, disabled)
 	detailIdx int
 	// inline text editing state
-	editing    bool
-	editBuffer string
+	editing        bool
+	editBuffer     string
+	editIsTextarea bool
+	ta             btextarea.Model
 	// which field is being edited (same as detailIdx when editing text)
 
 	// Loaded testcase cache by ID
@@ -122,49 +125,81 @@ func (m promptModel) Init() tea.Cmd { return nil }
 func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Editing mode: capture text
+		// Editing mode: capture text (textarea for text kind)
 		if m.editing {
-			switch msg.Type {
-			case tea.KeyEnter:
-				// Commit edit; may trigger async fetch
-				m = m.commitEdit()
-				var cmds []tea.Cmd
-				if id := strings.TrimSpace(m.pendingTCID); id != "" {
-					cmds = append(cmds, fetchTestcaseCmd(id))
-					m.pendingTCID = ""
+			if m.editIsTextarea {
+				switch msg.Type {
+				case tea.KeyCtrlS:
+					// Save textarea
+					m = m.commitEdit()
+					m.ta.Blur()
+					var cmds []tea.Cmd
+					if id := strings.TrimSpace(m.pendingTCID); id != "" {
+						cmds = append(cmds, fetchTestcaseCmd(id))
+						m.pendingTCID = ""
+					}
+					if id := strings.TrimSpace(m.pendingStickID); id != "" {
+						cmds = append(cmds, fetchStickieCmd(id))
+						m.pendingStickID = ""
+					}
+					if len(cmds) > 0 {
+						return m, tea.Batch(cmds...)
+					}
+					return m, nil
+				case tea.KeyEsc:
+					// Cancel textarea edit
+					m.editing = false
+					m.editIsTextarea = false
+					m.ta.Blur()
+					return m, nil
+				default:
+					var cmd tea.Cmd
+					m.ta, cmd = m.ta.Update(msg)
+					return m, cmd
 				}
-				if id := strings.TrimSpace(m.pendingStickID); id != "" {
-					cmds = append(cmds, fetchStickieCmd(id))
-					m.pendingStickID = ""
+			} else {
+				switch msg.Type {
+				case tea.KeyEnter:
+					// Commit edit; may trigger async fetch
+					m = m.commitEdit()
+					var cmds []tea.Cmd
+					if id := strings.TrimSpace(m.pendingTCID); id != "" {
+						cmds = append(cmds, fetchTestcaseCmd(id))
+						m.pendingTCID = ""
+					}
+					if id := strings.TrimSpace(m.pendingStickID); id != "" {
+						cmds = append(cmds, fetchStickieCmd(id))
+						m.pendingStickID = ""
+					}
+					if len(cmds) > 0 {
+						return m, tea.Batch(cmds...)
+					}
+					return m, nil
+				case tea.KeyEsc:
+					// Cancel edit
+					m.editing = false
+					m.editBuffer = ""
+					return m, nil
+				case tea.KeyBackspace, tea.KeyDelete, tea.KeyCtrlH:
+					if len(m.editBuffer) > 0 {
+						m.editBuffer = m.editBuffer[:len(m.editBuffer)-1]
+					}
+					return m, nil
+				case tea.KeyCtrlU:
+					m.editBuffer = ""
+					return m, nil
+				case tea.KeySpace:
+					// Accept spaces explicitly (some terminals send KeySpace, not KeyRunes)
+					m.editBuffer += " "
+					return m, nil
+				case tea.KeyRunes:
+					if len(msg.Runes) > 0 {
+						m.editBuffer += string(msg.Runes)
+					}
+					return m, nil
+				default:
+					return m, nil
 				}
-				if len(cmds) > 0 {
-					return m, tea.Batch(cmds...)
-				}
-				return m, nil
-			case tea.KeyEsc:
-				// Cancel edit
-				m.editing = false
-				m.editBuffer = ""
-				return m, nil
-			case tea.KeyBackspace, tea.KeyDelete, tea.KeyCtrlH:
-				if len(m.editBuffer) > 0 {
-					m.editBuffer = m.editBuffer[:len(m.editBuffer)-1]
-				}
-				return m, nil
-			case tea.KeyCtrlU:
-				m.editBuffer = ""
-				return m, nil
-			case tea.KeySpace:
-				// Accept spaces explicitly (some terminals send KeySpace, not KeyRunes)
-				m.editBuffer += " "
-				return m, nil
-			case tea.KeyRunes:
-				if len(msg.Runes) > 0 {
-					m.editBuffer += string(msg.Runes)
-				}
-				return m, nil
-			default:
-				return m, nil
 			}
 		}
 		// Quick add mode: capture UUID list input
@@ -273,13 +308,25 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter", "e":
-			// Edit value directly
+			// Edit value directly (textarea for text blocks)
 			if len(m.blocks) == 0 {
 				return m, nil
 			}
 			m.detailIdx = 0
-			m.editing = true
-			m.editBuffer = m.blocks[m.cursor].Value
+			blk := m.blocks[m.cursor]
+			if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindText) {
+				m.ta = btextarea.New()
+				m.ta.Placeholder = "Enter markdown…"
+				m.ta.CharLimit = 0
+				m.ta.SetValue(blk.Value)
+				m.ta.Focus()
+				m.editIsTextarea = true
+				m.editing = true
+			} else {
+				m.editing = true
+				m.editIsTextarea = false
+				m.editBuffer = blk.Value
+			}
 			return m, nil
 		case "i":
 			// Edit ID directly
@@ -397,7 +444,12 @@ func (m promptModel) View() string {
 		}
 
 		// Value first; for testcase/stickie, show resolved title/note if available
-		if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindTestcase) {
+		if m.editing && m.editIsTextarea && m.detailIdx == 0 && strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindText) {
+			// Show textarea when editing text value
+			b.WriteString(pStyleLabel.Render("Value*: ") + "\n")
+			b.WriteString(m.ta.View() + "\n")
+			b.WriteString(pStyleHelp.Render("ctrl+s=apply, esc=cancel") + "\n")
+		} else if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindTestcase) {
 			if tc, ok := m.tcCache[strings.TrimSpace(blk.Value)]; ok && strings.TrimSpace(tc.Title) != "" {
 				b.WriteString(renderField(0, "Value: ", blk.Value) + "\n")
 				b.WriteString(pStyleLabel.Render("  ↳ Testcase.title: ") + pStyleTCTitle.Render(tc.Title) + "\n")
@@ -425,7 +477,7 @@ func (m promptModel) View() string {
 		b.WriteString(renderField(1, "ID: ", blk.ID) + "\n")
 		b.WriteString(renderField(2, "Disabled: ", fmt.Sprintf("%v", blk.Disabled)) + "\n")
 
-		if m.editing {
+		if m.editing && !(m.editIsTextarea && m.detailIdx == 0 && strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindText)) {
 			b.WriteString(pStyleHelp.Render("Editing: ") + pStyleValue.Render(m.editBuffer) + "\n")
 			b.WriteString(pStyleHelp.Render("enter=apply, esc=cancel, ctrl+u=clear"))
 			b.WriteString("\n")
@@ -623,7 +675,12 @@ func (m promptModel) commitEdit() promptModel {
 	}
 	switch m.detailIdx {
 	case 0: // value
-		m.blocks[m.cursor].Value = m.editBuffer
+		if m.editIsTextarea {
+			m.blocks[m.cursor].Value = m.ta.Value()
+			m.editIsTextarea = false
+		} else {
+			m.blocks[m.cursor].Value = m.editBuffer
+		}
 		// If this is a testcase or stickie block and looks like a UUID, schedule fetch
 		blk := m.blocks[m.cursor]
 		id := strings.TrimSpace(m.blocks[m.cursor].Value)
