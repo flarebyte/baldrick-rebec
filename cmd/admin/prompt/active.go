@@ -241,18 +241,6 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
 			m.detailIdx = 0 // focus value
 			return m, nil
-		case "2":
-			// Add new testcase block
-			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindTestcase), Value: "", Disabled: false}
-			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
-			m.detailIdx = 0
-			return m, nil
-		case "3":
-			// Add new stickie block
-			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindStickie), Value: "", Disabled: false}
-			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
-			m.detailIdx = 0
-			return m, nil
 		case "d":
 			// Delete current
 			if len(m.blocks) > 0 {
@@ -368,7 +356,7 @@ func (m promptModel) View() string {
 		return b.String()
 	}
 	b.WriteString(pStyleHeader.Render("Prompt Designer") + "\n")
-	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, 1=text, 2=testcase, 3=stickie, d=del, [=up, ]=down, enter/e=edit value, i=edit id, x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
+	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, 1=text, d=del, [=up, ]=down, enter/e=edit value, i=edit id, x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
 	b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 	if m.inQuickAdd {
 		b.WriteString(pStyleLabel.Render("Quick add UUIDs*: "))
@@ -379,7 +367,7 @@ func (m promptModel) View() string {
 
 	// List of blocks
 	if len(m.blocks) == 0 {
-		b.WriteString("No blocks. Use 1/2/3 to add.\n")
+		b.WriteString("No blocks. Use 1 to add text, or 'u' to quick add UUIDs.\n")
 		return b.String()
 	}
 	for i, blk := range m.blocks {
