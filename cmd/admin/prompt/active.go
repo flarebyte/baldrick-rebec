@@ -18,14 +18,15 @@ import (
 
 // Styles
 var (
-	pStyleHeader  = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)   // cyan
-	pStyleLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Bold(true)    // gray
-	pStyleValue   = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))               // white-ish
-	pStyleHelp    = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Italic(true)  // dim italic
-	pStyleCursor  = lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true)   // magenta
-	pStyleDivider = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))               // gray line
-	pStyleWarn    = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true)    // red
-	pStyleTCTitle = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Italic(true) // cyan italic
+	pStyleHeader    = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)   // cyan
+	pStyleLabel     = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Bold(true)    // gray
+	pStyleValue     = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))               // white-ish
+	pStyleHelp      = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Italic(true)  // dim italic
+	pStyleCursor    = lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true)   // magenta
+	pStyleDivider   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))               // gray line
+	pStyleWarn      = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true)    // red
+	pStyleTCTitle   = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Italic(true) // cyan italic
+	pStyleStickNote = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Italic(true) // green italic
 )
 
 // BlockKind enumerates allowed kinds for blocks
@@ -92,13 +93,18 @@ type promptModel struct {
 	tcCache map[string]pgdao.Testcase
 	// pending fetch id (set after edit commit)
 	pendingTCID string
+
+	// Loaded stickie cache by ID
+	stickCache map[string]pgdao.Stickie
+	// pending stickie id
+	pendingStickID string
 }
 
 func newPromptModel(initial []DesignBlock) promptModel {
 	if len(initial) == 0 {
 		initial = []DesignBlock{newDefaultBlock()}
 	}
-	return promptModel{blocks: initial, cursor: 0, detailIdx: 0, tcCache: map[string]pgdao.Testcase{}}
+	return promptModel{blocks: initial, cursor: 0, detailIdx: 0, tcCache: map[string]pgdao.Testcase{}, stickCache: map[string]pgdao.Stickie{}}
 }
 
 func newDefaultBlock() DesignBlock {
@@ -122,10 +128,17 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case tea.KeyEnter:
 				// Commit edit; may trigger async fetch
 				m = m.commitEdit()
+				var cmds []tea.Cmd
 				if id := strings.TrimSpace(m.pendingTCID); id != "" {
-					cmd := fetchTestcaseCmd(id)
+					cmds = append(cmds, fetchTestcaseCmd(id))
 					m.pendingTCID = ""
-					return m, cmd
+				}
+				if id := strings.TrimSpace(m.pendingStickID); id != "" {
+					cmds = append(cmds, fetchStickieCmd(id))
+					m.pendingStickID = ""
+				}
+				if len(cmds) > 0 {
+					return m, tea.Batch(cmds...)
 				}
 				return m, nil
 			case tea.KeyEsc:
@@ -240,6 +253,12 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.tcCache[msg.id] = msg.tc
 		return m, nil
+	case stickLoadedMsg:
+		if m.stickCache == nil {
+			m.stickCache = map[string]pgdao.Stickie{}
+		}
+		m.stickCache[msg.id] = msg.s
+		return m, nil
 	case tcErrMsg:
 		// silently ignore; user can correct ID
 		return m, nil
@@ -286,11 +305,23 @@ func (m promptModel) View() string {
 
 		b.WriteString(renderField(0, "ID: ", blk.ID) + "\n")
 		b.WriteString(renderField(1, "Kind: ", blk.Kind) + "\n")
-		// Value line; for testcase, show resolved title if available
+		// Value line; for testcase/stickie, show resolved title/note if available
 		if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindTestcase) {
 			if tc, ok := m.tcCache[strings.TrimSpace(blk.Value)]; ok && strings.TrimSpace(tc.Title) != "" {
 				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
 				b.WriteString(pStyleLabel.Render("  ↳ Testcase.title: ") + pStyleTCTitle.Render(tc.Title) + "\n")
+			} else {
+				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+			}
+		} else if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindStickie) {
+			if st, ok := m.stickCache[strings.TrimSpace(blk.Value)]; ok && st.Note.Valid && strings.TrimSpace(st.Note.String) != "" {
+				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+				// Truncate long notes for display
+				note := strings.TrimSpace(st.Note.String)
+				if len(note) > 80 {
+					note = note[:80] + "…"
+				}
+				b.WriteString(pStyleLabel.Render("  ↳ Stickie.note: ") + pStyleStickNote.Render(note) + "\n")
 			} else {
 				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
 			}
@@ -339,7 +370,15 @@ func (m promptModel) summarizeBlock(b DesignBlock) string {
 		if strings.TrimSpace(b.Value) == "" {
 			return "stickie: <uuid>"
 		}
-		return "stickie: " + b.Value
+		id := strings.TrimSpace(b.Value)
+		if st, ok := m.stickCache[id]; ok && st.Note.Valid && strings.TrimSpace(st.Note.String) != "" {
+			note := strings.TrimSpace(st.Note.String)
+			if len(note) > 40 {
+				note = note[:40] + "…"
+			}
+			return "stickie: " + id + " — " + pStyleStickNote.Render(note)
+		}
+		return "stickie: " + id
 	default:
 		if strings.TrimSpace(b.Value) != "" {
 			return b.Kind + ": " + b.Value
@@ -369,12 +408,15 @@ func (m promptModel) commitEdit() promptModel {
 		m.blocks[m.cursor].ID = strings.TrimSpace(m.editBuffer)
 	case 2: // value
 		m.blocks[m.cursor].Value = m.editBuffer
-		// If this is a testcase block and looks like a UUID, schedule fetch
+		// If this is a testcase or stickie block and looks like a UUID, schedule fetch
 		blk := m.blocks[m.cursor]
-		if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindTestcase) {
-			id := strings.TrimSpace(m.blocks[m.cursor].Value)
-			if _, err := uuid.Parse(id); err == nil {
+		id := strings.TrimSpace(m.blocks[m.cursor].Value)
+		if _, err := uuid.Parse(id); err == nil {
+			switch strings.ToLower(strings.TrimSpace(blk.Kind)) {
+			case string(KindTestcase):
 				m.pendingTCID = id
+			case string(KindStickie):
+				m.pendingStickID = id
 			}
 		}
 	case 3: // scripts CSV
@@ -404,6 +446,10 @@ type tcLoadedMsg struct {
 	tc pgdao.Testcase
 }
 type tcErrMsg struct{ err error }
+type stickLoadedMsg struct {
+	id string
+	s  pgdao.Stickie
+}
 
 // fetchTestcaseCmd loads a testcase by ID from Postgres
 func fetchTestcaseCmd(id string) tea.Cmd {
@@ -427,6 +473,30 @@ func fetchTestcaseCmd(id string) tea.Cmd {
 			return tcErrMsg{fmt.Errorf("testcase %s not found", id)}
 		}
 		return tcLoadedMsg{id: id, tc: *row}
+	}
+}
+
+func fetchStickieCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		ctx := contextForShort()
+		defer ctx.cancel()
+		db, err := pgdao.OpenApp(ctx.ctx, cfg)
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		defer db.Close()
+		st, err := pgdao.GetStickieByID(ctx.ctx, db, id)
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		if st == nil {
+			return tcErrMsg{fmt.Errorf("stickie %s not found", id)}
+		}
+		return stickLoadedMsg{id: id, s: *st}
 	}
 }
 
