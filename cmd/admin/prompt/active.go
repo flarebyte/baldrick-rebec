@@ -33,13 +33,12 @@ var (
 type BlockKind string
 
 const (
-	KindH1       BlockKind = "h1"
-	KindBody     BlockKind = "body"
+	KindText     BlockKind = "text"
 	KindTestcase BlockKind = "testcase"
 	KindStickie  BlockKind = "stickie"
 )
 
-var allKinds = []BlockKind{KindH1, KindBody, KindTestcase, KindStickie}
+var allKinds = []BlockKind{KindText, KindTestcase, KindStickie}
 
 // DesignBlock represents a prompt designer block
 type DesignBlock struct {
@@ -112,7 +111,7 @@ func newPromptModel(initial []DesignBlock) promptModel {
 func newDefaultBlock() DesignBlock {
 	return DesignBlock{
 		ID:       uuid.NewString(),
-		Kind:     string(KindH1),
+		Kind:     string(KindText),
 		Value:    "",
 		Disabled: false,
 	}
@@ -237,24 +236,18 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 			// Removed tab/shift+tab field cycling to simplify UX
 		case "1":
-			// Add new h1 block
-			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindH1), Value: "", Disabled: false}
+			// Add new text block
+			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindText), Value: "", Disabled: false}
 			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
 			m.detailIdx = 0 // focus value
 			return m, nil
 		case "2":
-			// Add new body block
-			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindBody), Value: "", Disabled: false}
-			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
-			m.detailIdx = 0
-			return m, nil
-		case "3":
 			// Add new testcase block
 			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindTestcase), Value: "", Disabled: false}
 			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
 			m.detailIdx = 0
 			return m, nil
-		case "4":
+		case "3":
 			// Add new stickie block
 			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindStickie), Value: "", Disabled: false}
 			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
@@ -375,7 +368,7 @@ func (m promptModel) View() string {
 		return b.String()
 	}
 	b.WriteString(pStyleHeader.Render("Prompt Designer") + "\n")
-	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, 1=h1, 2=body, 3=testcase, 4=stickie, d=del, [=up, ]=down, enter/e=edit value, i=edit id, x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
+	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, 1=text, 2=testcase, 3=stickie, d=del, [=up, ]=down, enter/e=edit value, i=edit id, x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
 	b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 	if m.inQuickAdd {
 		b.WriteString(pStyleLabel.Render("Quick add UUIDs*: "))
@@ -386,7 +379,7 @@ func (m promptModel) View() string {
 
 	// List of blocks
 	if len(m.blocks) == 0 {
-		b.WriteString("No blocks. Use 1/2/3/4 to add.\n")
+		b.WriteString("No blocks. Use 1/2/3 to add.\n")
 		return b.String()
 	}
 	for i, blk := range m.blocks {
@@ -463,13 +456,7 @@ func (m promptModel) renderPreview() string {
 		kind := strings.ToLower(strings.TrimSpace(blk.Kind))
 		val := strings.TrimSpace(blk.Value)
 		switch kind {
-		case string(KindH1):
-			if val != "" {
-				out.WriteString("# ")
-				out.WriteString(val)
-				out.WriteString("\n\n")
-			}
-		case string(KindBody):
+		case string(KindText):
 			if val != "" {
 				out.WriteString(val)
 				out.WriteString("\n\n")
@@ -590,20 +577,15 @@ func parseUUIDs(s string) []string {
 
 func (m promptModel) summarizeBlock(b DesignBlock) string {
 	switch strings.ToLower(strings.TrimSpace(b.Kind)) {
-	case string(KindH1):
-		if strings.TrimSpace(b.Value) == "" {
-			return "h1: <title>"
-		}
-		return "h1: " + b.Value
-	case string(KindBody):
+	case string(KindText):
 		v := strings.TrimSpace(b.Value)
 		if v == "" {
-			return "body: <text>"
+			return "text: <markdown>"
 		}
 		if len(v) > 40 {
 			v = v[:40] + "…"
 		}
-		return "body: " + v
+		return "text: " + v
 	case string(KindTestcase):
 		id := strings.TrimSpace(b.Value)
 		if id == "" {
