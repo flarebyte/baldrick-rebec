@@ -307,6 +307,34 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 			return m, nil
+		case "c":
+			// Convert current testcase/stickie block to a text block using preview text
+			if len(m.blocks) == 0 {
+				return m, nil
+			}
+			blk := m.blocks[m.cursor]
+			k := strings.ToLower(strings.TrimSpace(blk.Kind))
+			id := strings.TrimSpace(blk.Value)
+			switch BlockKind(k) {
+			case KindTestcase:
+				if tc, ok := m.tcCache[id]; ok {
+					text := previewTestcaseText(tc)
+					m.blocks[m.cursor].Kind = string(KindText)
+					m.blocks[m.cursor].Value = text
+					return m, nil
+				}
+				return m, convertCurrentToTextCmd(KindTestcase, id, m.cursor)
+			case KindStickie:
+				if st, ok := m.stickCache[id]; ok {
+					text := previewStickieText(st)
+					m.blocks[m.cursor].Kind = string(KindText)
+					m.blocks[m.cursor].Value = text
+					return m, nil
+				}
+				return m, convertCurrentToTextCmd(KindStickie, id, m.cursor)
+			default:
+				return m, nil
+			}
 		case "enter", "e":
 			// Edit value directly (textarea for text blocks)
 			if len(m.blocks) == 0 {
@@ -386,6 +414,16 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			return m, nil
 		}
+	case convertDoneMsg:
+		// Verify index and that block hasn't changed type/value unexpectedly
+		if msg.idx >= 0 && msg.idx < len(m.blocks) {
+			b := m.blocks[msg.idx]
+			if strings.ToLower(strings.TrimSpace(b.Kind)) == strings.ToLower(string(msg.kind)) && strings.TrimSpace(b.Value) == strings.TrimSpace(msg.id) {
+				m.blocks[msg.idx].Kind = string(KindText)
+				m.blocks[msg.idx].Value = msg.text
+			}
+		}
+		return m, nil
 	case tcErrMsg:
 		// silently ignore; user can correct ID
 		return m, nil
@@ -403,7 +441,7 @@ func (m promptModel) View() string {
 		return b.String()
 	}
 	b.WriteString(pStyleHeader.Render("Prompt Designer") + "\n")
-	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, 1=text, d=del, [=up, ]=down, enter/e=edit value, i=edit id, x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
+	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, 1=text, d=del, [=up, ]=down, enter/e=edit value, i=edit id, c=convert to text, x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
 	b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 	if m.inQuickAdd {
 		b.WriteString(pStyleLabel.Render("Quick add UUIDs*: "))
@@ -577,6 +615,70 @@ func (m promptModel) renderPreview() string {
 	return out.String()
 }
 
+// Helpers to generate preview text for a single entity
+func previewTestcaseText(tc pgdao.Testcase) string {
+	var out strings.Builder
+	title := strings.TrimSpace(tc.Title)
+	if title == "" {
+		return ""
+	}
+	out.WriteString(title)
+	out.WriteString("\n")
+	if strings.TrimSpace(tc.Status) != "" {
+		out.WriteString("- Status: ")
+		out.WriteString(strings.TrimSpace(tc.Status))
+		out.WriteString("\n")
+	}
+	if tc.Name.Valid && strings.TrimSpace(tc.Name.String) != "" {
+		out.WriteString("- Name: ")
+		out.WriteString(strings.TrimSpace(tc.Name.String))
+		out.WriteString("\n")
+	}
+	if tc.Package.Valid && strings.TrimSpace(tc.Package.String) != "" {
+		out.WriteString("- Package: ")
+		out.WriteString(strings.TrimSpace(tc.Package.String))
+		out.WriteString("\n")
+	}
+	if tc.Classname.Valid && strings.TrimSpace(tc.Classname.String) != "" {
+		out.WriteString("- Classname: ")
+		out.WriteString(strings.TrimSpace(tc.Classname.String))
+		out.WriteString("\n")
+	}
+	if tc.File.Valid && strings.TrimSpace(tc.File.String) != "" {
+		out.WriteString("- File: ")
+		out.WriteString(strings.TrimSpace(tc.File.String))
+		if tc.Line.Valid {
+			out.WriteString(":" + fmt.Sprintf("%d", tc.Line.Int64))
+		}
+		out.WriteString("\n")
+	}
+	if tc.ErrorMessage.Valid && strings.TrimSpace(tc.ErrorMessage.String) != "" {
+		out.WriteString("- Error: ")
+		out.WriteString(strings.TrimSpace(tc.ErrorMessage.String))
+		out.WriteString("\n")
+	}
+	out.WriteString("\n")
+	return out.String()
+}
+
+func previewStickieText(st pgdao.Stickie) string {
+	var out strings.Builder
+	if st.Note.Valid {
+		note := strings.TrimSpace(st.Note.String)
+		if note != "" {
+			out.WriteString(note)
+			out.WriteString("\n")
+		}
+	}
+	if st.PriorityLevel.Valid && strings.TrimSpace(st.PriorityLevel.String) != "" {
+		out.WriteString("- Priority: ")
+		out.WriteString(strings.TrimSpace(st.PriorityLevel.String))
+		out.WriteString("\n")
+	}
+	out.WriteString("\n")
+	return out.String()
+}
+
 // hasBlock returns true if a block with the given kind and value already exists
 func (m promptModel) hasBlock(kind BlockKind, value string) bool {
 	kv := strings.ToLower(strings.TrimSpace(string(kind)))
@@ -717,6 +819,13 @@ type quickAddResult struct {
 	st   *pgdao.Stickie
 }
 
+type convertDoneMsg struct {
+	idx  int
+	kind BlockKind
+	id   string
+	text string
+}
+
 // fetchTestcaseCmd loads a testcase by ID from Postgres
 func fetchTestcaseCmd(id string) tea.Cmd {
 	return func() tea.Msg {
@@ -787,6 +896,39 @@ func detectAndLoadByIDCmd(id string) tea.Cmd {
 			return quickAddResult{id: id, kind: KindStickie, st: st}
 		}
 		return quickAddResult{id: id, kind: ""}
+	}
+}
+
+// convertCurrentToTextCmd loads the entity by id and returns a convertDoneMsg with generated text
+func convertCurrentToTextCmd(kind BlockKind, id string, idx int) tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		ctx := contextForShort()
+		defer ctx.cancel()
+		db, err := pgdao.OpenApp(ctx.ctx, cfg)
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		defer db.Close()
+		switch kind {
+		case KindTestcase:
+			tc, err := pgdao.GetTestcaseByID(ctx.ctx, db, id)
+			if err != nil || tc == nil {
+				return tcErrMsg{fmt.Errorf("cannot load testcase %s", id)}
+			}
+			return convertDoneMsg{idx: idx, kind: KindTestcase, id: id, text: previewTestcaseText(*tc)}
+		case KindStickie:
+			st, err := pgdao.GetStickieByID(ctx.ctx, db, id)
+			if err != nil || st == nil {
+				return tcErrMsg{fmt.Errorf("cannot load stickie %s", id)}
+			}
+			return convertDoneMsg{idx: idx, kind: KindStickie, id: id, text: previewStickieText(*st)}
+		default:
+			return tcErrMsg{fmt.Errorf("unsupported convert kind")}
+		}
 	}
 }
 
