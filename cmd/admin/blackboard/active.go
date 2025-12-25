@@ -106,6 +106,9 @@ type bbActiveModel struct {
 	noteSearch   string
 	inNoteSearch bool
 	noteInput    string
+	// Multi-select mode in board view
+	inSelect bool
+	selected map[string]bool // stickieID -> selected
 }
 
 func newBBActiveModel(roles []string, currentRole string, boards []pgdao.BlackboardWithRefs, search string) bbActiveModel {
@@ -119,7 +122,7 @@ func newBBActiveModel(roles []string, currentRole string, boards []pgdao.Blackbo
 	if idx < 0 {
 		idx = 0
 	}
-	return bbActiveModel{roles: roles, roleIdx: idx, boards: boards, search: search, inSearch: false, searchInput: search}
+	return bbActiveModel{roles: roles, roleIdx: idx, boards: boards, search: search, inSearch: false, searchInput: search, selected: map[string]bool{}}
 }
 
 func (m bbActiveModel) Init() tea.Cmd { return nil }
@@ -192,6 +195,40 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "b", "esc":
 				m.inBoard = false
 				return m, nil
+			case "m":
+				// Toggle multi-select mode
+				m.inSelect = !m.inSelect
+				return m, nil
+			case " ":
+				// Toggle selection for current stickie when in select mode
+				if m.inSelect {
+					idxs := m.filteredStickyIndices()
+					if m.stickCursor >= 0 && m.stickCursor < len(idxs) {
+						s := m.stickies[idxs[m.stickCursor]]
+						if m.selected == nil {
+							m.selected = map[string]bool{}
+						}
+						m.selected[s.ID] = !m.selected[s.ID]
+					}
+					return m, nil
+				}
+			case "a":
+				// Select all visible when in select mode
+				if m.inSelect {
+					if m.selected == nil {
+						m.selected = map[string]bool{}
+					}
+					for _, i := range m.filteredStickyIndices() {
+						m.selected[m.stickies[i].ID] = true
+					}
+					return m, nil
+				}
+			case "n":
+				// Clear selection
+				if m.inSelect {
+					m.selected = map[string]bool{}
+					return m, nil
+				}
 			default:
 				return m, nil
 			}
@@ -313,7 +350,7 @@ func (m bbActiveModel) View() string {
 			b.WriteString(bStyleLabel.Render("Search.note: ") + bStyleValue.Render(m.noteSearch) + bStyleHelp.Render(" (/ to edit)") + "\n")
 		}
 		b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
-		b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, /=search, t=topic, b/esc=back, r=refresh, q") + "\n")
+		b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, /=search, t=topic, m=multi-select, space=toggle, a=all, n=none, b/esc=back, r=refresh, q") + "\n")
 		filtered := m.filteredStickyIndices()
 		if len(m.stickies) == 0 || len(filtered) == 0 {
 			b.WriteString("No stickies.\n")
@@ -326,7 +363,16 @@ func (m bbActiveModel) View() string {
 				cursor = bStyleCursor.Render("> ")
 			}
 			title := stickieTitle(s)
-			fmt.Fprintf(&b, "%s%s\n", cursor, bStyleValue.Render(title))
+			// Selection marker
+			if m.inSelect {
+				mark := "[ ]"
+				if m.selected != nil && m.selected[s.ID] {
+					mark = "[x]"
+				}
+				fmt.Fprintf(&b, "%s%s %s\n", cursor, mark, bStyleValue.Render(title))
+			} else {
+				fmt.Fprintf(&b, "%s%s\n", cursor, bStyleValue.Render(title))
+			}
 		}
 		// Details for selected stickie
 		if m.stickCursor >= 0 && m.stickCursor < len(filtered) {
@@ -377,6 +423,12 @@ func (m bbActiveModel) View() string {
 			}
 			b.WriteString(bStyleLabel.Render("Edits: ") + bStyleValue.Render(fmt.Sprintf("%d", st.EditCount)) + "\n")
 			b.WriteString(bStyleLabel.Render("Archived: ") + bStyleValue.Render(fmt.Sprintf("%v", st.Archived)) + "\n")
+		}
+		// Selected UUIDs line
+		if m.inSelect {
+			b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
+			b.WriteString(bStyleHeader.Render("Selected UUIDs") + "\n")
+			b.WriteString(bStyleValue.Render(strings.Join(m.selectedIDsInOrder(filtered), " ")) + "\n")
 		}
 		return b.String()
 	}
@@ -655,4 +707,19 @@ func (m *bbActiveModel) recomputeTopicOptions() {
 	if m.topicIdx >= len(m.topicOptions) {
 		m.topicIdx = 0
 	}
+}
+
+// selectedIDsInOrder returns selected IDs in the order they appear in the filtered list
+func (m bbActiveModel) selectedIDsInOrder(filtered []int) []string {
+	if m.selected == nil || len(m.selected) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(m.selected))
+	for _, i := range filtered {
+		id := m.stickies[i].ID
+		if m.selected[id] {
+			out = append(out, id)
+		}
+	}
+	return out
 }
