@@ -373,28 +373,72 @@ func (m promptModel) renderPreview() string {
 				out.WriteString(val)
 				out.WriteString("\n\n")
 			}
-        case string(KindTestcase):
-            if val == "" {
-                break
-            }
-            if tc, ok := m.tcCache[val]; ok {
-                title := strings.TrimSpace(tc.Title)
-                if title != "" {
-                    out.WriteString(title)
-                    out.WriteString("\n\n")
-                }
-            }
-        case string(KindStickie):
-            if val == "" {
-                break
-            }
-            if st, ok := m.stickCache[val]; ok && st.Note.Valid {
-                note := strings.TrimSpace(st.Note.String)
-                if note != "" {
-                    out.WriteString(note)
-                    out.WriteString("\n\n")
-                }
-            }
+		case string(KindTestcase):
+			if val == "" {
+				break
+			}
+			if tc, ok := m.tcCache[val]; ok {
+				title := strings.TrimSpace(tc.Title)
+				if title != "" {
+					out.WriteString(title)
+					out.WriteString("\n")
+					// Always show status
+					if strings.TrimSpace(tc.Status) != "" {
+						out.WriteString("Status: ")
+						out.WriteString(strings.TrimSpace(tc.Status))
+						out.WriteString("\n")
+					}
+					// Optional fields
+					if tc.Name.Valid && strings.TrimSpace(tc.Name.String) != "" {
+						out.WriteString("Name: ")
+						out.WriteString(strings.TrimSpace(tc.Name.String))
+						out.WriteString("\n")
+					}
+					if tc.Package.Valid && strings.TrimSpace(tc.Package.String) != "" {
+						out.WriteString("Package: ")
+						out.WriteString(strings.TrimSpace(tc.Package.String))
+						out.WriteString("\n")
+					}
+					if tc.Classname.Valid && strings.TrimSpace(tc.Classname.String) != "" {
+						out.WriteString("Classname: ")
+						out.WriteString(strings.TrimSpace(tc.Classname.String))
+						out.WriteString("\n")
+					}
+					if tc.File.Valid && strings.TrimSpace(tc.File.String) != "" {
+						out.WriteString("File: ")
+						out.WriteString(strings.TrimSpace(tc.File.String))
+						if tc.Line.Valid {
+							out.WriteString(":" + fmt.Sprintf("%d", tc.Line.Int64))
+						}
+						out.WriteString("\n")
+					}
+					if tc.ErrorMessage.Valid && strings.TrimSpace(tc.ErrorMessage.String) != "" {
+						out.WriteString("Error: ")
+						out.WriteString(strings.TrimSpace(tc.ErrorMessage.String))
+						out.WriteString("\n")
+					}
+					out.WriteString("\n")
+				}
+			}
+		case string(KindStickie):
+			if val == "" {
+				break
+			}
+			if st, ok := m.stickCache[val]; ok {
+				if st.Note.Valid {
+					note := strings.TrimSpace(st.Note.String)
+					if note != "" {
+						out.WriteString(note)
+						out.WriteString("\n")
+					}
+				}
+				if st.PriorityLevel.Valid && strings.TrimSpace(st.PriorityLevel.String) != "" {
+					out.WriteString("Priority: ")
+					out.WriteString(strings.TrimSpace(st.PriorityLevel.String))
+					out.WriteString("\n")
+				}
+				out.WriteString("\n")
+			}
 		default:
 			if val != "" {
 				out.WriteString(val)
