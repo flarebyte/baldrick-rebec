@@ -384,28 +384,28 @@ func (m promptModel) renderPreview() string {
 					out.WriteString("\n")
 					// Always show status
 					if strings.TrimSpace(tc.Status) != "" {
-						out.WriteString("Status: ")
+						out.WriteString("- Status: ")
 						out.WriteString(strings.TrimSpace(tc.Status))
 						out.WriteString("\n")
 					}
 					// Optional fields
 					if tc.Name.Valid && strings.TrimSpace(tc.Name.String) != "" {
-						out.WriteString("Name: ")
+						out.WriteString("- Name: ")
 						out.WriteString(strings.TrimSpace(tc.Name.String))
 						out.WriteString("\n")
 					}
 					if tc.Package.Valid && strings.TrimSpace(tc.Package.String) != "" {
-						out.WriteString("Package: ")
+						out.WriteString("- Package: ")
 						out.WriteString(strings.TrimSpace(tc.Package.String))
 						out.WriteString("\n")
 					}
 					if tc.Classname.Valid && strings.TrimSpace(tc.Classname.String) != "" {
-						out.WriteString("Classname: ")
+						out.WriteString("- Classname: ")
 						out.WriteString(strings.TrimSpace(tc.Classname.String))
 						out.WriteString("\n")
 					}
 					if tc.File.Valid && strings.TrimSpace(tc.File.String) != "" {
-						out.WriteString("File: ")
+						out.WriteString("- File: ")
 						out.WriteString(strings.TrimSpace(tc.File.String))
 						if tc.Line.Valid {
 							out.WriteString(":" + fmt.Sprintf("%d", tc.Line.Int64))
@@ -413,7 +413,7 @@ func (m promptModel) renderPreview() string {
 						out.WriteString("\n")
 					}
 					if tc.ErrorMessage.Valid && strings.TrimSpace(tc.ErrorMessage.String) != "" {
-						out.WriteString("Error: ")
+						out.WriteString("- Error: ")
 						out.WriteString(strings.TrimSpace(tc.ErrorMessage.String))
 						out.WriteString("\n")
 					}
@@ -433,7 +433,7 @@ func (m promptModel) renderPreview() string {
 					}
 				}
 				if st.PriorityLevel.Valid && strings.TrimSpace(st.PriorityLevel.String) != "" {
-					out.WriteString("Priority: ")
+					out.WriteString("- Priority: ")
 					out.WriteString(strings.TrimSpace(st.PriorityLevel.String))
 					out.WriteString("\n")
 				}
