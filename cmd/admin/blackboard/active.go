@@ -100,6 +100,12 @@ type bbActiveModel struct {
 	boardTitle  string
 	stickies    []pgdao.Stickie
 	stickCursor int
+	// In-board filters
+	topicOptions []string // 0:"any", others topic names
+	topicIdx     int
+	noteSearch   string
+	inNoteSearch bool
+	noteInput    string
 }
 
 func newBBActiveModel(roles []string, currentRole string, boards []pgdao.BlackboardWithRefs, search string) bbActiveModel {
@@ -132,14 +138,54 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "down", "j":
-				if m.stickCursor < len(m.stickies)-1 {
+				if m.stickCursor < len(m.filteredStickyIndices())-1 {
 					m.stickCursor++
+				}
+				return m, nil
+			case "/":
+				m.inNoteSearch = true
+				m.noteInput = m.noteSearch
+				return m, nil
+			case "t":
+				if len(m.topicOptions) == 0 {
+					m.recomputeTopicOptions()
+				}
+				if len(m.topicOptions) > 0 {
+					m.topicIdx = (m.topicIdx + 1) % len(m.topicOptions)
+					if m.stickCursor >= len(m.filteredStickyIndices()) {
+						m.stickCursor = 0
+					}
 				}
 				return m, nil
 			case "r":
 				return m, refreshStickiesCmd(m.boardID)
 			case "b", "esc":
 				m.inBoard = false
+				return m, nil
+			default:
+				return m, nil
+			}
+		}
+		if m.inNoteSearch {
+			switch msg.Type {
+			case tea.KeyEnter:
+				m.noteSearch = m.noteInput
+				m.inNoteSearch = false
+				m.stickCursor = 0
+				return m, nil
+			case tea.KeyEsc:
+				m.inNoteSearch = false
+				m.noteInput = m.noteSearch
+				return m, nil
+			case tea.KeyBackspace, tea.KeyDelete, tea.KeyCtrlH:
+				if len(m.noteInput) > 0 {
+					m.noteInput = m.noteInput[:len(m.noteInput)-1]
+				}
+				return m, nil
+			case tea.KeyRunes:
+				if len(msg.Runes) > 0 {
+					m.noteInput += string(msg.Runes)
+				}
 				return m, nil
 			default:
 				return m, nil
@@ -222,6 +268,7 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case stickRefreshMsg:
 		m.stickies = msg.stickies
+		m.recomputeTopicOptions()
 		if m.stickCursor >= len(m.stickies) {
 			m.stickCursor = len(m.stickies) - 1
 			if m.stickCursor < 0 {
@@ -248,13 +295,27 @@ func (m bbActiveModel) View() string {
 	if m.inBoard {
 		b.WriteString(bStyleLabel.Render("Board: ") + bStyleValue.Render(m.boardTitle) + "\n")
 		b.WriteString(bStyleHelp.Render("ID: ") + bStyleValue.Render(m.boardID) + "\n")
+		// Filter/search section
+		topic := "any"
+		if m.topicIdx > 0 && m.topicIdx < len(m.topicOptions) {
+			topic = m.topicOptions[m.topicIdx]
+		}
+		b.WriteString(bStyleLabel.Render("Filter.topic: ") + bStyleValue.Render(topic) + bStyleHelp.Render(" (t=cycle)") + "\n")
+		if m.inNoteSearch {
+			b.WriteString(bStyleLabel.Render("Search.note*: ") + bStyleValue.Render(m.noteInput) + "\n")
+			b.WriteString(bStyleHelp.Render("enter=apply, esc=cancel") + "\n")
+		} else {
+			b.WriteString(bStyleLabel.Render("Search.note: ") + bStyleValue.Render(m.noteSearch) + bStyleHelp.Render(" (/ to edit)") + "\n")
+		}
 		b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
-		b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, b/esc=back, r=refresh, q") + "\n")
-		if len(m.stickies) == 0 {
+		b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, /=search, t=topic, b/esc=back, r=refresh, q") + "\n")
+		filtered := m.filteredStickyIndices()
+		if len(m.stickies) == 0 || len(filtered) == 0 {
 			b.WriteString("No stickies.\n")
 			return b.String()
 		}
-		for i, s := range m.stickies {
+		for i, idx := range filtered {
+			s := m.stickies[idx]
 			cursor := "  "
 			if i == m.stickCursor {
 				cursor = bStyleCursor.Render("> ")
@@ -263,8 +324,8 @@ func (m bbActiveModel) View() string {
 			fmt.Fprintf(&b, "%s%s\n", cursor, bStyleValue.Render(title))
 		}
 		// Details for selected stickie
-		if m.stickCursor >= 0 && m.stickCursor < len(m.stickies) {
-			st := m.stickies[m.stickCursor]
+		if m.stickCursor >= 0 && m.stickCursor < len(filtered) {
+			st := m.stickies[filtered[m.stickCursor]]
 			b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 			b.WriteString(bStyleHeader.Render("Stickie Details") + "\n")
 			b.WriteString(bStyleLabel.Render("ID: ") + bStyleValue.Render(st.ID) + "\n")
@@ -537,4 +598,56 @@ func relatedChips(bb pgdao.BlackboardWithRefs) string {
 		return ""
 	}
 	return "[" + strings.Join(parts, "  ") + "]"
+}
+
+// Filtering helpers for in-board view
+func (m bbActiveModel) filteredStickyIndices() []int {
+	out := make([]int, 0, len(m.stickies))
+	// Resolve topic filter
+	topic := ""
+	if m.topicIdx > 0 && m.topicIdx < len(m.topicOptions) {
+		topic = m.topicOptions[m.topicIdx]
+	}
+	q := strings.ToLower(strings.TrimSpace(m.noteSearch))
+	for i, s := range m.stickies {
+		// Topic filter
+		if topic != "" {
+			if !s.TopicName.Valid || strings.TrimSpace(s.TopicName.String) != topic {
+				continue
+			}
+		}
+		// Note search
+		if q != "" {
+			note := ""
+			if s.Note.Valid {
+				note = s.Note.String
+			}
+			if !strings.Contains(strings.ToLower(note), q) {
+				continue
+			}
+		}
+		out = append(out, i)
+	}
+	return out
+}
+
+func (m *bbActiveModel) recomputeTopicOptions() {
+	seen := map[string]struct{}{}
+	opts := []string{"any"}
+	for _, s := range m.stickies {
+		if s.TopicName.Valid {
+			t := strings.TrimSpace(s.TopicName.String)
+			if t == "" {
+				continue
+			}
+			if _, ok := seen[t]; !ok {
+				seen[t] = struct{}{}
+				opts = append(opts, t)
+			}
+		}
+	}
+	m.topicOptions = opts
+	if m.topicIdx >= len(m.topicOptions) {
+		m.topicIdx = 0
+	}
 }
