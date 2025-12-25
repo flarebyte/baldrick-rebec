@@ -76,11 +76,13 @@ func init() {
 
 // Model for the designer
 type promptModel struct {
-	blocks    []DesignBlock
-	cursor    int // which block
-	quitting  bool
-	export    bool // if true, print JSON on exit
-	inPreview bool
+	blocks      []DesignBlock
+	cursor      int // which block
+	quitting    bool
+	export      bool // if true, print JSON on exit
+	inPreview   bool
+	inQuickAdd  bool
+	quickBuffer string
 
 	// detail pane selection 0..3 (id, kind, value, disabled)
 	detailIdx int
@@ -166,6 +168,45 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
+		// Quick add mode: capture UUID list input
+		if m.inQuickAdd {
+			switch msg.Type {
+			case tea.KeyEnter:
+				ids := parseUUIDs(strings.TrimSpace(m.quickBuffer))
+				m.inQuickAdd = false
+				m.quickBuffer = ""
+				if len(ids) == 0 {
+					return m, nil
+				}
+				cmds := make([]tea.Cmd, 0, len(ids))
+				for _, id := range ids {
+					cmds = append(cmds, detectAndLoadByIDCmd(id))
+				}
+				return m, tea.Batch(cmds...)
+			case tea.KeyEsc:
+				m.inQuickAdd = false
+				m.quickBuffer = ""
+				return m, nil
+			case tea.KeyBackspace, tea.KeyDelete, tea.KeyCtrlH:
+				if len(m.quickBuffer) > 0 {
+					m.quickBuffer = m.quickBuffer[:len(m.quickBuffer)-1]
+				}
+				return m, nil
+			case tea.KeyCtrlU:
+				m.quickBuffer = ""
+				return m, nil
+			case tea.KeySpace:
+				m.quickBuffer += " "
+				return m, nil
+			case tea.KeyRunes:
+				if len(msg.Runes) > 0 {
+					m.quickBuffer += string(msg.Runes)
+				}
+				return m, nil
+			default:
+				return m, nil
+			}
+		}
 		// Normal mode
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -178,6 +219,11 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "p":
 			// Toggle Markdown preview
 			m.inPreview = !m.inPreview
+			return m, nil
+		case "u":
+			// Enter quick add UUIDs mode
+			m.inQuickAdd = true
+			m.quickBuffer = ""
 			return m, nil
 		case "up", "k":
 			if m.cursor > 0 {
@@ -279,6 +325,32 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.stickCache[msg.id] = msg.s
 		return m, nil
+	case quickAddResult:
+		// Append a new block based on detected kind, cache loaded entity
+		switch msg.kind {
+		case KindTestcase:
+			if msg.tc != nil {
+				if m.tcCache == nil {
+					m.tcCache = map[string]pgdao.Testcase{}
+				}
+				m.tcCache[msg.id] = *msg.tc
+			}
+			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindTestcase), Value: msg.id, Disabled: false}
+			m.blocks = append(m.blocks, nb)
+			return m, nil
+		case KindStickie:
+			if msg.st != nil {
+				if m.stickCache == nil {
+					m.stickCache = map[string]pgdao.Stickie{}
+				}
+				m.stickCache[msg.id] = *msg.st
+			}
+			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindStickie), Value: msg.id, Disabled: false}
+			m.blocks = append(m.blocks, nb)
+			return m, nil
+		default:
+			return m, nil
+		}
 	case tcErrMsg:
 		// silently ignore; user can correct ID
 		return m, nil
@@ -296,8 +368,14 @@ func (m promptModel) View() string {
 		return b.String()
 	}
 	b.WriteString(pStyleHeader.Render("Prompt Designer") + "\n")
-	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, a=add, d=del, [=move up, ]=move down, tab/shift+tab=field, e/enter=edit, t/K=kind, x=disable, p=preview, s=save JSON, q") + "\n")
+	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, a=add, d=del, [=move up, ]=move down, tab/shift+tab=field, e/enter=edit, t/K=kind, x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
 	b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
+	if m.inQuickAdd {
+		b.WriteString(pStyleLabel.Render("Quick add UUIDs*: "))
+		b.WriteString(pStyleValue.Render(m.quickBuffer) + "\n")
+		b.WriteString(pStyleHelp.Render("(paste UUIDs separated by spaces) enter=apply, esc=cancel") + "\n")
+		b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
+	}
 
 	// List of blocks
 	if len(m.blocks) == 0 {
@@ -463,6 +541,21 @@ func (m promptModel) renderPreview() string {
 	return out.String()
 }
 
+// Quick add: parse space-separated UUIDs
+func parseUUIDs(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Fields(s)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if _, err := uuid.Parse(p); err == nil {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func (m promptModel) summarizeBlock(b DesignBlock) string {
 	switch strings.ToLower(strings.TrimSpace(b.Kind)) {
 	case string(KindH1):
@@ -558,6 +651,12 @@ type stickLoadedMsg struct {
 	id string
 	s  pgdao.Stickie
 }
+type quickAddResult struct {
+	id   string
+	kind BlockKind
+	tc   *pgdao.Testcase
+	st   *pgdao.Stickie
+}
 
 // fetchTestcaseCmd loads a testcase by ID from Postgres
 func fetchTestcaseCmd(id string) tea.Cmd {
@@ -605,6 +704,30 @@ func fetchStickieCmd(id string) tea.Cmd {
 			return tcErrMsg{fmt.Errorf("stickie %s not found", id)}
 		}
 		return stickLoadedMsg{id: id, s: *st}
+	}
+}
+
+// detectAndLoadByIDCmd tries testcase first, then stickie, and returns a quickAddResult
+func detectAndLoadByIDCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		ctx := contextForShort()
+		defer ctx.cancel()
+		db, err := pgdao.OpenApp(ctx.ctx, cfg)
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		defer db.Close()
+		if tc, err := pgdao.GetTestcaseByID(ctx.ctx, db, id); err == nil && tc != nil {
+			return quickAddResult{id: id, kind: KindTestcase, tc: tc}
+		}
+		if st, err := pgdao.GetStickieByID(ctx.ctx, db, id); err == nil && st != nil {
+			return quickAddResult{id: id, kind: KindStickie, st: st}
+		}
+		return quickAddResult{id: id, kind: ""}
 	}
 }
 
