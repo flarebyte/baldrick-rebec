@@ -335,8 +335,10 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.tcCache[msg.id] = *msg.tc
 			}
-			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindTestcase), Value: msg.id, Disabled: false}
-			m.blocks = append(m.blocks, nb)
+			if !m.hasBlock(KindTestcase, msg.id) {
+				nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindTestcase), Value: msg.id, Disabled: false}
+				m.blocks = append(m.blocks, nb)
+			}
 			return m, nil
 		case KindStickie:
 			if msg.st != nil {
@@ -345,8 +347,10 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.stickCache[msg.id] = *msg.st
 			}
-			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindStickie), Value: msg.id, Disabled: false}
-			m.blocks = append(m.blocks, nb)
+			if !m.hasBlock(KindStickie, msg.id) {
+				nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindStickie), Value: msg.id, Disabled: false}
+				m.blocks = append(m.blocks, nb)
+			}
 			return m, nil
 		default:
 			return m, nil
@@ -539,6 +543,18 @@ func (m promptModel) renderPreview() string {
 		}
 	}
 	return out.String()
+}
+
+// hasBlock returns true if a block with the given kind and value already exists
+func (m promptModel) hasBlock(kind BlockKind, value string) bool {
+	kv := strings.ToLower(strings.TrimSpace(string(kind)))
+	vv := strings.TrimSpace(value)
+	for _, b := range m.blocks {
+		if strings.ToLower(strings.TrimSpace(b.Kind)) == kv && strings.TrimSpace(b.Value) == vv {
+			return true
+		}
+	}
+	return false
 }
 
 // Quick add: parse space-separated UUIDs
