@@ -77,10 +77,11 @@ func init() {
 
 // Model for the designer
 type promptModel struct {
-	blocks   []DesignBlock
-	cursor   int // which block
-	quitting bool
-	export   bool // if true, print JSON on exit
+	blocks    []DesignBlock
+	cursor    int // which block
+	quitting  bool
+	export    bool // if true, print JSON on exit
+	inPreview bool
 
 	// detail pane selection 0..4 (id, kind, value, scripts, disabled)
 	detailIdx int
@@ -172,6 +173,10 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Export JSON then quit
 			m.export = true
 			return m, tea.Quit
+		case "p":
+			// Toggle Markdown preview
+			m.inPreview = !m.inPreview
+			return m, nil
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -268,8 +273,15 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m promptModel) View() string {
 	var b strings.Builder
+	if m.inPreview {
+		b.WriteString(pStyleHeader.Render("Preview (Markdown)") + "\n")
+		b.WriteString(pStyleHelp.Render("Keys: p=back, q=quit") + "\n")
+		b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
+		b.WriteString(m.renderPreview())
+		return b.String()
+	}
 	b.WriteString(pStyleHeader.Render("Prompt Designer") + "\n")
-	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, a=add, d=del, tab/shift+tab=field, e/enter=edit, t/K=kind, x=disable, s=save JSON, q") + "\n")
+	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, a=add, d=del, tab/shift+tab=field, e/enter=edit, t/K=kind, x=disable, p=preview, s=save JSON, q") + "\n")
 	b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 
 	// List of blocks
@@ -338,6 +350,71 @@ func (m promptModel) View() string {
 		}
 	}
 	return b.String()
+}
+
+// renderPreview concatenates enabled blocks into simple Markdown.
+func (m promptModel) renderPreview() string {
+	var out strings.Builder
+	for _, blk := range m.blocks {
+		if blk.Disabled {
+			continue
+		}
+		kind := strings.ToLower(strings.TrimSpace(blk.Kind))
+		val := strings.TrimSpace(blk.Value)
+		switch kind {
+		case string(KindH1):
+			if val != "" {
+				out.WriteString("# ")
+				out.WriteString(val)
+				out.WriteString("\n\n")
+			}
+		case string(KindBody):
+			if val != "" {
+				out.WriteString(val)
+				out.WriteString("\n\n")
+			}
+		case string(KindTestcase):
+			if val == "" {
+				break
+			}
+			title := ""
+			if tc, ok := m.tcCache[val]; ok {
+				title = strings.TrimSpace(tc.Title)
+			}
+			if title != "" {
+				out.WriteString("Testcase: ")
+				out.WriteString(title)
+				out.WriteString(" (" + val + ")\n\n")
+			} else {
+				out.WriteString("Testcase: ")
+				out.WriteString(val)
+				out.WriteString("\n\n")
+			}
+		case string(KindStickie):
+			if val == "" {
+				break
+			}
+			note := ""
+			if st, ok := m.stickCache[val]; ok && st.Note.Valid {
+				note = strings.TrimSpace(st.Note.String)
+			}
+			if note != "" {
+				out.WriteString("Stickie: ")
+				out.WriteString(note)
+				out.WriteString("\n\n")
+			} else {
+				out.WriteString("Stickie: ")
+				out.WriteString(val)
+				out.WriteString("\n\n")
+			}
+		default:
+			if val != "" {
+				out.WriteString(val)
+				out.WriteString("\n\n")
+			}
+		}
+	}
+	return out.String()
 }
 
 func (m promptModel) summarizeBlock(b DesignBlock) string {
