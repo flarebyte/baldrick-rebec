@@ -145,6 +145,10 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.noteInput = m.noteInput[:len(m.noteInput)-1]
 					}
 					return m, nil
+				case tea.KeySpace:
+					// Explicitly accept spaces in search text
+					m.noteInput += " "
+					return m, nil
 				case tea.KeyRunes:
 					if len(msg.Runes) > 0 {
 						m.noteInput += string(msg.Runes)
