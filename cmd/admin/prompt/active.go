@@ -220,6 +220,22 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			return m, nil
+		case "[":
+			// Move current block up
+			if m.cursor > 0 && m.cursor < len(m.blocks) {
+				i := m.cursor
+				m.blocks[i-1], m.blocks[i] = m.blocks[i], m.blocks[i-1]
+				m.cursor--
+			}
+			return m, nil
+		case "]":
+			// Move current block down
+			if m.cursor >= 0 && m.cursor < len(m.blocks)-1 {
+				i := m.cursor
+				m.blocks[i], m.blocks[i+1] = m.blocks[i+1], m.blocks[i]
+				m.cursor++
+			}
+			return m, nil
 		case "enter", "e":
 			// Begin editing selected text field (id/value/scripts). Kind/bool handled via keys
 			if len(m.blocks) == 0 {
@@ -281,7 +297,7 @@ func (m promptModel) View() string {
 		return b.String()
 	}
 	b.WriteString(pStyleHeader.Render("Prompt Designer") + "\n")
-	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, a=add, d=del, tab/shift+tab=field, e/enter=edit, t/K=kind, x=disable, p=preview, s=save JSON, q") + "\n")
+	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, a=add, d=del, [=move up, ]=move down, tab/shift+tab=field, e/enter=edit, t/K=kind, x=disable, p=preview, s=save JSON, q") + "\n")
 	b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 
 	// List of blocks
