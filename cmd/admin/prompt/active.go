@@ -153,6 +153,10 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case tea.KeyCtrlU:
 				m.editBuffer = ""
 				return m, nil
+			case tea.KeySpace:
+				// Accept spaces explicitly (some terminals send KeySpace, not KeyRunes)
+				m.editBuffer += " "
+				return m, nil
 			case tea.KeyRunes:
 				if len(msg.Runes) > 0 {
 					m.editBuffer += string(msg.Runes)
