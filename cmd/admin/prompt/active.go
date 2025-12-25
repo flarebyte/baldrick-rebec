@@ -84,7 +84,7 @@ type promptModel struct {
 	inQuickAdd  bool
 	quickBuffer string
 
-	// detail pane selection 0..3 (id, kind, value, disabled)
+	// detail pane selection 0..2 (value, id, disabled)
 	detailIdx int
 	// inline text editing state
 	editing    bool
@@ -236,22 +236,34 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "tab":
-			m.detailIdx = (m.detailIdx + 1) % 4
+			m.detailIdx = (m.detailIdx + 1) % 3
 			return m, nil
 		case "shift+tab":
-			m.detailIdx = (m.detailIdx + 3) % 4
+			m.detailIdx = (m.detailIdx + 2) % 3
 			return m, nil
-		case "a":
-			// Add after current
-			nb := newDefaultBlock()
-			if len(m.blocks) == 0 || m.cursor >= len(m.blocks)-1 {
-				m.blocks = append(m.blocks, nb)
-				m.cursor = len(m.blocks) - 1
-			} else {
-				idx := m.cursor + 1
-				m.blocks = append(m.blocks[:idx], append([]DesignBlock{nb}, m.blocks[idx:]...)...)
-				m.cursor = idx
-			}
+		case "1":
+			// Add new h1 block
+			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindH1), Value: "", Disabled: false}
+			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
+			m.detailIdx = 0 // focus value
+			return m, nil
+		case "2":
+			// Add new body block
+			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindBody), Value: "", Disabled: false}
+			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
+			m.detailIdx = 0
+			return m, nil
+		case "3":
+			// Add new testcase block
+			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindTestcase), Value: "", Disabled: false}
+			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
+			m.detailIdx = 0
+			return m, nil
+		case "4":
+			// Add new stickie block
+			nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindStickie), Value: "", Disabled: false}
+			m.blocks, m.cursor = appendAfter(m.blocks, m.cursor, nb)
+			m.detailIdx = 0
 			return m, nil
 		case "d":
 			// Delete current
@@ -285,31 +297,25 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter", "e":
-			// Begin editing selected text field (id/value). Kind/bool handled via keys
+			// Begin editing selected text field (value/id). Kind cannot be changed
 			if len(m.blocks) == 0 {
 				return m, nil
 			}
 			switch m.detailIdx {
-			case 0: // id
-				m.editing = true
-				m.editBuffer = m.blocks[m.cursor].ID
-			case 2: // value
+			case 0: // value
 				m.editing = true
 				m.editBuffer = m.blocks[m.cursor].Value
+			case 1: // id
+				m.editing = true
+				m.editBuffer = m.blocks[m.cursor].ID
 			default:
-				// no-op; for kind/bool use dedicated keys
+				// no-op
 			}
 			return m, nil
 		case "x":
 			// Toggle disable
 			if len(m.blocks) > 0 {
 				m.blocks[m.cursor].Disabled = !m.blocks[m.cursor].Disabled
-			}
-			return m, nil
-		case "K", "t":
-			// Cycle kind forward
-			if len(m.blocks) > 0 {
-				m.blocks[m.cursor].Kind = string(nextKind(BlockKind(m.blocks[m.cursor].Kind)))
 			}
 			return m, nil
 		}
@@ -372,7 +378,7 @@ func (m promptModel) View() string {
 		return b.String()
 	}
 	b.WriteString(pStyleHeader.Render("Prompt Designer") + "\n")
-	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, a=add, d=del, [=move up, ]=move down, tab/shift+tab=field, e/enter=edit, t/K=kind, x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
+	b.WriteString(pStyleHelp.Render("Keys: ↑/k, ↓/j, 1=h1, 2=body, 3=testcase, 4=stickie, d=del, [=up, ]=down, tab/shift+tab=field, e/enter=edit (value/id), x=disable, u=quick add UUIDs, p=preview, s=save JSON, q") + "\n")
 	b.WriteString(pStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 	if m.inQuickAdd {
 		b.WriteString(pStyleLabel.Render("Quick add UUIDs*: "))
@@ -383,7 +389,7 @@ func (m promptModel) View() string {
 
 	// List of blocks
 	if len(m.blocks) == 0 {
-		b.WriteString("No blocks. Press 'a' to add.\n")
+		b.WriteString("No blocks. Use 1/2/3/4 to add.\n")
 		return b.String()
 	}
 	for i, blk := range m.blocks {
@@ -412,19 +418,17 @@ func (m promptModel) View() string {
 			return pStyleLabel.Render(label) + pStyleValue.Render(val)
 		}
 
-		b.WriteString(renderField(0, "ID: ", blk.ID) + "\n")
-		b.WriteString(renderField(1, "Kind: ", blk.Kind) + "\n")
-		// Value line; for testcase/stickie, show resolved title/note if available
+		// Value first; for testcase/stickie, show resolved title/note if available
 		if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindTestcase) {
 			if tc, ok := m.tcCache[strings.TrimSpace(blk.Value)]; ok && strings.TrimSpace(tc.Title) != "" {
-				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+				b.WriteString(renderField(0, "Value: ", blk.Value) + "\n")
 				b.WriteString(pStyleLabel.Render("  ↳ Testcase.title: ") + pStyleTCTitle.Render(tc.Title) + "\n")
 			} else {
-				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+				b.WriteString(renderField(0, "Value: ", blk.Value) + "\n")
 			}
 		} else if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindStickie) {
 			if st, ok := m.stickCache[strings.TrimSpace(blk.Value)]; ok && st.Note.Valid && strings.TrimSpace(st.Note.String) != "" {
-				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+				b.WriteString(renderField(0, "Value: ", blk.Value) + "\n")
 				// Truncate long notes for display
 				note := strings.TrimSpace(st.Note.String)
 				if len(note) > 80 {
@@ -432,12 +436,16 @@ func (m promptModel) View() string {
 				}
 				b.WriteString(pStyleLabel.Render("  ↳ Stickie.note: ") + pStyleStickNote.Render(note) + "\n")
 			} else {
-				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+				b.WriteString(renderField(0, "Value: ", blk.Value) + "\n")
 			}
 		} else {
-			b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+			b.WriteString(renderField(0, "Value: ", blk.Value) + "\n")
 		}
-		b.WriteString(renderField(3, "Disabled: ", fmt.Sprintf("%v", blk.Disabled)) + "\n")
+		// Static kind (not editable)
+		b.WriteString(pStyleLabel.Render("Kind: ") + pStyleValue.Render(blk.Kind) + "\n")
+		// ID and Disabled follow
+		b.WriteString(renderField(1, "ID: ", blk.ID) + "\n")
+		b.WriteString(renderField(2, "Disabled: ", fmt.Sprintf("%v", blk.Disabled)) + "\n")
 
 		if m.editing {
 			b.WriteString(pStyleHelp.Render("Editing: ") + pStyleValue.Render(m.editBuffer) + "\n")
@@ -557,6 +565,17 @@ func (m promptModel) hasBlock(kind BlockKind, value string) bool {
 	return false
 }
 
+// appendAfter inserts nb after the current cursor; returns new slice and new cursor pointing to the inserted element
+func appendAfter(list []DesignBlock, cursor int, nb DesignBlock) ([]DesignBlock, int) {
+	if len(list) == 0 || cursor >= len(list)-1 {
+		list = append(list, nb)
+		return list, len(list) - 1
+	}
+	idx := cursor + 1
+	list = append(list[:idx], append([]DesignBlock{nb}, list[idx:]...)...)
+	return list, idx
+}
+
 // Quick add: parse space-separated UUIDs
 func parseUUIDs(s string) []string {
 	if s == "" {
@@ -636,9 +655,7 @@ func (m promptModel) commitEdit() promptModel {
 		return m
 	}
 	switch m.detailIdx {
-	case 0: // id
-		m.blocks[m.cursor].ID = strings.TrimSpace(m.editBuffer)
-	case 2: // value
+	case 0: // value
 		m.blocks[m.cursor].Value = m.editBuffer
 		// If this is a testcase or stickie block and looks like a UUID, schedule fetch
 		blk := m.blocks[m.cursor]
@@ -651,6 +668,8 @@ func (m promptModel) commitEdit() promptModel {
 				m.pendingStickID = id
 			}
 		}
+	case 1: // id
+		m.blocks[m.cursor].ID = strings.TrimSpace(m.editBuffer)
 	}
 	m.editing = false
 	m.editBuffer = ""
