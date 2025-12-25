@@ -373,40 +373,28 @@ func (m promptModel) renderPreview() string {
 				out.WriteString(val)
 				out.WriteString("\n\n")
 			}
-		case string(KindTestcase):
-			if val == "" {
-				break
-			}
-			title := ""
-			if tc, ok := m.tcCache[val]; ok {
-				title = strings.TrimSpace(tc.Title)
-			}
-			if title != "" {
-				out.WriteString("Testcase: ")
-				out.WriteString(title)
-				out.WriteString(" (" + val + ")\n\n")
-			} else {
-				out.WriteString("Testcase: ")
-				out.WriteString(val)
-				out.WriteString("\n\n")
-			}
-		case string(KindStickie):
-			if val == "" {
-				break
-			}
-			note := ""
-			if st, ok := m.stickCache[val]; ok && st.Note.Valid {
-				note = strings.TrimSpace(st.Note.String)
-			}
-			if note != "" {
-				out.WriteString("Stickie: ")
-				out.WriteString(note)
-				out.WriteString("\n\n")
-			} else {
-				out.WriteString("Stickie: ")
-				out.WriteString(val)
-				out.WriteString("\n\n")
-			}
+        case string(KindTestcase):
+            if val == "" {
+                break
+            }
+            if tc, ok := m.tcCache[val]; ok {
+                title := strings.TrimSpace(tc.Title)
+                if title != "" {
+                    out.WriteString(title)
+                    out.WriteString("\n\n")
+                }
+            }
+        case string(KindStickie):
+            if val == "" {
+                break
+            }
+            if st, ok := m.stickCache[val]; ok && st.Note.Valid {
+                note := strings.TrimSpace(st.Note.String)
+                if note != "" {
+                    out.WriteString(note)
+                    out.WriteString("\n\n")
+                }
+            }
 		default:
 			if val != "" {
 				out.WriteString(val)
