@@ -1,26 +1,31 @@
 package prompt
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
+	pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
 // Styles
 var (
-	pStyleHeader  = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)  // cyan
-	pStyleLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Bold(true)   // gray
-	pStyleValue   = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))              // white-ish
-	pStyleHelp    = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Italic(true) // dim italic
-	pStyleCursor  = lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true)  // magenta
-	pStyleDivider = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))              // gray line
-	pStyleWarn    = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true)   // red
+	pStyleHeader  = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)   // cyan
+	pStyleLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Bold(true)    // gray
+	pStyleValue   = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))               // white-ish
+	pStyleHelp    = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Italic(true)  // dim italic
+	pStyleCursor  = lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true)   // magenta
+	pStyleDivider = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))               // gray line
+	pStyleWarn    = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true)    // red
+	pStyleTCTitle = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Italic(true) // cyan italic
 )
 
 // BlockKind enumerates allowed kinds for blocks
@@ -82,13 +87,18 @@ type promptModel struct {
 	editing    bool
 	editBuffer string
 	// which field is being edited (same as detailIdx when editing text)
+
+	// Loaded testcase cache by ID
+	tcCache map[string]pgdao.Testcase
+	// pending fetch id (set after edit commit)
+	pendingTCID string
 }
 
 func newPromptModel(initial []DesignBlock) promptModel {
 	if len(initial) == 0 {
 		initial = []DesignBlock{newDefaultBlock()}
 	}
-	return promptModel{blocks: initial, cursor: 0, detailIdx: 0}
+	return promptModel{blocks: initial, cursor: 0, detailIdx: 0, tcCache: map[string]pgdao.Testcase{}}
 }
 
 func newDefaultBlock() DesignBlock {
@@ -110,8 +120,13 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.editing {
 			switch msg.Type {
 			case tea.KeyEnter:
-				// Commit edit
+				// Commit edit; may trigger async fetch
 				m = m.commitEdit()
+				if id := strings.TrimSpace(m.pendingTCID); id != "" {
+					cmd := fetchTestcaseCmd(id)
+					m.pendingTCID = ""
+					return m, cmd
+				}
 				return m, nil
 			case tea.KeyEsc:
 				// Cancel edit
@@ -219,6 +234,15 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+	case tcLoadedMsg:
+		if m.tcCache == nil {
+			m.tcCache = map[string]pgdao.Testcase{}
+		}
+		m.tcCache[msg.id] = msg.tc
+		return m, nil
+	case tcErrMsg:
+		// silently ignore; user can correct ID
+		return m, nil
 	}
 	return m, nil
 }
@@ -239,7 +263,7 @@ func (m promptModel) View() string {
 		if i == m.cursor {
 			cursor = pStyleCursor.Render("> ")
 		}
-		title := summarizeBlock(blk)
+		title := m.summarizeBlock(blk)
 		if blk.Disabled {
 			title += " " + pStyleWarn.Render("(disabled)")
 		}
@@ -262,7 +286,17 @@ func (m promptModel) View() string {
 
 		b.WriteString(renderField(0, "ID: ", blk.ID) + "\n")
 		b.WriteString(renderField(1, "Kind: ", blk.Kind) + "\n")
-		b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+		// Value line; for testcase, show resolved title if available
+		if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindTestcase) {
+			if tc, ok := m.tcCache[strings.TrimSpace(blk.Value)]; ok && strings.TrimSpace(tc.Title) != "" {
+				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+				b.WriteString(pStyleLabel.Render("  ↳ Testcase.title: ") + pStyleTCTitle.Render(tc.Title) + "\n")
+			} else {
+				b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+			}
+		} else {
+			b.WriteString(renderField(2, "Value: ", blk.Value) + "\n")
+		}
 		b.WriteString(renderField(3, "Scripts: ", strings.Join(blk.Scripts, ", ")) + "\n")
 		b.WriteString(renderField(4, "Disabled: ", fmt.Sprintf("%v", blk.Disabled)) + "\n")
 
@@ -275,7 +309,7 @@ func (m promptModel) View() string {
 	return b.String()
 }
 
-func summarizeBlock(b DesignBlock) string {
+func (m promptModel) summarizeBlock(b DesignBlock) string {
 	switch strings.ToLower(strings.TrimSpace(b.Kind)) {
 	case string(KindH1):
 		if strings.TrimSpace(b.Value) == "" {
@@ -292,10 +326,15 @@ func summarizeBlock(b DesignBlock) string {
 		}
 		return "body: " + v
 	case string(KindTestcase):
-		if strings.TrimSpace(b.Value) == "" {
+		id := strings.TrimSpace(b.Value)
+		if id == "" {
 			return "testcase: <uuid>"
 		}
-		return "testcase: " + b.Value
+		// if we have it, append styled title
+		if tc, ok := m.tcCache[id]; ok && strings.TrimSpace(tc.Title) != "" {
+			return "testcase: " + id + " — " + pStyleTCTitle.Render(tc.Title)
+		}
+		return "testcase: " + id
 	case string(KindStickie):
 		if strings.TrimSpace(b.Value) == "" {
 			return "stickie: <uuid>"
@@ -330,6 +369,14 @@ func (m promptModel) commitEdit() promptModel {
 		m.blocks[m.cursor].ID = strings.TrimSpace(m.editBuffer)
 	case 2: // value
 		m.blocks[m.cursor].Value = m.editBuffer
+		// If this is a testcase block and looks like a UUID, schedule fetch
+		blk := m.blocks[m.cursor]
+		if strings.ToLower(strings.TrimSpace(blk.Kind)) == string(KindTestcase) {
+			id := strings.TrimSpace(m.blocks[m.cursor].Value)
+			if _, err := uuid.Parse(id); err == nil {
+				m.pendingTCID = id
+			}
+		}
 	case 3: // scripts CSV
 		txt := strings.TrimSpace(m.editBuffer)
 		if txt == "" {
@@ -349,4 +396,48 @@ func (m promptModel) commitEdit() promptModel {
 	m.editing = false
 	m.editBuffer = ""
 	return m
+}
+
+// Messages
+type tcLoadedMsg struct {
+	id string
+	tc pgdao.Testcase
+}
+type tcErrMsg struct{ err error }
+
+// fetchTestcaseCmd loads a testcase by ID from Postgres
+func fetchTestcaseCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		ctx := contextForShort()
+		defer ctx.cancel()
+		db, err := pgdao.OpenApp(ctx.ctx, cfg)
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		defer db.Close()
+		row, err := pgdao.GetTestcaseByID(ctx.ctx, db, id)
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		if row == nil {
+			return tcErrMsg{fmt.Errorf("testcase %s not found", id)}
+		}
+		return tcLoadedMsg{id: id, tc: *row}
+	}
+}
+
+// small helper to provide a cancellable context with a default timeout
+type shortCtx struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+func contextForShort() shortCtx {
+	// 10s default to match other admin TUIs
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	return shortCtx{ctx: ctx, cancel: cancel}
 }

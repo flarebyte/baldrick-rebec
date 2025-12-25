@@ -12,3 +12,4 @@ const rbcHome = app.systemAttribute('RBC_HOME');
 
 launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin db show`})
 launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin conversation active`})
+launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin testcase active`})

@@ -103,6 +103,21 @@ func DeleteTestcase(ctx context.Context, db *pgxpool.Pool, id string) (int64, er
 	return ct.RowsAffected(), nil
 }
 
+// GetTestcaseByID fetches a single testcase by its UUID.
+func GetTestcaseByID(ctx context.Context, db *pgxpool.Pool, id string) (*Testcase, error) {
+	row := db.QueryRow(ctx, `SELECT id::text, name, package, classname, title, experiment_id::text, role_name, status, error_message, tags, level, created, file, line, execution_time
+                              FROM testcases WHERE id=$1::uuid`, id)
+	var t Testcase
+	var tagsJSON []byte
+	if err := row.Scan(&t.ID, &t.Name, &t.Package, &t.Classname, &t.Title, &t.ExperimentID, &t.RoleName, &t.Status, &t.ErrorMessage, &tagsJSON, &t.Level, &t.Created, &t.File, &t.Line, &t.ExecutionTime); err != nil {
+		return nil, dbutil.ErrWrap("testcase.get", err, dbutil.ParamSummary("id", id))
+	}
+	if len(tagsJSON) > 0 {
+		_ = json.Unmarshal(tagsJSON, &t.Tags)
+	}
+	return &t, nil
+}
+
 func nullOrInt(n sql.NullInt64) any {
 	if n.Valid {
 		return n.Int64
