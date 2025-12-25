@@ -128,6 +128,32 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.inBoard {
+			// In-board note search editing has priority
+			if m.inNoteSearch {
+				switch msg.Type {
+				case tea.KeyEnter:
+					m.noteSearch = m.noteInput
+					m.inNoteSearch = false
+					m.stickCursor = 0
+					return m, nil
+				case tea.KeyEsc:
+					m.inNoteSearch = false
+					m.noteInput = m.noteSearch
+					return m, nil
+				case tea.KeyBackspace, tea.KeyDelete, tea.KeyCtrlH:
+					if len(m.noteInput) > 0 {
+						m.noteInput = m.noteInput[:len(m.noteInput)-1]
+					}
+					return m, nil
+				case tea.KeyRunes:
+					if len(msg.Runes) > 0 {
+						m.noteInput += string(msg.Runes)
+					}
+					return m, nil
+				default:
+					return m, nil
+				}
+			}
 			switch msg.String() {
 			case "ctrl+c", "q":
 				m.quitting = true
@@ -161,31 +187,6 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, refreshStickiesCmd(m.boardID)
 			case "b", "esc":
 				m.inBoard = false
-				return m, nil
-			default:
-				return m, nil
-			}
-		}
-		if m.inNoteSearch {
-			switch msg.Type {
-			case tea.KeyEnter:
-				m.noteSearch = m.noteInput
-				m.inNoteSearch = false
-				m.stickCursor = 0
-				return m, nil
-			case tea.KeyEsc:
-				m.inNoteSearch = false
-				m.noteInput = m.noteSearch
-				return m, nil
-			case tea.KeyBackspace, tea.KeyDelete, tea.KeyCtrlH:
-				if len(m.noteInput) > 0 {
-					m.noteInput = m.noteInput[:len(m.noteInput)-1]
-				}
-				return m, nil
-			case tea.KeyRunes:
-				if len(msg.Runes) > 0 {
-					m.noteInput += string(msg.Runes)
-				}
 				return m, nil
 			default:
 				return m, nil
