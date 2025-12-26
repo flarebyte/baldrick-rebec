@@ -347,6 +347,18 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				return m, convertCurrentToTextCmd(KindStickie, id, m.cursor)
+			case KindMessage:
+				if me, ok := m.msgCache[id]; ok {
+					var cr *pgdao.ContentRecord
+					if rec, okc := m.contentCache[me.ContentID]; okc {
+						cr = &rec
+					}
+					text := previewMessageText(me, cr)
+					m.blocks[m.cursor].Kind = string(KindText)
+					m.blocks[m.cursor].Value = text
+					return m, nil
+				}
+				return m, convertCurrentToTextCmd(KindMessage, id, m.cursor)
 			default:
 				return m, nil
 			}
@@ -767,6 +779,30 @@ func previewStickieText(st pgdao.Stickie) string {
 	return out.String()
 }
 
+// previewMessageText renders message content + optional error and status
+func previewMessageText(me pgdao.MessageEvent, cr *pgdao.ContentRecord) string {
+	var out strings.Builder
+	if cr != nil {
+		txt := strings.TrimSpace(cr.TextContent)
+		if txt != "" {
+			out.WriteString(txt)
+			out.WriteString("\n")
+		}
+	}
+	if me.ErrorMessage.Valid && strings.TrimSpace(me.ErrorMessage.String) != "" {
+		out.WriteString("- Error: ")
+		out.WriteString(strings.TrimSpace(me.ErrorMessage.String))
+		out.WriteString("\n")
+	}
+	if strings.TrimSpace(me.Status) != "" {
+		out.WriteString("- Status: ")
+		out.WriteString(strings.TrimSpace(me.Status))
+		out.WriteString("\n")
+	}
+	out.WriteString("\n")
+	return out.String()
+}
+
 // hasBlock returns true if a block with the given kind and value already exists
 func (m promptModel) hasBlock(kind BlockKind, value string) bool {
 	kv := strings.ToLower(strings.TrimSpace(string(kind)))
@@ -1098,6 +1134,16 @@ func convertCurrentToTextCmd(kind BlockKind, id string, idx int) tea.Cmd {
 				return tcErrMsg{fmt.Errorf("cannot load stickie %s", id)}
 			}
 			return convertDoneMsg{idx: idx, kind: KindStickie, id: id, text: previewStickieText(*st)}
+		case KindMessage:
+			me, err := pgdao.GetMessageEventByID(ctx.ctx, db, id)
+			if err != nil || me == nil {
+				return tcErrMsg{fmt.Errorf("cannot load message %s", id)}
+			}
+			var cr *pgdao.ContentRecord
+			if rec, e2 := pgdao.GetContent(ctx.ctx, db, me.ContentID); e2 == nil {
+				cr = &rec
+			}
+			return convertDoneMsg{idx: idx, kind: KindMessage, id: id, text: previewMessageText(*me, cr)}
 		default:
 			return tcErrMsg{fmt.Errorf("unsupported convert kind")}
 		}
