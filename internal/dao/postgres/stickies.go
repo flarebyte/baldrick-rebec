@@ -16,6 +16,7 @@ type Stickie struct {
 	TopicName       sql.NullString
 	TopicRoleName   sql.NullString
 	Note            sql.NullString
+	Code            sql.NullString
 	Labels          []string
 	Created         sql.NullTime
 	Updated         sql.NullTime
@@ -46,16 +47,17 @@ func UpsertStickie(ctx context.Context, db *pgxpool.Pool, s *Stickie) error {
                   topic_name=COALESCE(NULLIF($3,''), topic_name),
                   topic_role_name=COALESCE(NULLIF($4,''), topic_role_name),
                   note=COALESCE(NULLIF($5,''), note),
-                  labels=COALESCE($6, labels),
-                  created_by_task_id=COALESCE(CASE WHEN $7='' THEN NULL ELSE $7::uuid END, created_by_task_id),
-                  priority_level=COALESCE(NULLIF($8,''), priority_level),
-                  complex_name=COALESCE($9, complex_name),
-                  archived=$10,
-                  score=COALESCE($11::double precision, score)
+                  code=COALESCE(NULLIF($6,''), code),
+                  labels=COALESCE($7, labels),
+                  created_by_task_id=COALESCE(CASE WHEN $8='' THEN NULL ELSE $8::uuid END, created_by_task_id),
+                  priority_level=COALESCE(NULLIF($9,''), priority_level),
+                  complex_name=COALESCE($10, complex_name),
+                  archived=$11,
+                  score=COALESCE($12::double precision, score)
               WHERE id=$1::uuid
               RETURNING created, updated, edit_count`
 		if err := db.QueryRow(ctx, q,
-			s.ID, s.BlackboardID, nullOrString(s.TopicName), nullOrString(s.TopicRoleName), nullOrString(s.Note),
+			s.ID, s.BlackboardID, nullOrString(s.TopicName), nullOrString(s.TopicRoleName), nullOrString(s.Note), stringOrEmpty(s.Code),
 			pgTextArrayOrNil(s.Labels), nullOrUUID(s.CreatedByTaskID), nullOrString(s.PriorityLevel), jsonOrNil(cnJSON), s.Archived,
 			nullOrFloat64(s.Score),
 		).Scan(&s.Created, &s.Updated, &s.EditCount); err != nil {
@@ -65,11 +67,11 @@ func UpsertStickie(ctx context.Context, db *pgxpool.Pool, s *Stickie) error {
 		return nil
 	}
 	cnJSON, _ := json.Marshal(map[string]string{"name": s.ComplexName.Name, "variant": s.ComplexName.Variant})
-	q := `INSERT INTO stickies (blackboard_id, topic_name, topic_role_name, note, labels, created_by_task_id, priority_level, complex_name, archived, score)
-          VALUES ($1::uuid, NULLIF($2,''), NULLIF($3,''), NULLIF($4,''), COALESCE($5,ARRAY[]::text[]), CASE WHEN $6='' THEN NULL ELSE $6::uuid END, NULLIF($7,''), COALESCE($8,'{"name":"","variant":""}'::jsonb), COALESCE($9,false), $10::double precision)
+	q := `INSERT INTO stickies (blackboard_id, topic_name, topic_role_name, note, code, labels, created_by_task_id, priority_level, complex_name, archived, score)
+          VALUES ($1::uuid, NULLIF($2,''), NULLIF($3,''), NULLIF($4,''), NULLIF($5,''), COALESCE($6,ARRAY[]::text[]), CASE WHEN $7='' THEN NULL ELSE $7::uuid END, NULLIF($8,''), COALESCE($9,'{"name":"","variant":""}'::jsonb), COALESCE($10,false), $11::double precision)
           RETURNING id::text, created, updated, edit_count`
 	if err := db.QueryRow(ctx, q,
-		s.BlackboardID, stringOrEmpty(s.TopicName), stringOrEmpty(s.TopicRoleName), stringOrEmpty(s.Note), pgTextArrayOrNil(s.Labels), stringOrEmpty(s.CreatedByTaskID), stringOrEmpty(s.PriorityLevel), string(cnJSON), s.Archived, nullOrFloat64(s.Score),
+		s.BlackboardID, stringOrEmpty(s.TopicName), stringOrEmpty(s.TopicRoleName), stringOrEmpty(s.Note), stringOrEmpty(s.Code), pgTextArrayOrNil(s.Labels), stringOrEmpty(s.CreatedByTaskID), stringOrEmpty(s.PriorityLevel), string(cnJSON), s.Archived, nullOrFloat64(s.Score),
 	).Scan(&s.ID, &s.Created, &s.Updated, &s.EditCount); err != nil {
 		return dbutil.ErrWrap("stickie.upsert.insert", err,
 			dbutil.ParamSummary("blackboard_id", s.BlackboardID), dbutil.ParamSummary("topic_name", s.TopicName), dbutil.ParamSummary("topic_role", s.TopicRoleName))
@@ -79,11 +81,11 @@ func UpsertStickie(ctx context.Context, db *pgxpool.Pool, s *Stickie) error {
 
 // GetStickieByID fetches a stickie by UUID.
 func GetStickieByID(ctx context.Context, db *pgxpool.Pool, id string) (*Stickie, error) {
-	q := `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
+	q := `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, code, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
           FROM stickies WHERE id=$1::uuid`
 	var s Stickie
 	var cnJSON []byte
-	if err := db.QueryRow(ctx, q, id).Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Labels, &s.Created, &s.Updated, &s.CreatedByTaskID, &s.EditCount, &s.PriorityLevel, &s.Score, &cnJSON, &s.Archived); err != nil {
+	if err := db.QueryRow(ctx, q, id).Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Code, &s.Labels, &s.Created, &s.Updated, &s.CreatedByTaskID, &s.EditCount, &s.PriorityLevel, &s.Score, &cnJSON, &s.Archived); err != nil {
 		return nil, dbutil.ErrWrap("stickie.get", err, dbutil.ParamSummary("id", id))
 	}
 	if len(cnJSON) > 0 {
@@ -104,19 +106,19 @@ func ListStickies(ctx context.Context, db *pgxpool.Pool, blackboardID, topicName
 	var err error
 	switch {
 	case stringsTrim(blackboardID) != "" && stringsTrim(topicName) != "" && stringsTrim(topicRole) != "":
-		rows, err = db.Query(ctx, `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
+		rows, err = db.Query(ctx, `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, code, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
                                    FROM stickies WHERE blackboard_id=$1::uuid AND topic_name=$2 AND topic_role_name=$3
                                    ORDER BY updated DESC, created DESC LIMIT $4 OFFSET $5`, blackboardID, topicName, topicRole, limit, offset)
 	case stringsTrim(blackboardID) != "":
-		rows, err = db.Query(ctx, `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
+		rows, err = db.Query(ctx, `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, code, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
                                    FROM stickies WHERE blackboard_id=$1::uuid
                                    ORDER BY updated DESC, created DESC LIMIT $2 OFFSET $3`, blackboardID, limit, offset)
 	case stringsTrim(topicName) != "" && stringsTrim(topicRole) != "":
-		rows, err = db.Query(ctx, `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
+		rows, err = db.Query(ctx, `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, code, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
                                    FROM stickies WHERE topic_name=$1 AND topic_role_name=$2
                                    ORDER BY updated DESC, created DESC LIMIT $3 OFFSET $4`, topicName, topicRole, limit, offset)
 	default:
-		rows, err = db.Query(ctx, `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
+		rows, err = db.Query(ctx, `SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, code, labels, created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
                                    FROM stickies ORDER BY updated DESC, created DESC LIMIT $1 OFFSET $2`, limit, offset)
 	}
 	if err != nil {
@@ -128,7 +130,7 @@ func ListStickies(ctx context.Context, db *pgxpool.Pool, blackboardID, topicName
 	for rows.Next() {
 		var s Stickie
 		var cnJSON []byte
-		if err := rows.Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Labels, &s.Created, &s.Updated, &s.CreatedByTaskID, &s.EditCount, &s.PriorityLevel, &s.Score, &cnJSON, &s.Archived); err != nil {
+		if err := rows.Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Code, &s.Labels, &s.Created, &s.Updated, &s.CreatedByTaskID, &s.EditCount, &s.PriorityLevel, &s.Score, &cnJSON, &s.Archived); err != nil {
 			return nil, dbutil.ErrWrap("stickie.list.scan", err, dbutil.ParamSummary("blackboard_id", blackboardID))
 		}
 		if len(cnJSON) > 0 {
@@ -154,7 +156,7 @@ func DeleteStickie(ctx context.Context, db *pgxpool.Pool, id string) (int64, err
 // GetStickieByComplexName performs exact lookup on (complex_name.name, complex_name.variant) with archived flag.
 func GetStickieByComplexName(ctx context.Context, db *pgxpool.Pool, name, variant string, archived bool) (*Stickie, error) {
 	const q = `
-        SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, labels,
+        SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, code, labels,
                created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
         FROM stickies
         WHERE (complex_name->>'name') = $1
@@ -165,7 +167,7 @@ func GetStickieByComplexName(ctx context.Context, db *pgxpool.Pool, name, varian
 	var s Stickie
 	var cnJSON []byte
 	if err := db.QueryRow(ctx, q, name, variant, archived).
-		Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Labels,
+		Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Code, &s.Labels,
 			&s.Created, &s.Updated, &s.CreatedByTaskID, &s.EditCount, &s.PriorityLevel, &s.Score, &cnJSON, &s.Archived); err != nil {
 		return nil, dbutil.ErrWrap("stickie.get_by_complex_name", err, dbutil.ParamSummary("name", name), dbutil.ParamSummary("variant", variant), dbutil.ParamSummary("archived", archived))
 	}
@@ -178,7 +180,7 @@ func GetStickieByComplexName(ctx context.Context, db *pgxpool.Pool, name, varian
 // GetStickieByComplexNameInBlackboard exact lookup constrained by blackboard UUID.
 func GetStickieByComplexNameInBlackboard(ctx context.Context, db *pgxpool.Pool, name, variant string, archived bool, blackboardID string) (*Stickie, error) {
 	const q = `
-        SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, labels,
+        SELECT id::text, blackboard_id::text, topic_name, topic_role_name, note, code, labels,
                created, updated, created_by_task_id::text, edit_count, priority_level, score, complex_name, archived
         FROM stickies
         WHERE blackboard_id = $1::uuid
@@ -190,7 +192,7 @@ func GetStickieByComplexNameInBlackboard(ctx context.Context, db *pgxpool.Pool, 
 	var s Stickie
 	var cnJSON []byte
 	if err := db.QueryRow(ctx, q, blackboardID, name, variant, archived).
-		Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Labels,
+		Scan(&s.ID, &s.BlackboardID, &s.TopicName, &s.TopicRoleName, &s.Note, &s.Code, &s.Labels,
 			&s.Created, &s.Updated, &s.CreatedByTaskID, &s.EditCount, &s.PriorityLevel, &s.Score, &cnJSON, &s.Archived); err != nil {
 		return nil, dbutil.ErrWrap("stickie.get_by_complex_name_board", err, dbutil.ParamSummary("board", blackboardID), dbutil.ParamSummary("name", name), dbutil.ParamSummary("variant", variant), dbutil.ParamSummary("archived", archived))
 	}

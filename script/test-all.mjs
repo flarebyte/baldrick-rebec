@@ -618,6 +618,7 @@ try {
       topicName: 'devops',
       topicRole: TEST_ROLE_USER,
       note: 'Evaluate GitHub Actions caching for go build',
+      code: 'name: CI\n\non: [push]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-go@v5\n      - run: go build ./...\n',
       labels: ['idea', 'devops'],
       priority: 'could',
       name: 'DevOps Caching',
@@ -628,6 +629,7 @@ try {
     await stickieSet({
       blackboard: bb2,
       note: 'Team retro every Friday',
+      code: 'package main\n\nimport "fmt"\n\nfunc main() {\n  fmt.Println("Hello, RBCTest!")\n}\n',
       labels: ['team', 'ritual'],
       priority: 'must',
       name: 'Team Retro',

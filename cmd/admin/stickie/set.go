@@ -21,6 +21,7 @@ var (
 	flagStTopicName  string
 	flagStTopicRole  string
 	flagStNote       string
+	flagStCode       string
 	flagStLabels     []string
 	flagStCreatedBy  string
 	flagStPriority   string
@@ -61,6 +62,9 @@ var setCmd = &cobra.Command{
 		}
 		if strings.TrimSpace(flagStNote) != "" {
 			st.Note = sql.NullString{String: flagStNote, Valid: true}
+		}
+		if strings.TrimSpace(flagStCode) != "" {
+			st.Code = sql.NullString{String: flagStCode, Valid: true}
 		}
 		if len(flagStLabels) > 0 {
 			st.Labels = flagStLabels
@@ -106,6 +110,7 @@ func init() {
 	setCmd.Flags().StringVar(&flagStTopicName, "topic-name", "", "Topic name (optional)")
 	setCmd.Flags().StringVar(&flagStTopicRole, "topic-role", "", "Topic role name (optional)")
 	setCmd.Flags().StringVar(&flagStNote, "note", "", "Note text")
+	setCmd.Flags().StringVar(&flagStCode, "code", "", "Code snippet (programming language)")
 	setCmd.Flags().StringSliceVar(&flagStLabels, "labels", nil, "Labels (repeat or comma-separated)")
 	setCmd.Flags().StringVar(&flagStCreatedBy, "created-by-task", "", "Creator task UUID (optional)")
 	setCmd.Flags().StringVar(&flagStPriority, "priority", "", "Priority level: must, should, could, wont")
