@@ -37,9 +37,10 @@ const (
 	KindText     BlockKind = "text"
 	KindTestcase BlockKind = "testcase"
 	KindStickie  BlockKind = "stickie"
+	KindMessage  BlockKind = "message"
 )
 
-var allKinds = []BlockKind{KindText, KindTestcase, KindStickie}
+var allKinds = []BlockKind{KindText, KindTestcase, KindStickie, KindMessage}
 
 // DesignBlock represents a prompt designer block
 type DesignBlock struct {
@@ -102,13 +103,19 @@ type promptModel struct {
 	stickCache map[string]pgdao.Stickie
 	// pending stickie id
 	pendingStickID string
+
+	// Loaded message cache by ID and content cache by contentID
+	msgCache     map[string]pgdao.MessageEvent
+	contentCache map[string]pgdao.ContentRecord
+	// pending message id
+	pendingMsgID string
 }
 
 func newPromptModel(initial []DesignBlock) promptModel {
 	if len(initial) == 0 {
 		initial = []DesignBlock{newDefaultBlock()}
 	}
-	return promptModel{blocks: initial, cursor: 0, detailIdx: 0, tcCache: map[string]pgdao.Testcase{}, stickCache: map[string]pgdao.Stickie{}}
+	return promptModel{blocks: initial, cursor: 0, detailIdx: 0, tcCache: map[string]pgdao.Testcase{}, stickCache: map[string]pgdao.Stickie{}, msgCache: map[string]pgdao.MessageEvent{}, contentCache: map[string]pgdao.ContentRecord{}}
 }
 
 func newDefaultBlock() DesignBlock {
@@ -142,6 +149,10 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cmds = append(cmds, fetchStickieCmd(id))
 						m.pendingStickID = ""
 					}
+					if id := strings.TrimSpace(m.pendingMsgID); id != "" {
+						cmds = append(cmds, fetchMessageAndContentCmd(id))
+						m.pendingMsgID = ""
+					}
 					if len(cmds) > 0 {
 						return m, tea.Batch(cmds...)
 					}
@@ -170,6 +181,10 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if id := strings.TrimSpace(m.pendingStickID); id != "" {
 						cmds = append(cmds, fetchStickieCmd(id))
 						m.pendingStickID = ""
+					}
+					if id := strings.TrimSpace(m.pendingMsgID); id != "" {
+						cmds = append(cmds, fetchMessageAndContentCmd(id))
+						m.pendingMsgID = ""
 					}
 					if len(cmds) > 0 {
 						return m, tea.Batch(cmds...)
@@ -411,9 +426,39 @@ func (m promptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.blocks = append(m.blocks, nb)
 			}
 			return m, nil
+		case KindMessage:
+			if msg.msg != nil {
+				if m.msgCache == nil {
+					m.msgCache = map[string]pgdao.MessageEvent{}
+				}
+				m.msgCache[msg.id] = *msg.msg
+			}
+			if msg.cnt != nil && msg.msg != nil {
+				if m.contentCache == nil {
+					m.contentCache = map[string]pgdao.ContentRecord{}
+				}
+				m.contentCache[msg.msg.ContentID] = *msg.cnt
+			}
+			if !m.hasBlock(KindMessage, msg.id) {
+				nb := DesignBlock{ID: uuid.NewString(), Kind: string(KindMessage), Value: msg.id, Disabled: false}
+				m.blocks = append(m.blocks, nb)
+			}
+			return m, nil
 		default:
 			return m, nil
 		}
+	case msgLoadedMsg:
+		if m.msgCache == nil {
+			m.msgCache = map[string]pgdao.MessageEvent{}
+		}
+		m.msgCache[msg.id] = msg.me
+		return m, fetchContentPromptCmd(msg.me.ContentID)
+	case contentLoadedMsgPrompt:
+		if m.contentCache == nil {
+			m.contentCache = map[string]pgdao.ContentRecord{}
+		}
+		m.contentCache[msg.id] = msg.rec
+		return m, nil
 	case convertDoneMsg:
 		// Verify index and that block hasn't changed type/value unexpectedly
 		if msg.idx >= 0 && msg.idx < len(m.blocks) {
@@ -614,6 +659,32 @@ func (m promptModel) renderPreview() string {
 				}
 				out.WriteString("\n")
 			}
+		case string(KindMessage):
+			if val == "" {
+				break
+			}
+			if me, ok := m.msgCache[val]; ok {
+				// content
+				if cr, ok2 := m.contentCache[me.ContentID]; ok2 {
+					txt := strings.TrimSpace(cr.TextContent)
+					if txt != "" {
+						out.WriteString(txt)
+						out.WriteString("\n")
+					}
+				}
+				// error then status
+				if me.ErrorMessage.Valid && strings.TrimSpace(me.ErrorMessage.String) != "" {
+					out.WriteString("- Error: ")
+					out.WriteString(strings.TrimSpace(me.ErrorMessage.String))
+					out.WriteString("\n")
+				}
+				if strings.TrimSpace(me.Status) != "" {
+					out.WriteString("- Status: ")
+					out.WriteString(strings.TrimSpace(me.Status))
+					out.WriteString("\n")
+				}
+				out.WriteString("\n")
+			}
 		default:
 			if val != "" {
 				out.WriteString(val)
@@ -768,6 +839,26 @@ func (m promptModel) summarizeBlock(b DesignBlock) string {
 			return "stickie: " + id + " — " + pStyleStickNote.Render(note)
 		}
 		return "stickie: " + id
+	case string(KindMessage):
+		id := strings.TrimSpace(b.Value)
+		if id == "" {
+			return "message: <uuid>"
+		}
+		if me, ok := m.msgCache[id]; ok {
+			if cr, ok2 := m.contentCache[me.ContentID]; ok2 {
+				first := strings.TrimSpace(cr.TextContent)
+				if idx := strings.IndexByte(first, '\n'); idx >= 0 {
+					first = first[:idx]
+				}
+				if len(first) > 40 {
+					first = first[:40] + "…"
+				}
+				if first != "" {
+					return "message: " + id + " — " + first
+				}
+			}
+		}
+		return "message: " + id
 	default:
 		if strings.TrimSpace(b.Value) != "" {
 			return b.Kind + ": " + b.Value
@@ -809,6 +900,8 @@ func (m promptModel) commitEdit() promptModel {
 				m.pendingTCID = id
 			case string(KindStickie):
 				m.pendingStickID = id
+			case string(KindMessage):
+				m.pendingMsgID = id
 			}
 		}
 	case 1: // id
@@ -829,11 +922,21 @@ type stickLoadedMsg struct {
 	id string
 	s  pgdao.Stickie
 }
+type msgLoadedMsg struct {
+	id string
+	me pgdao.MessageEvent
+}
+type contentLoadedMsgPrompt struct {
+	id  string
+	rec pgdao.ContentRecord
+}
 type quickAddResult struct {
 	id   string
 	kind BlockKind
 	tc   *pgdao.Testcase
 	st   *pgdao.Stickie
+	msg  *pgdao.MessageEvent
+	cnt  *pgdao.ContentRecord
 }
 
 type convertDoneMsg struct {
@@ -892,6 +995,50 @@ func fetchStickieCmd(id string) tea.Cmd {
 	}
 }
 
+func fetchMessageAndContentCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		ctx := contextForShort()
+		defer ctx.cancel()
+		db, err := pgdao.OpenApp(ctx.ctx, cfg)
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		defer db.Close()
+		me, err := pgdao.GetMessageEventByID(ctx.ctx, db, id)
+		if err != nil || me == nil {
+			return tcErrMsg{fmt.Errorf("message %s not found", id)}
+		}
+		// Emit two messages: event first, then content load message
+		// We return msgLoadedMsg; Update will trigger content fetch via fetchContentPromptCmd
+		return msgLoadedMsg{id: id, me: *me}
+	}
+}
+
+func fetchContentPromptCmd(contentID string) tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		ctx := contextForShort()
+		defer ctx.cancel()
+		db, err := pgdao.OpenApp(ctx.ctx, cfg)
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		defer db.Close()
+		rec, err := pgdao.GetContent(ctx.ctx, db, contentID)
+		if err != nil {
+			return tcErrMsg{err}
+		}
+		return contentLoadedMsgPrompt{id: contentID, rec: rec}
+	}
+}
+
 // detectAndLoadByIDCmd tries testcase first, then stickie, and returns a quickAddResult
 func detectAndLoadByIDCmd(id string) tea.Cmd {
 	return func() tea.Msg {
@@ -911,6 +1058,14 @@ func detectAndLoadByIDCmd(id string) tea.Cmd {
 		}
 		if st, err := pgdao.GetStickieByID(ctx.ctx, db, id); err == nil && st != nil {
 			return quickAddResult{id: id, kind: KindStickie, st: st}
+		}
+		if me, err := pgdao.GetMessageEventByID(ctx.ctx, db, id); err == nil && me != nil {
+			// Try to load content as well but don't fail if missing
+			var cr *pgdao.ContentRecord
+			if rec, e2 := pgdao.GetContent(ctx.ctx, db, me.ContentID); e2 == nil {
+				cr = &rec
+			}
+			return quickAddResult{id: id, kind: KindMessage, msg: me, cnt: cr}
 		}
 		return quickAddResult{id: id, kind: ""}
 	}
