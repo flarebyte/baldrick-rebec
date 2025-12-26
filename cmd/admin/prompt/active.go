@@ -684,6 +684,14 @@ func previewStickieText(st pgdao.Stickie) string {
 		out.WriteString(strings.TrimSpace(st.PriorityLevel.String))
 		out.WriteString("\n")
 	}
+	if st.Code.Valid {
+		code := strings.TrimSpace(st.Code.String)
+		if code != "" {
+			out.WriteString("\n```\n")
+			out.WriteString(code)
+			out.WriteString("\n```\n")
+		}
+	}
 	out.WriteString("\n")
 	return out.String()
 }
