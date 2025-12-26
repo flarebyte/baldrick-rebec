@@ -399,6 +399,10 @@ func (m bbActiveModel) View() string {
 			if st.Note.Valid && strings.TrimSpace(st.Note.String) != "" {
 				b.WriteString(bStyleLabel.Render("Note: ") + bStyleValue.Render(st.Note.String) + "\n")
 			}
+			// Code (truncated snippet)
+			if st.Code.Valid && strings.TrimSpace(st.Code.String) != "" {
+				b.WriteString(bStyleLabel.Render("Code: ") + bStyleValue.Render(truncateCodeSnippet(st.Code.String)) + "\n")
+			}
 			// Labels
 			if len(st.Labels) > 0 {
 				b.WriteString(bStyleLabel.Render("Labels: ") + bStyleValue.Render(strings.Join(st.Labels, ", ")) + "\n")
@@ -655,6 +659,35 @@ func relatedChips(bb pgdao.BlackboardWithRefs) string {
 		return ""
 	}
 	return "[" + strings.Join(parts, "  ") + "]"
+}
+
+// truncateCodeSnippet returns a short, multi-line snippet of code.
+// It keeps up to 6 lines and up to 80 runes per line; appends an ellipsis when truncated.
+func truncateCodeSnippet(code string) string {
+	const maxLines = 6
+	const maxCols = 80
+	s := strings.TrimSpace(code)
+	if s == "" {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	truncated := false
+	if len(lines) > maxLines {
+		lines = lines[:maxLines]
+		truncated = true
+	}
+	for i := range lines {
+		r := []rune(lines[i])
+		if len(r) > maxCols {
+			lines[i] = string(r[:maxCols]) + "…"
+			truncated = true
+		}
+	}
+	out := strings.Join(lines, "\n")
+	if truncated {
+		return out + "\n…"
+	}
+	return out
 }
 
 // Filtering helpers for in-board view
