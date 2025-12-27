@@ -9,7 +9,15 @@ function launchTerminal({profileName, command}) {
 const app = Application.currentApplication();
 app.includeStandardAdditions = true;
 const rbcHome = app.systemAttribute('RBC_HOME');
-const conversationId = 'TODO'
+const conversationId = app.systemAttribute('CONVERSATION_ID');
+
+if (!conversationId || conversationId.trim() === '') {
+  app.displayDialog('CONVERSATION_ID is missing. Run as: make termsc CONV=<conversation-uuid>', {
+    withIcon: 'stop',
+    buttons: ['OK'],
+  });
+  throw new Error('CONVERSATION_ID not provided');
+}
 
 launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin testcase active --conversation ${conversationId}`})
 launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin message active --conversation ${conversationId}`})
