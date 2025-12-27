@@ -218,6 +218,19 @@ try {
     'Demo: ls -la',
     '#!/usr/bin/env bash\nset -euo pipefail\nls -la\n',
   );
+  // Additional demo scripts for the same variant
+  const sidLsAll = await createScript(
+    TEST_ROLE_USER,
+    'List all files',
+    'Demo: ls -la (all files)',
+    '#!/usr/bin/env bash\nset -euo pipefail\nls -la\n',
+  );
+  const sidLsDirs = await createScript(
+    TEST_ROLE_USER,
+    'List directories only',
+    'Demo: ls -la | grep ^d',
+    '#!/usr/bin/env bash\nset -euo pipefail\nls -la | grep ^d || true\n',
+  );
 
   // Regression: script list includes complex name; script find resolves by complex name
   {
@@ -309,7 +322,7 @@ try {
     await runSetTask({
       workflow: 'ci-test',
       command: 'lsdemo',
-      variant: '',
+      variant: 'lsdemo/go',
       role: TEST_ROLE_USER,
       title: 'List workspace',
       description: 'Runs ls -la',
@@ -321,6 +334,9 @@ try {
   );
   // Attach the ls script to the lsdemo task
   await taskScriptAdd({ task: tList, script: sidLs, name: 'list' });
+  // Attach additional scripts for the same task/variant
+  await taskScriptAdd({ task: tList, script: sidLsAll, name: 'list-all' });
+  await taskScriptAdd({ task: tList, script: sidLsDirs, name: 'list-dirs' });
 
   // Replacements
   await taskSetReplacement({
