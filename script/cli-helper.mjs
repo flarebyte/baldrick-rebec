@@ -176,6 +176,22 @@ export async function runSetTask({
   return await runRbcJSON(...args);
 }
 
+export async function taskScriptAdd({ task, script, name, alias = '' }) {
+  const args = [
+    'admin',
+    'task',
+    'script-add',
+    '--task',
+    task,
+    '--script',
+    script,
+    '--name',
+    name,
+  ];
+  if (alias) args.push('--alias', alias);
+  return await runRbc(...args);
+}
+
 export async function storeGet({ name, role = 'user' }) {
   return await runRbcJSON(
     'admin',

@@ -76,6 +76,7 @@ import {
   storeSet,
   tagSet,
   taskListJSON,
+  taskScriptAdd,
   taskSetReplacement,
   testcaseCreate,
   testcaseListJSON,
@@ -210,6 +211,13 @@ try {
     'Runs vet and lints',
     '#!/usr/bin/env bash\nset -euo pipefail\ngo vet ./... && echo linting...\n',
   );
+  // Simple demo script: list files
+  const sidLs = await createScript(
+    TEST_ROLE_USER,
+    'List directory',
+    'Demo: ls -la',
+    '#!/usr/bin/env bash\nset -euo pipefail\nls -la\n',
+  );
 
   // Regression: script list includes complex name; script find resolves by complex name
   {
@@ -296,6 +304,23 @@ try {
     tags: 'lint,style',
     level: 'h2',
   });
+  // Demo task using the ls script
+  const tList = idFrom(
+    await runSetTask({
+      workflow: 'ci-test',
+      command: 'lsdemo',
+      variant: '',
+      role: TEST_ROLE_USER,
+      title: 'List workspace',
+      description: 'Runs ls -la',
+      shell: 'bash',
+      timeout: '30 seconds',
+      tags: 'demo,ls',
+      level: 'h3',
+    }),
+  );
+  // Attach the ls script to the lsdemo task
+  await taskScriptAdd({ task: tList, script: sidLs, name: 'list' });
 
   // Replacements
   await taskSetReplacement({
