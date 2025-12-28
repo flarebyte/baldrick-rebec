@@ -182,14 +182,9 @@ func (m taskActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
         case "r":
             return m, refreshTasksCmd(m.role, m.search)
-        case "left", "h":
-            if m.scriptIdx > 0 {
-                m.scriptIdx--
-            }
-            return m, nil
-        case "right", "l":
-            if m.scriptIdx < len(m.scripts)-1 {
-                m.scriptIdx++
+        case "right":
+            if len(m.scripts) > 0 {
+                m.scriptIdx = (m.scriptIdx + 1) % len(m.scripts)
             }
             return m, nil
         case "x", "X":
@@ -297,7 +292,7 @@ func (m taskActiveModel) View() string {
 	}
 
     b.WriteString(tStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
-    b.WriteString(tStyleHelp.Render("Keys: ↑/k, ↓/j, ←/h, →/l = select script, /=search, n=next exp, r=refresh, x=run, q") + "\n")
+    b.WriteString(tStyleHelp.Render("Keys: ↑/k, ↓/j, →=next script, /=search, n=next exp, r=refresh, x=run, q") + "\n")
 
 	if len(m.tasks) == 0 {
 		b.WriteString("No tasks.\n")
