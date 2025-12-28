@@ -21,6 +21,7 @@ const SKIP_SNAPSHOT = argv['skip-snapshot'] ?? false;
 // -----------------------------
 import {
   assert,
+  assertStep,
   blackboardListJSON,
   blackboardSet,
   conversationGetJSON,
@@ -93,84 +94,6 @@ import {
   workspaceSet,
 } from './cli-helper.mjs';
 
-// Connect JSON client (loaded lazily by assertStep)
-let __connectClient = null;
-let __assertExperimentId = null;
-async function __ensureConnectClient() {
-  if (__connectClient) return __connectClient;
-  // Make sure server is running and healthy
-  try {
-    await $`go run main.go server start --detach`;
-  } catch {}
-  // Wait for health without hard failing the whole script
-  try {
-    for (let i = 0; i < 50; i++) {
-      try {
-        const r = await fetch('http://127.0.0.1:53051/health');
-        if (r?.ok) break;
-      } catch {}
-      await sleep(100);
-    }
-  } catch {}
-  // Dynamic import with on-demand install of dependencies
-  let createConnectGrpcJsonClient;
-  try {
-    ({ createConnectGrpcJsonClient } = await import(
-      './grpc-json-client-connect.mjs'
-    ));
-  } catch (e) {
-    const msg = e?.message || String(e || '');
-    if (
-      msg.includes("'@connectrpc/connect-node'") ||
-      msg.includes('@bufbuild')
-    ) {
-      await $`npm --prefix script install --silent`;
-      ({ createConnectGrpcJsonClient } = await import(
-        './grpc-json-client-connect.mjs'
-      ));
-    } else {
-      throw e;
-    }
-  }
-  __connectClient = createConnectGrpcJsonClient({
-    baseUrl: 'http://127.0.0.1:53051',
-  });
-  return __connectClient;
-}
-
-async function __ensureAssertExperiment() {
-  if (__assertExperimentId) return __assertExperimentId;
-  // Create a lightweight conversation+experiment via CLI so we can attach step testcases
-  const conv = await conversationSet({
-    title: 'Test-All Assert Steps',
-    role: TEST_ROLE_USER,
-  });
-  const exp = await experimentCreate({ conversation: idFrom(conv) });
-  __assertExperimentId = idFrom(exp);
-  return __assertExperimentId;
-}
-
-export async function assertStep(stepName, cond, msg = '') {
-  const ok = !!cond;
-  // Try to create a testcase via Connect JSON; never throw from this helper on transport issues
-  try {
-    const client = await __ensureConnectClient();
-    const experiment = await __ensureAssertExperiment();
-    await client.testcase.Create({
-      title: String(stepName || 'unnamed-step'),
-      role: TEST_ROLE_USER,
-      experiment,
-      status: ok ? 'OK' : 'KO',
-      file: 'script/test-all.mjs',
-    });
-  } catch (e) {
-    console.error('assertStep: testcase create skipped:', e?.message || e);
-  }
-  if (!ok) {
-    throw new Error(msg || `assertStep failed: ${stepName}`);
-  }
-}
-
 import {
   validateBlackboardListContract,
   validateConversationListContract,
@@ -187,8 +110,6 @@ import {
   validateVaultShowContract,
   validateWorkflowListContract,
 } from './contract-helper.mjs';
-
-// Connect client imported dynamically in the step to avoid hard failure
 
 // Note: sleep helper removed until needed; ZX provides sleep() globally.
 

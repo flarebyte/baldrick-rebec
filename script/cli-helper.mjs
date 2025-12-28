@@ -33,6 +33,81 @@ export function assert(cond, msg) {
   }
 }
 
+// -----------------------------
+// Step assertion -> records testcase via Connect JSON
+// -----------------------------
+let __connectClient = null;
+let __assertExperimentId = null;
+async function __ensureConnectClient() {
+  if (__connectClient) return __connectClient;
+  try {
+    await $`go run main.go server start --detach`;
+  } catch {}
+  try {
+    for (let i = 0; i < 50; i++) {
+      try {
+        const r = await fetch('http://127.0.0.1:53051/health');
+        if (r?.ok) break;
+      } catch {}
+      await sleep(100);
+    }
+  } catch {}
+  let createConnectGrpcJsonClient;
+  try {
+    ({ createConnectGrpcJsonClient } = await import(
+      './grpc-json-client-connect.mjs'
+    ));
+  } catch (e) {
+    const msg = e?.message || String(e || '');
+    if (
+      msg.includes("'@connectrpc/connect-node'") ||
+      msg.includes('@bufbuild')
+    ) {
+      await $`npm --prefix script install --silent`;
+      ({ createConnectGrpcJsonClient } = await import(
+        './grpc-json-client-connect.mjs'
+      ));
+    } else {
+      throw e;
+    }
+  }
+  __connectClient = createConnectGrpcJsonClient({
+    baseUrl: 'http://127.0.0.1:53051',
+  });
+  return __connectClient;
+}
+
+async function __ensureAssertExperiment() {
+  if (__assertExperimentId) return __assertExperimentId;
+  const conv = await conversationSet({
+    title: 'Test-All Assert Steps',
+    role: 'rbctest-user',
+  });
+  const exp = await experimentCreate({ conversation: idFrom(conv) });
+  __assertExperimentId = idFrom(exp);
+  return __assertExperimentId;
+}
+
+export async function assertStep(stepName, cond, msg = '') {
+  const ok = !!cond;
+  try {
+    const client = await __ensureConnectClient();
+    const experiment = await __ensureAssertExperiment();
+    await client.testcase.Create({
+      title: String(stepName || 'unnamed-step'),
+      role: 'rbctest-user',
+      experiment,
+      status: ok ? 'OK' : 'KO',
+      file: 'script/test-all.mjs',
+    });
+  } catch (e) {
+    console.error('assertStep: testcase create skipped:', e?.message || e);
+  }
+  if (!ok) {
+    throw new Error(msg || `assertStep failed: ${stepName}`);
+  }
+}
+
 // Command helpers
 export async function runSetRole({
   name,
