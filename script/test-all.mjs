@@ -92,6 +92,85 @@ import {
   workflowListJSON,
   workspaceSet,
 } from './cli-helper.mjs';
+
+// Connect JSON client (loaded lazily by assertStep)
+let __connectClient = null;
+let __assertExperimentId = null;
+async function __ensureConnectClient() {
+  if (__connectClient) return __connectClient;
+  // Make sure server is running and healthy
+  try {
+    await $`go run main.go server start --detach`;
+  } catch {}
+  // Wait for health without hard failing the whole script
+  try {
+    for (let i = 0; i < 50; i++) {
+      try {
+        const r = await fetch('http://127.0.0.1:53051/health');
+        if (r?.ok) break;
+      } catch {}
+      await sleep(100);
+    }
+  } catch {}
+  // Dynamic import with on-demand install of dependencies
+  let createConnectGrpcJsonClient;
+  try {
+    ({ createConnectGrpcJsonClient } = await import(
+      './grpc-json-client-connect.mjs'
+    ));
+  } catch (e) {
+    const msg = e?.message || String(e || '');
+    if (
+      msg.includes("'@connectrpc/connect-node'") ||
+      msg.includes('@bufbuild')
+    ) {
+      await $`npm --prefix script install --silent`;
+      ({ createConnectGrpcJsonClient } = await import(
+        './grpc-json-client-connect.mjs'
+      ));
+    } else {
+      throw e;
+    }
+  }
+  __connectClient = createConnectGrpcJsonClient({
+    baseUrl: 'http://127.0.0.1:53051',
+  });
+  return __connectClient;
+}
+
+async function __ensureAssertExperiment() {
+  if (__assertExperimentId) return __assertExperimentId;
+  // Create a lightweight conversation+experiment via CLI so we can attach step testcases
+  const conv = await conversationSet({
+    title: 'Test-All Assert Steps',
+    role: TEST_ROLE_USER,
+  });
+  const exp = await experimentCreate({ conversation: idFrom(conv) });
+  __assertExperimentId = idFrom(exp);
+  return __assertExperimentId;
+}
+
+export async function assertStep(stepName, cond, msg = '') {
+  const ok = !!cond;
+  // Try to create a testcase via Connect JSON; never throw from this helper on transport issues
+  try {
+    const client = await __ensureConnectClient();
+    const experiment = await __ensureAssertExperiment();
+    await client.testcase.Create({
+      title: String(stepName || 'unnamed-step'),
+      role: TEST_ROLE_USER,
+      experiment,
+      status: ok ? 'OK' : 'KO',
+      file: 'script/test-all.mjs',
+    });
+  } catch (e) {
+    console.error('assertStep: testcase create skipped:', e?.message || e);
+  }
+  if (!ok) {
+    throw new Error(msg || `assertStep failed: ${stepName}`);
+  }
+}
+
 import {
   validateBlackboardListContract,
   validateConversationListContract,
@@ -148,6 +227,7 @@ try {
     'Scaffolding roles, database, privileges, schema, content index, backup grants',
   );
   await dbScaffoldAll();
+  await assertStep('db scaffolded', true, 'db scaffold should succeed');
 
   // 2.5) Ensure roles exist for package FKs
   step++;
@@ -162,7 +242,8 @@ try {
     validateRoleContract(rQA, { allowEmptyTitle: false });
     const rList = await roleListJSON({ limit: 200 });
     const parsed = validateRoleListContract(rList, { allowEmptyTitle: false });
-    assert(
+    await assertStep(
+      'roles seeded',
       parsed.length >= 2,
       'expected at least the 2 test roles in role list',
     );
@@ -189,6 +270,11 @@ try {
     const wfList = await workflowListJSON({ role: TEST_ROLE_USER, limit: 50 });
     validateWorkflowListContract(wfList, { allowEmptyTitle: false });
   }
+  await assertStep(
+    'workflows created',
+    true,
+    'workflows were created and listed',
+  );
 
   // 4) Scripts
   step++;
@@ -271,6 +357,11 @@ try {
       'script find did not resolve unit by complex name',
     );
   }
+  await assertStep(
+    'scripts created',
+    true,
+    'scripts were created and validated',
+  );
 
   // 5) Tasks
   step++;
