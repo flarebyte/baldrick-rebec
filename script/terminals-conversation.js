@@ -22,6 +22,6 @@ if (!conversationId || conversationId.trim() === '') {
   throw new Error('CONVERSATION_ID not provided');
 }
 
-launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin testcase active --conversation ${conversationId}`, title: '✅ Testcase',})
-launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin message active --conversation ${conversationId}`, title: '✉️ Message'})
-launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin task active --conversation ${conversationId}`, title: '[ ] Task'})
+launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc testcase active --conversation ${conversationId}`, title: '✅ Testcase',})
+launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc message active --conversation ${conversationId}`, title: '✉️ Message'})
+launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc task active --conversation ${conversationId}`, title: '[ ] Task'})

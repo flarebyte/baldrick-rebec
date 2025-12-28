@@ -41,7 +41,6 @@ export async function runSetRole({
   notes = '',
 }) {
   return await runRbc(
-    'admin',
     'role',
     'set',
     '--name',
@@ -54,12 +53,11 @@ export async function runSetRole({
 }
 
 export async function roleGetJSON({ name }) {
-  return await runRbcJSON('admin', 'role', 'get', '--name', name);
+  return await runRbcJSON('role', 'get', '--name', name);
 }
 
 export async function roleListJSON({ limit = 100, offset = 0 } = {}) {
   return await runRbcJSON(
-    'admin',
     'role',
     'list',
     '--output',
@@ -79,7 +77,6 @@ export async function runSetWorkflow({
   notes = '',
 }) {
   return await runRbc(
-    'admin',
     'workflow',
     'set',
     '--name',
@@ -94,7 +91,7 @@ export async function runSetWorkflow({
 }
 
 export async function createScript(role, title, description, body, opts = {}) {
-  const args = ['admin', 'script', 'set', '--role', role, '--title', title];
+  const args = ['script', 'set', '--role', role, '--title', title];
   if (description) args.push('--description', description);
   if (opts.name !== undefined) args.push('--name', opts.name);
   if (opts.variant !== undefined) args.push('--variant', opts.variant);
@@ -108,7 +105,6 @@ export async function createScript(role, title, description, body, opts = {}) {
 
 export async function scriptListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
-    'admin',
     'script',
     'list',
     '--role',
@@ -128,15 +124,7 @@ export async function scriptFind({
   archived = false,
   role = '',
 }) {
-  const args = [
-    'admin',
-    'script',
-    'find',
-    '--name',
-    name,
-    '--variant',
-    variant,
-  ];
+  const args = ['script', 'find', '--name', name, '--variant', variant];
   if (archived) args.push('--archived');
   if (role) args.push('--role', role);
   return await runRbcJSON(...args);
@@ -155,7 +143,6 @@ export async function runSetTask({
   level = '',
 }) {
   const args = [
-    'admin',
     'task',
     'set',
     '--workflow',
@@ -178,7 +165,6 @@ export async function runSetTask({
 
 export async function taskScriptAdd({ task, script, name, alias = '' }) {
   const args = [
-    'admin',
     'task',
     'script-add',
     '--task',
@@ -193,15 +179,7 @@ export async function taskScriptAdd({ task, script, name, alias = '' }) {
 }
 
 export async function storeGet({ name, role = 'user' }) {
-  return await runRbcJSON(
-    'admin',
-    'store',
-    'get',
-    '--name',
-    name,
-    '--role',
-    role,
-  );
+  return await runRbcJSON('store', 'get', '--name', name, '--role', role);
 }
 
 export async function blackboardSet({
@@ -211,15 +189,7 @@ export async function blackboardSet({
   background = '',
   guidelines = '',
 }) {
-  const args = [
-    'admin',
-    'blackboard',
-    'set',
-    '--role',
-    role,
-    '--store-id',
-    storeId,
-  ];
+  const args = ['blackboard', 'set', '--role', role, '--store-id', storeId];
   if (project) args.push('--project', project);
   if (background) args.push('--background', background);
   if (guidelines) args.push('--guidelines', guidelines);
@@ -234,15 +204,7 @@ export async function conversationSet({
   tags = '',
   notes = '',
 }) {
-  const args = [
-    'admin',
-    'conversation',
-    'set',
-    '--title',
-    title,
-    '--role',
-    role,
-  ];
+  const args = ['conversation', 'set', '--title', title, '--role', role];
   if (description) args.push('--description', description);
   if (project) args.push('--project', project);
   if (tags) args.push('--tags', tags);
@@ -252,7 +214,6 @@ export async function conversationSet({
 
 export async function experimentCreate({ conversation }) {
   return await runRbcJSON(
-    'admin',
     'experiment',
     'create',
     '--conversation',
@@ -266,7 +227,7 @@ export async function queueAdd({
   why = '',
   tags = '',
 }) {
-  const args = ['admin', 'queue', 'add', '--description', description];
+  const args = ['queue', 'add', '--description', description];
   if (status) args.push('--status', status);
   if (why) args.push('--why', why);
   if (tags) args.push('--tags', tags);
@@ -288,7 +249,7 @@ export async function stickieSet({
   archived = false,
   score = null,
 }) {
-  const args = ['admin', 'stickie', 'set'];
+  const args = ['stickie', 'set'];
   if (id) args.push('--id', id);
   if (blackboard) args.push('--blackboard', blackboard);
   if (topicName) args.push('--topic-name', topicName);
@@ -313,7 +274,7 @@ export async function stickieListJSON({
   limit = 100,
   offset = 0,
 }) {
-  const args = ['admin', 'stickie', 'list', '--output', 'json'];
+  const args = ['stickie', 'list', '--output', 'json'];
   if (blackboard) args.push('--blackboard', blackboard);
   if (topicName) args.push('--topic-name', topicName);
   if (topicRole) args.push('--topic-role', topicRole);
@@ -322,12 +283,11 @@ export async function stickieListJSON({
 }
 
 export async function stickieGetJSON({ id }) {
-  return await runRbcJSON('admin', 'stickie', 'get', '--id', id);
+  return await runRbcJSON('stickie', 'get', '--id', id);
 }
 
 export async function workflowListJSON({ role, limit = 100, offset = 0 } = {}) {
   return await runRbcJSON(
-    'admin',
     'workflow',
     'list',
     '--role',
@@ -348,7 +308,6 @@ export async function taskListJSON({
   offset = 0,
 } = {}) {
   const args = [
-    'admin',
     'task',
     'list',
     '--role',
@@ -370,15 +329,7 @@ export async function stickieFind({
   archived = false,
   blackboard = '',
 }) {
-  const args = [
-    'admin',
-    'stickie',
-    'find',
-    '--name',
-    name,
-    '--variant',
-    variant,
-  ];
+  const args = ['stickie', 'find', '--name', name, '--variant', variant];
   if (archived) args.push('--archived');
   if (blackboard) args.push('--blackboard', blackboard);
   return await runRbcJSON(...args);
@@ -392,7 +343,7 @@ export async function messageSet({
   tags = '',
   role = 'user',
 }) {
-  const args = ['admin', 'message', 'set'];
+  const args = ['message', 'set'];
   if (experiment) args.push('--experiment', experiment);
   if (title) args.push('--title', title);
   if (tags) args.push('--tags', tags);
@@ -406,7 +357,6 @@ export async function messageSet({
 // Stickie relations
 export async function stickieRelSet({ from, to, type, labels = '' }) {
   const args = [
-    'admin',
     'stickie-rel',
     'set',
     '--from',
@@ -422,7 +372,6 @@ export async function stickieRelSet({ from, to, type, labels = '' }) {
 
 export async function stickieRelList({ id, direction = 'out' }) {
   return await runRbc(
-    'admin',
     'stickie-rel',
     'list',
     '--id',
@@ -434,7 +383,6 @@ export async function stickieRelList({ id, direction = 'out' }) {
 
 export async function stickieRelGet({ from, to, type, ignoreMissing = false }) {
   const args = [
-    'admin',
     'stickie-rel',
     'get',
     '--from',
@@ -451,7 +399,6 @@ export async function stickieRelGet({ from, to, type, ignoreMissing = false }) {
 // Non-JSON convenience wrappers
 export async function dbReset({ dropAppRole = false } = {}) {
   return await runRbc(
-    'admin',
     'db',
     'reset',
     '--force',
@@ -460,7 +407,7 @@ export async function dbReset({ dropAppRole = false } = {}) {
 }
 
 export async function dbScaffoldAll() {
-  return await runRbc('admin', 'db', 'scaffold', '--all', '--yes');
+  return await runRbc('db', 'scaffold', '--all', '--yes');
 }
 
 export async function taskSetReplacement({
@@ -476,7 +423,6 @@ export async function taskSetReplacement({
   replaceComment = '',
 }) {
   const args = [
-    'admin',
     'task',
     'set',
     '--workflow',
@@ -499,7 +445,6 @@ export async function taskSetReplacement({
 
 export async function tagSet({ name, title, role = 'user' }) {
   return await runRbc(
-    'admin',
     'tag',
     'set',
     '--name',
@@ -519,7 +464,6 @@ export async function topicSet({
   tags = '',
 }) {
   const args = [
-    'admin',
     'topic',
     'set',
     '--name',
@@ -541,7 +485,7 @@ export async function projectSet({
   notes = '',
   tags = '',
 }) {
-  const args = ['admin', 'project', 'set', '--name', name, '--role', role];
+  const args = ['project', 'set', '--name', name, '--role', role];
   if (description) args.push('--description', description);
   if (notes) args.push('--notes', notes);
   if (tags) args.push('--tags', tags);
@@ -560,7 +504,6 @@ export async function toolSet({
   type = '',
 }) {
   const args = [
-    'admin',
     'tool',
     'set',
     '--name',
@@ -579,12 +522,11 @@ export async function toolSet({
 }
 
 export async function toolGetJSON({ name }) {
-  return await runRbcJSON('admin', 'tool', 'get', '--name', name);
+  return await runRbcJSON('tool', 'get', '--name', name);
 }
 
 export async function toolListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
-    'admin',
     'tool',
     'list',
     '--role',
@@ -603,7 +545,7 @@ export async function toolDelete({
   force = true,
   ignoreMissing = false,
 }) {
-  const args = ['admin', 'tool', 'delete', '--name', name];
+  const args = ['tool', 'delete', '--name', name];
   if (force) args.push('--force');
   if (ignoreMissing) args.push('--ignore-missing');
   return await runRbc(...args);
@@ -623,7 +565,7 @@ export async function storeSet({
   lifecycle = '',
   tags = '',
 }) {
-  const args = ['admin', 'store', 'set', '--name', name, '--role', role];
+  const args = ['store', 'set', '--name', name, '--role', role];
   if (title) args.push('--title', title);
   if (description) args.push('--description', description);
   if (motivation) args.push('--motivation', motivation);
@@ -643,7 +585,7 @@ export async function workspaceSet({
   description = '',
   tags = '',
 }) {
-  const args = ['admin', 'workspace', 'set', '--role', role];
+  const args = ['workspace', 'set', '--role', role];
   if (project) args.push('--project', project);
   if (description) args.push('--description', description);
   if (tags) args.push('--tags', tags);
@@ -651,47 +593,30 @@ export async function workspaceSet({
 }
 
 export async function packageSet({ role = 'user', variant }) {
-  return await runRbc(
-    'admin',
-    'package',
-    'set',
-    '--role',
-    role,
-    '--variant',
-    variant,
-  );
+  return await runRbc('package', 'set', '--role', role, '--variant', variant);
 }
 
 export async function queuePeek({ limit = 2 } = {}) {
-  return await runRbc('admin', 'queue', 'peek', '--limit', String(limit));
+  return await runRbc('queue', 'peek', '--limit', String(limit));
 }
 export async function queueSize() {
-  return await runRbc('admin', 'queue', 'size');
+  return await runRbc('queue', 'size');
 }
 export async function queueTake({ id }) {
-  return await runRbc('admin', 'queue', 'take', '--id', id);
+  return await runRbc('queue', 'take', '--id', id);
 }
 
 export async function listWithRole(cmd, role, limit = 50) {
-  return await runRbc(
-    'admin',
-    cmd,
-    'list',
-    '--role',
-    role,
-    '--limit',
-    String(limit),
-  );
+  return await runRbc(cmd, 'list', '--role', role, '--limit', String(limit));
 }
 export async function experimentList(limit = 50) {
-  return await runRbc('admin', 'experiment', 'list', '--limit', String(limit));
+  return await runRbc('experiment', 'list', '--limit', String(limit));
 }
 export async function stickieList(limit = 50) {
-  return await runRbc('admin', 'stickie', 'list', '--limit', String(limit));
+  return await runRbc('stickie', 'list', '--limit', String(limit));
 }
 export async function stickieListByBlackboard({ blackboard, limit = 50 }) {
   return await runRbc(
-    'admin',
     'stickie',
     'list',
     '--blackboard',
@@ -702,7 +627,6 @@ export async function stickieListByBlackboard({ blackboard, limit = 50 }) {
 }
 export async function stickieListByTopic({ topicName, topicRole, limit = 50 }) {
   return await runRbc(
-    'admin',
     'stickie',
     'list',
     '--topic-name',
@@ -715,15 +639,14 @@ export async function stickieListByTopic({ topicName, topicRole, limit = 50 }) {
 }
 
 export async function dbCountPerRole() {
-  return await runRbc('admin', 'db', 'count', '--per-role');
+  return await runRbc('db', 'count', '--per-role');
 }
 export async function dbCountJSON() {
-  return await runRbc('admin', 'db', 'count', '--json');
+  return await runRbc('db', 'count', '--json');
 }
 
 export async function snapshotBackupJSON({ description, who }) {
   return await runRbcJSON(
-    'admin',
     'snapshot',
     'backup',
     '--description',
@@ -734,29 +657,20 @@ export async function snapshotBackupJSON({ description, who }) {
   );
 }
 export async function snapshotList({ limit = 5 } = {}) {
-  return await runRbc('admin', 'snapshot', 'list', '--limit', String(limit));
+  return await runRbc('snapshot', 'list', '--limit', String(limit));
 }
 export async function snapshotShow({ id }) {
-  return await runRbc('admin', 'snapshot', 'show', id);
+  return await runRbc('snapshot', 'show', id);
 }
 export async function snapshotRestoreDry({ id, mode = 'append' }) {
-  return await runRbc(
-    'admin',
-    'snapshot',
-    'restore',
-    id,
-    '--mode',
-    mode,
-    '--dry-run',
-  );
+  return await runRbc('snapshot', 'restore', id, '--mode', mode, '--dry-run');
 }
 export async function snapshotDelete({ id }) {
-  return await runRbc('admin', 'snapshot', 'delete', id, '--force');
+  return await runRbc('snapshot', 'delete', id, '--force');
 }
 
 export async function snapshotVerifyJSON({ id, schema = 'backup' }) {
   return await runRbcJSON(
-    'admin',
     'snapshot',
     'verify',
     id,
@@ -771,7 +685,6 @@ export async function snapshotPrunePreviewJSON({
   schema = 'backup',
 }) {
   return await runRbcJSON(
-    'admin',
     'snapshot',
     'prune',
     '--older-than',
@@ -787,7 +700,6 @@ export async function snapshotPruneYesJSON({
   schema = 'backup',
 }) {
   return await runRbcJSON(
-    'admin',
     'snapshot',
     'prune',
     '--older-than',
@@ -801,7 +713,6 @@ export async function snapshotPruneYesJSON({
 
 export async function projectListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
-    'admin',
     'project',
     'list',
     '--role',
@@ -816,7 +727,6 @@ export async function projectListJSON({ role, limit = 100, offset = 0 }) {
 }
 export async function storeListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
-    'admin',
     'store',
     'list',
     '--role',
@@ -831,7 +741,6 @@ export async function storeListJSON({ role, limit = 100, offset = 0 }) {
 }
 export async function topicListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
-    'admin',
     'topic',
     'list',
     '--role',
@@ -846,7 +755,6 @@ export async function topicListJSON({ role, limit = 100, offset = 0 }) {
 }
 export async function blackboardListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
-    'admin',
     'blackboard',
     'list',
     '--role',
@@ -866,7 +774,6 @@ export async function conversationListJSON({
   offset = 0,
 }) {
   const args = [
-    'admin',
     'conversation',
     'list',
     '--role',
@@ -882,18 +789,10 @@ export async function conversationListJSON({
   return await runRbcJSON(...args);
 }
 export async function conversationGetJSON({ id }) {
-  return await runRbcJSON('admin', 'conversation', 'get', '--id', id);
+  return await runRbcJSON('conversation', 'get', '--id', id);
 }
 export async function projectGetJSON({ name, role }) {
-  return await runRbcJSON(
-    'admin',
-    'project',
-    'get',
-    '--name',
-    name,
-    '--role',
-    role,
-  );
+  return await runRbcJSON('project', 'get', '--name', name, '--role', role);
 }
 export async function messageListJSON({
   role,
@@ -904,7 +803,6 @@ export async function messageListJSON({
   offset = 0,
 }) {
   const args = [
-    'admin',
     'message',
     'list',
     '--role',
@@ -926,7 +824,7 @@ export async function messageListJSON({
 // Vault helpers (read-only; never print secrets)
 // -----------------------------
 export async function vaultList() {
-  const p = await runRbc('admin', 'vault', 'list');
+  const p = await runRbc('vault', 'list');
   const lines = (p.stdout || '')
     .split('\n')
     .map((l) => l.trim())
@@ -947,7 +845,7 @@ export async function vaultList() {
 }
 
 export async function vaultShow(name) {
-  const p = await runRbc('admin', 'vault', 'show', name);
+  const p = await runRbc('vault', 'show', name);
   const out = p.stdout || '';
   const obj = { name: '', status: '', backend: '', updated: '' };
   for (const line of out.split('\n')) {
@@ -964,13 +862,13 @@ export async function vaultShow(name) {
 }
 
 export async function vaultBackendCurrent() {
-  const p = await runRbc('admin', 'vault', 'backend', 'current');
+  const p = await runRbc('vault', 'backend', 'current');
   return String(p.stdout || '').trim();
 }
 
 export async function vaultDoctor() {
   // Return raw text for now; callers can inspect for 'status: OK'
-  const p = await runRbc('admin', 'vault', 'doctor');
+  const p = await runRbc('vault', 'doctor');
   return { stdout: String(p.stdout || ''), stderr: String(p.stderr || '') };
 }
 
@@ -993,7 +891,6 @@ export async function testcaseCreate({
   executionTime = 0,
 }) {
   const args = [
-    'admin',
     'testcase',
     'create',
     '--title',
@@ -1024,7 +921,6 @@ export async function testcaseListJSON({
   offset = 0,
 }) {
   const args = [
-    'admin',
     'testcase',
     'list',
     '--role',
@@ -1053,7 +949,7 @@ export async function promptRun({
   maxOutputTokens = undefined,
   json = false,
 }) {
-  const args = ['admin', 'prompt', 'run', '--tool-name', toolName];
+  const args = ['prompt', 'run', '--tool-name', toolName];
   if (input) args.push('--input', input);
   if (inputFile) args.push('--input-file', inputFile);
   if (toolsPath) args.push('--tools', toolsPath);
@@ -1067,7 +963,6 @@ export async function promptRun({
 
 export async function promptRunJSON(opts) {
   return await runRbcJSON(
-    'admin',
     'prompt',
     'run',
     ...(() => {

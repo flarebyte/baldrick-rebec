@@ -523,7 +523,7 @@ try {
   logStep(step, TOTAL, 'Prompt via Connect client (if server available)');
   try {
     // Start server in background if not running
-    await $`go run main.go admin server start --detach`;
+    await $`go run main.go server start --detach`;
     // Wait for health endpoint instead of fixed sleep to avoid race conditions
     try {
       await (async function waitHealth() {
@@ -572,7 +572,7 @@ try {
     }
   } finally {
     try {
-      await $`go run main.go admin server stop`;
+      await $`go run main.go server stop`;
     } catch {}
   }
 
@@ -998,7 +998,7 @@ try {
   step++;
   logStep(step, TOTAL, 'Testcases via Connect JSON service');
   try {
-    await $`go run main.go admin server start --detach`;
+    await $`go run main.go server start --detach`;
     await sleep(1500);
     // Use fetch against Connect JSON endpoints
     const endpoint = (m) =>
@@ -1055,7 +1055,7 @@ try {
     }
   } finally {
     try {
-      await $`go run main.go admin server stop`;
+      await $`go run main.go server stop`;
     } catch {}
   }
 
