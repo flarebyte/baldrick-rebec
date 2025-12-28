@@ -165,7 +165,7 @@ func (m taskActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
         case "r":
             return m, refreshTasksCmd(m.role, m.search)
-        case "enter":
+        case "x", "X":
             if m.cursor >= 0 && m.cursor < len(m.tasks) {
                 var expID string
                 if len(m.experiments) > 0 && m.expIdx >= 0 && m.expIdx < len(m.experiments) { expID = m.experiments[m.expIdx].ID }
@@ -245,7 +245,7 @@ func (m taskActiveModel) View() string {
 	}
 
     b.WriteString(tStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
-    b.WriteString(tStyleHelp.Render("Keys: ↑/k, ↓/j, /=search, n=next exp, r=refresh, enter=run, q") + "\n")
+    b.WriteString(tStyleHelp.Render("Keys: ↑/k, ↓/j, /=search, n=next exp, r=refresh, x=run, q") + "\n")
 
 	if len(m.tasks) == 0 {
 		b.WriteString("No tasks.\n")
