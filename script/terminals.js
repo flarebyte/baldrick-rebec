@@ -15,25 +15,24 @@ const rbcHome = app.systemAttribute('RBC_HOME');
 
 launchTerminal({
   profileName: 'Basic',
-  title: 'DB - show',
+  title: '🗄️ DB - show',
   command: `cd ${rbcHome}; rbc admin db show`,
 });
 
 launchTerminal({
   profileName: 'Basic',
-  title: 'Conversation',
+  title: '💬 Conversation',
   command: `cd ${rbcHome}; rbc admin conversation active`,
 });
 
 launchTerminal({
   profileName: 'Basic',
-  title: 'Blackboards',
+  title: '🎓 Blackboards',
   command: `cd ${rbcHome}; rbc admin blackboard active`,
 });
 
 launchTerminal({
   profileName: 'Basic',
-  title: 'Prompt',
+  title: '>_ Prompt',
   command: `cd ${rbcHome}; rbc admin prompt active`,
 });
-
