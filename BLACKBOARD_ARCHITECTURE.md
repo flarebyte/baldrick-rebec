@@ -105,7 +105,7 @@ erDiagram
 - `internal/dao/postgres/blackboards.go`: `Blackboard`, `UpsertBlackboard`, `GetBlackboardByID`, `ListBlackboards`, `DeleteBlackboard`.
 - `internal/dao/postgres/stickies.go`: `Stickie`, `UpsertStickie`, `GetStickieByID`, `ListStickies`, `DeleteStickie`, `GetStickieByComplexName*`.
 - `internal/dao/postgres/graph.go`: `CreateStickieEdge`, `ListStickieEdges`, `GetStickieEdge`, `DeleteStickieEdge`.
-- `cmd/admin/db/show.go`: relationships table documents FKs and SQL‑graph edges.
+- `cmd/db/show.go`: relationships table documents FKs and SQL‑graph edges.
 
 ## Notes
 

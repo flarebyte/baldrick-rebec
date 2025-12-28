@@ -4,7 +4,7 @@ This codebase provides a CLI-first admin and data-manipulation workflow on top o
 
 ## High-level Layers
 - CLI (Cobra)
-  - Commands in `cmd/admin/**` implement subcommands for each entity (roles, workflows, projects, workspaces, scripts, tasks, messages, queues, testcases, tags, topics, stores, blackboards, stickies) and for DB admin (scaffold/init/status/show/count/backup/restore/age-status/age-init) and graph helpers (task latest/next, stickie-rel).
+  - Commands in `cmd/**` implement subcommands for each entity (roles, workflows, projects, workspaces, scripts, tasks, messages, queues, testcases, tags, topics, stores, blackboards, stickies) and for DB admin (scaffold/init/status/show/count/backup/restore/age-status/age-init) and graph helpers (task latest/next, stickie-rel).
   - Conventions: parse flags, load config, open DB connection, call DAO functions, print stderr summary and JSON to stdout.
 
 - Config

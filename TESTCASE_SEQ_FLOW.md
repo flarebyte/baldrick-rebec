@@ -7,7 +7,7 @@ This document outlines how testcase operations flow through the system for both 
 - Postgres DAO (read/write): `internal/dao/postgres/testcases.go`
   - `InsertTestcase`, `ListTestcases`, `DeleteTestcase`
   - Table: `testcases(id UUID PK, name, package, classname, title, experiment_id, role_name, status, error_message, tags, level, created, file, line, execution_time)`
-- CLI subcommands: `cmd/admin/testcase`
+- CLI subcommands: `cmd/testcase`
   - `create`, `list`, `delete`
 - gRPC JSON service: `internal/server/testcase/grpc.go`
   - Service: `testcase.v1.TestcaseService` with `Create`, `List`, `Delete`
