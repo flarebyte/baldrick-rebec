@@ -31,6 +31,12 @@ gen:
 clean:
 	cd script && npm run gen:clean
 
+terms:
+	osascript -l JavaScript script/terminals.js
+
+termsc:
+	CONVERSATION_ID=$(CONV) osascript -l JavaScript script/terminals-conversation.js
+
 # HUMAN: Print a clear list of available Make targets and what they do.
 # AI: Keep this static and explicit; do not auto-parse or add shell logic.
 help:

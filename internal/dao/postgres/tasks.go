@@ -207,6 +207,46 @@ func ListTasks(ctx context.Context, db *pgxpool.Pool, workflow, roleName string,
 	return out, nil
 }
 
+// ListTasksSearch lists tasks for a role with a case-insensitive search on variant or title.
+func ListTasksSearch(ctx context.Context, db *pgxpool.Pool, roleName, search string, limit, offset int) ([]Task, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	like := "%" + strings.TrimSpace(search) + "%"
+	rows, err := db.Query(ctx, `SELECT t.id, tv.workflow_id, t.command, t.variant, t.title, t.description, t.motivation,
+                                        t.notes, t.shell, t.timeout::text, t.tool_workspace_id::text, t.tags, t.level, t.archived, t.created
+                                   FROM tasks t
+                                   LEFT JOIN task_variants tv ON tv.variant = t.variant
+                                   WHERE t.role_name=$1 AND (
+                                         t.variant ILIKE $2 OR COALESCE(t.title,'') ILIKE $2)
+                                   ORDER BY t.variant ASC
+                                   LIMIT $3 OFFSET $4`, roleName, like, limit, offset)
+	if err != nil {
+		return nil, dbutil.ErrWrap("task.search", err, dbutil.ParamSummary("role", roleName), dbutil.ParamSummary("search", search), fmt.Sprintf("limit=%d", limit), fmt.Sprintf("offset=%d", offset))
+	}
+	defer rows.Close()
+	var out []Task
+	for rows.Next() {
+		var t Task
+		var tagsJSON []byte
+		if err := rows.Scan(&t.ID, &t.WorkflowID, &t.Command, &t.Variant, &t.Title, &t.Description, &t.Motivation,
+			&t.Notes, &t.Shell, &t.Timeout, &t.ToolWorkspaceID, &tagsJSON, &t.Level, &t.Archived, &t.Created); err != nil {
+			return nil, dbutil.ErrWrap("task.search.scan", err)
+		}
+		if len(tagsJSON) > 0 {
+			_ = json.Unmarshal(tagsJSON, &t.Tags)
+		}
+		out = append(out, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, dbutil.ErrWrap("task.search", err)
+	}
+	return out, nil
+}
+
 // ListTasksWithArchived lists tasks with optional workflow filter and archived filtering.
 // Modes:
 // - if activeOnly is true: archived=false

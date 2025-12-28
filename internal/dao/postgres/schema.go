@@ -534,6 +534,8 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_stickies_complex_name ON stickies ((complex_name->>'name'), (complex_name->>'variant')) WHERE archived = FALSE`,
 		`CREATE INDEX IF NOT EXISTS idx_stickies_updated ON stickies (updated DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_stickies_complex_name_gin ON stickies USING GIN (complex_name jsonb_path_ops)`,
+		// Ensure optional code column exists for stickies (programming code snippet)
+		`ALTER TABLE stickies ADD COLUMN IF NOT EXISTS code TEXT`,
 		// Ensure new optional structured JSONB column exists for stickies
 		`ALTER TABLE stickies ADD COLUMN IF NOT EXISTS structured JSONB`,
 		// Ensure new optional score column exists for stickies

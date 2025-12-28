@@ -23,6 +23,7 @@ import {
   assert,
   blackboardListJSON,
   blackboardSet,
+  conversationGetJSON,
   conversationListJSON,
   conversationSet,
   createScript,
@@ -38,6 +39,7 @@ import {
   messageListJSON,
   messageSet,
   packageSet,
+  projectGetJSON,
   projectListJSON,
   projectSet,
   promptRunJSON,
@@ -74,6 +76,7 @@ import {
   storeSet,
   tagSet,
   taskListJSON,
+  taskScriptAdd,
   taskSetReplacement,
   testcaseCreate,
   testcaseListJSON,
@@ -124,6 +127,17 @@ try {
     await dbReset({ dropAppRole: false });
   } else {
     logStep(step, TOTAL, 'Skipping reset (--skip-reset)');
+    // Create a blackboard anchored to the complete-store to surface joined Store fields in the TUI
+    const storeIdFull = sfull.id || sfull.ID || '';
+    if (storeIdFull) {
+      await blackboardSet({
+        role: TEST_ROLE_USER,
+        storeId: storeIdFull,
+        project: 'acme/complete',
+        background: 'Board for complete-store demo',
+        guidelines: 'Keep entries consistent; test UI fields',
+      });
+    }
   }
 
   // 2) Scaffold
@@ -196,6 +210,26 @@ try {
     'Lint & Vet',
     'Runs vet and lints',
     '#!/usr/bin/env bash\nset -euo pipefail\ngo vet ./... && echo linting...\n',
+  );
+  // Simple demo script: list files
+  const sidLs = await createScript(
+    TEST_ROLE_USER,
+    'List directory',
+    'Demo: ls -la',
+    '#!/usr/bin/env bash\nset -euo pipefail\nls -la\n',
+  );
+  // Additional demo scripts for the same variant
+  const sidLsAll = await createScript(
+    TEST_ROLE_USER,
+    'List all files',
+    'Demo: ls -la (all files)',
+    '#!/usr/bin/env bash\nset -euo pipefail\nls -la\n',
+  );
+  const sidLsDirs = await createScript(
+    TEST_ROLE_USER,
+    'List directories only',
+    'Demo: ls -la | grep ^d',
+    '#!/usr/bin/env bash\nset -euo pipefail\nls -la | grep ^d || true\n',
   );
 
   // Regression: script list includes complex name; script find resolves by complex name
@@ -283,6 +317,26 @@ try {
     tags: 'lint,style',
     level: 'h2',
   });
+  // Demo task using the ls script
+  const tList = idFrom(
+    await runSetTask({
+      workflow: 'ci-test',
+      command: 'lsdemo',
+      variant: 'lsdemo/go',
+      role: TEST_ROLE_USER,
+      title: 'List workspace',
+      description: 'Runs ls -la',
+      shell: 'bash',
+      timeout: '30 seconds',
+      tags: 'demo,ls',
+      level: 'h3',
+    }),
+  );
+  // Attach the ls script to the lsdemo task
+  await taskScriptAdd({ task: tList, script: sidLs, name: 'list' });
+  // Attach additional scripts for the same task/variant
+  await taskScriptAdd({ task: tList, script: sidLsAll, name: 'list-all' });
+  await taskScriptAdd({ task: tList, script: sidLsDirs, name: 'list-dirs' });
 
   // Replacements
   await taskSetReplacement({
@@ -344,14 +398,42 @@ try {
     name: 'acme/build-system',
     role: TEST_ROLE_USER,
     description: 'Build system and CI pipeline',
+    notes: 'Notes: CI with Go and Docker',
     tags: 'status=active,type=ci',
   });
   await projectSet({
     name: 'acme/product',
     role: TEST_ROLE_USER,
     description: 'Main product',
+    notes: 'Notes: App repo',
     tags: 'status=active,type=app',
   });
+  // Ensure one project has all fields populated
+  await projectSet({
+    name: 'acme/complete',
+    role: TEST_ROLE_USER,
+    description: 'Complete metadata project',
+    notes: 'Project notes filled',
+    tags: 'area=complete,stage=alpha',
+  });
+  {
+    const pj = await projectGetJSON({
+      name: 'acme/complete',
+      role: TEST_ROLE_USER,
+    });
+    assert(
+      pj && pj.name === 'acme/complete',
+      'project complete: name mismatch',
+    );
+    assert(
+      pj.description === 'Complete metadata project',
+      'project complete: description missing',
+    );
+    assert(
+      pj.notes === 'Project notes filled',
+      'project complete: notes missing',
+    );
+  }
   {
     const prj = await projectListJSON({ role: TEST_ROLE_USER, limit: 50 });
     validateProjectListContract(prj);
@@ -502,6 +584,10 @@ try {
     role: TEST_ROLE_USER,
     title: 'Ideas for acme/build-system',
     description: 'Idea backlog',
+    motivation: 'Capture and prioritize improvement ideas',
+    security: 'Internal only',
+    privacy: 'No PII expected',
+    notes: 'Markdown allowed: keep entries concise',
     type: 'journal',
     scope: 'project',
     lifecycle: 'monthly',
@@ -573,6 +659,7 @@ try {
       topicName: 'devops',
       topicRole: TEST_ROLE_USER,
       note: 'Evaluate GitHub Actions caching for go build',
+      code: 'name: CI\n\non: [push]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-go@v5\n      - run: go build ./...\n',
       labels: ['idea', 'devops'],
       priority: 'could',
       name: 'DevOps Caching',
@@ -583,6 +670,7 @@ try {
     await stickieSet({
       blackboard: bb2,
       note: 'Team retro every Friday',
+      code: 'package main\n\nimport "fmt"\n\nfunc main() {\n  fmt.Println("Hello, RBCTest!")\n}\n',
       labels: ['team', 'ritual'],
       priority: 'must',
       name: 'Team Retro',
@@ -641,6 +729,53 @@ try {
     tags: 'status=active',
   });
 
+  // Ensure one store has all fields populated
+  await storeSet({
+    name: 'complete-store',
+    role: TEST_ROLE_USER,
+    title: 'Complete Store',
+    description: 'Store with all fields',
+    motivation: 'Centralize artifacts',
+    security: 'Internal only',
+    privacy: 'No PII',
+    notes: 'Markdown: some details here',
+    type: 'journal',
+    scope: 'shared',
+    lifecycle: 'weekly',
+    tags: 'env=dev,owner=qa',
+  });
+  {
+    const sfull = await storeGet({
+      name: 'complete-store',
+      role: TEST_ROLE_USER,
+    });
+    assert(
+      sfull && (sfull.id || sfull.ID || sfull.name === 'complete-store'),
+      'store complete: not found',
+    );
+    assert(sfull.title === 'Complete Store', 'store complete: title mismatch');
+    assert(
+      sfull.description === 'Store with all fields',
+      'store complete: description missing',
+    );
+    assert(
+      sfull.motivation === 'Centralize artifacts',
+      'store complete: motivation missing',
+    );
+    assert(
+      sfull.security === 'Internal only',
+      'store complete: security missing',
+    );
+    assert(sfull.privacy === 'No PII', 'store complete: privacy missing');
+    assert(
+      sfull.notes === 'Markdown: some details here',
+      'store complete: notes missing',
+    );
+    assert(sfull.type === 'journal', 'store complete: type missing');
+    assert(sfull.scope === 'shared', 'store complete: scope missing');
+    assert(sfull.lifecycle === 'weekly', 'store complete: lifecycle missing');
+  }
+
   await packageSet({ role: TEST_ROLE_USER, variant: 'unit/go' });
   await packageSet({ role: TEST_ROLE_QA, variant: 'integration' });
   await packageSet({ role: TEST_ROLE_USER, variant: 'lint/go' });
@@ -677,6 +812,30 @@ try {
     role: TEST_ROLE_USER,
   });
 
+  // Create a second conversation with populated metadata fields
+  const convMeta2 = await conversationSet({
+    title: 'QA Discussion',
+    role: TEST_ROLE_QA,
+    description: 'Quality assurance planning and triage',
+    project: 'acme/quality',
+    tags: 'area=qa,priority=high,triage',
+    notes: 'Weekly QA sync notes',
+  });
+  const convID2 = idFrom(convMeta2);
+  {
+    const c2 = await conversationGetJSON({ id: convID2 });
+    assert(c2 && c2.id === convID2, 'conv2: id mismatch');
+    assert(c2.title === 'QA Discussion', 'conv2: title mismatch');
+    assert(
+      c2.description === 'Quality assurance planning and triage',
+      'conv2: description missing',
+    );
+    assert(c2.project === 'acme/quality', 'conv2: project missing');
+    assert(c2.notes === 'Weekly QA sync notes', 'conv2: notes missing');
+    assert(c2.tags && typeof c2.tags === 'object', 'conv2: tags missing');
+    assert(c2.tags.area === 'qa', 'conv2: tag area=qa missing');
+  }
+
   // 11.5) Testcases
   step++;
   logStep(step, TOTAL, 'Creating testcases and verifying listing');
@@ -685,6 +844,7 @@ try {
     role: TEST_ROLE_USER,
     experiment: expID,
     status: 'OK',
+    level: 'h1',
     name: 'vet-basic',
     pkg: 'acme/build',
     classname: 'lint.Vet',
@@ -697,6 +857,7 @@ try {
     role: TEST_ROLE_USER,
     experiment: expID,
     status: 'OK',
+    level: 'h2',
     name: 'fmt-style',
     pkg: 'acme/build',
     classname: 'format.Fmt',
@@ -709,6 +870,7 @@ try {
     role: TEST_ROLE_USER,
     experiment: expID,
     status: 'KO',
+    level: 'h3',
     name: 'misspell',
     pkg: 'acme/build',
     classname: 'lint.Misspell',
@@ -717,6 +879,32 @@ try {
     line: 3,
     executionTime: 0.33,
   });
+  // Additional cases including TODO and mixed levels
+  await testcaseCreate({
+    title: 'Integration: DB connect smoke',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'TODO',
+    level: 'h1',
+    name: 'db-connect',
+    pkg: 'acme/integration',
+    classname: 'integration.DB',
+    file: 'db_test.go',
+    line: 5,
+  });
+  await testcaseCreate({
+    title: 'Unit: edge cases',
+    role: TEST_ROLE_USER,
+    experiment: expID,
+    status: 'OK',
+    level: 'h3',
+    name: 'edge-cases',
+    pkg: 'acme/build',
+    classname: 'unit.Edge',
+    file: 'edge_test.go',
+    line: 21,
+    executionTime: 0.05,
+  });
   {
     const tcs = await testcaseListJSON({
       role: TEST_ROLE_USER,
@@ -724,8 +912,8 @@ try {
       limit: 50,
     });
     assert(
-      Array.isArray(tcs) && tcs.length >= 3,
-      'expected at least 3 testcases',
+      Array.isArray(tcs) && tcs.length >= 5,
+      'expected at least 5 testcases',
     );
     const gotVet = tcs.find(
       (x) => x?.title === 'Unit: go vet' && x?.status === 'OK',
@@ -733,8 +921,77 @@ try {
     const gotMisspell = tcs.find(
       (x) => x?.title === 'Lint: misspell' && x?.status === 'KO',
     );
+    const gotTodo = tcs.find(
+      (x) =>
+        x?.title === 'Integration: DB connect smoke' &&
+        x?.status?.toUpperCase() === 'TODO',
+    );
     assert(!!gotVet, 'missing testcase: go vet');
     assert(!!gotMisspell, 'missing testcase: misspell');
+    assert(!!gotTodo, 'missing testcase: integration DB connect (TODO)');
+  }
+
+  // Create a second experiment and attach a different set of testcases
+  logStep(step, TOTAL, 'Creating additional testcases under a new experiment');
+  const expMeta2 = await experimentCreate({ conversation: convID });
+  const expID2 = idFrom(expMeta2);
+  await testcaseCreate({
+    title: 'Unit: string utils',
+    role: TEST_ROLE_USER,
+    experiment: expID2,
+    status: 'OK',
+    level: 'h2',
+    name: 'string-utils',
+    pkg: 'acme/build',
+    classname: 'unit.Strings',
+    file: 'strings_test.go',
+    line: 15,
+    executionTime: 0.11,
+  });
+  await testcaseCreate({
+    title: 'Integration: API smoke',
+    role: TEST_ROLE_USER,
+    experiment: expID2,
+    status: 'KO',
+    level: 'h2',
+    name: 'api-smoke',
+    pkg: 'acme/integration',
+    classname: 'integration.API',
+    error: 'timeout contacting service',
+    file: 'api_test.go',
+    line: 27,
+    executionTime: 2.5,
+  });
+  await testcaseCreate({
+    title: 'Unit: parsing basics',
+    role: TEST_ROLE_USER,
+    experiment: expID2,
+    status: 'TODO',
+    level: 'h1',
+    name: 'parsing-basics',
+    pkg: 'acme/build',
+    classname: 'unit.Parser',
+    file: 'parse_test.go',
+    line: 3,
+  });
+  {
+    const tcs2 = await testcaseListJSON({
+      role: TEST_ROLE_USER,
+      experiment: expID2,
+      limit: 50,
+    });
+    assert(
+      Array.isArray(tcs2) && tcs2.length >= 3,
+      'expected at least 3 testcases in second experiment',
+    );
+    const gotAPI = tcs2.find(
+      (x) => x?.title === 'Integration: API smoke' && x?.status === 'KO',
+    );
+    const gotStrings = tcs2.find(
+      (x) => x?.title === 'Unit: string utils' && x?.status === 'OK',
+    );
+    assert(!!gotAPI, 'missing testcase in exp2: API smoke');
+    assert(!!gotStrings, 'missing testcase in exp2: string utils');
   }
 
   // 11.6) Testcases via Connect JSON (start server, create+list+delete one)

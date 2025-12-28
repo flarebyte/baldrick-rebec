@@ -68,6 +68,21 @@ var runCmd = &cobra.Command{
 			toDur = 10 * time.Minute
 		}
 
+		// Determine role for message: prefer experiment's conversation role, else task's role
+		var roleForMessage string
+		if strings.TrimSpace(flagRunExperiment) != "" {
+			if exp, err := pgdao.GetExperimentByID(ctx, db, flagRunExperiment); err == nil && exp != nil {
+				if conv, err := pgdao.GetConversationByID(ctx, db, exp.ConversationID); err == nil && conv != nil {
+					if strings.TrimSpace(conv.RoleName) != "" {
+						roleForMessage = strings.TrimSpace(conv.RoleName)
+					}
+				}
+			}
+		}
+		if roleForMessage == "" {
+			roleForMessage = strings.TrimSpace(task.RoleName)
+		}
+
 		// Start message: status=starting
 		startText := fmt.Sprintf("starting task %s (shell=%s, timeout=%s)", task.Variant, valueOr(task.Shell.String, "bash"), toDur)
 		metaStart := map[string]any{
@@ -83,6 +98,9 @@ var runCmd = &cobra.Command{
 			return err
 		}
 		ev := &pgdao.MessageEvent{ContentID: contentID, Status: "starting", Tags: map[string]any{"task": true, "run": true}}
+		if roleForMessage != "" {
+			ev.RoleName = roleForMessage
+		}
 		if strings.TrimSpace(task.ID) != "" {
 			ev.FromTaskID = sql.NullString{String: task.ID, Valid: true}
 		}
