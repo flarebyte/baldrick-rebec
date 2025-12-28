@@ -24,7 +24,7 @@ This codebase provides a CLI-first admin and data-manipulation workflow on top o
   - `internal/server/server.go` contains a minimal gRPC server wiring (port, PID, reload signals). There are no service definitions wired yet; the CLI talks directly to Postgres.
 
 ## Data Flow (CLI → DB)
-1) User runs a command, e.g. `rbc admin project set --name X --role user --description ...`.
+1) User runs a command, e.g. `rbc project set --name X --role user --description ...`.
 2) Cobra command parses flags and loads config (`internal/config`).
 3) Command opens a DB connection via `OpenApp` (app role) or `OpenAdmin` (admin role). The AfterConnect hook configures the session (LOAD AGE; search_path).
 4) Command calls a DAO function (e.g., `UpsertProject`) with validated inputs.

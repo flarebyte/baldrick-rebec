@@ -1,6 +1,6 @@
 # Prompt Sequence Flow
 
-This document describes, concisely, how a prompt travels through the system from the moment a user runs the CLI (`rbc admin prompt run`) or invokes the gRPC/HTTP API, to when the Large Language Model (LLM) returns a response.
+This document describes, concisely, how a prompt travels through the system from the moment a user runs the CLI (`rbc prompt run`) or invokes the gRPC/HTTP API, to when the Large Language Model (LLM) returns a response.
 
 ## Key Components
 
@@ -27,7 +27,7 @@ This document describes, concisely, how a prompt travels through the system from
 }
 ```
 
-## CLI Flow: `rbc admin prompt run`
+## CLI Flow: `rbc prompt run`
 
 High-level sequence:
 
@@ -121,13 +121,13 @@ Content types:
 
 ## Sequence Diagrams (Mermaid)
 
-### CLI Path (`rbc admin prompt run`)
+### CLI Path (`rbc prompt run`)
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
-    participant CLI as CLI (admin prompt run)
+    participant CLI as CLI (prompt run)
     participant ToolDAO
     participant VaultDAO
     participant LLMF as LLMFactory

@@ -21,11 +21,11 @@ This document explains how the Baldrick‑Rebec CLI uses its databases (PostgreS
 
 ## What the CLI Manages
 
-- `rbc admin config init` — Creates `~/.baldrick-rebec/config.yaml` with server/DB settings.
-- `rbc admin db init` — Initializes data stores:
+- `rbc config init` — Creates `~/.baldrick-rebec/config.yaml` with server/DB settings.
+- `rbc db init` — Initializes data stores:
   - PostgreSQL: creates or updates core tables and a trigger to maintain `updated_at` on `message_profiles`.
   - OpenSearch: ensures the `messages_content` index with simplified mappings/settings exists.
-- `rbc admin db status` — Connectivity + basic health checks for PostgreSQL and OpenSearch and presence of `messages_content`.
+- `rbc db status` — Connectivity + basic health checks for PostgreSQL and OpenSearch and presence of `messages_content`.
 
 Notes:
 - PostgreSQL schema changes are currently applied directly by `db init` (no versioned migrations yet). For production, consider adopting a migration tool later (e.g., `golang-migrate`).
@@ -36,29 +36,29 @@ Notes:
 PostgreSQL and OpenSearch provisioning is designed to be driven by the CLI.
 
 - Configure global settings (server + DBs):
-  - `rbc admin config init --overwrite [flags]`
+  - `rbc config init --overwrite [flags]`
   - Use `--dry-run` to preview changes without writing.
 
 - Preview planned DB changes (no writes):
-  - `rbc admin db plan`
+  - `rbc db plan`
 
 - Create roles, database, grants, and schema (admin required):
-  - `rbc admin db scaffold --create-roles --create-db --grant-privileges --yes`
-  - Then ensure tables/triggers: `rbc admin db scaffold` (schema-only re-run is safe)
+  - `rbc db scaffold --create-roles --create-db --grant-privileges --yes`
+  - Then ensure tables/triggers: `rbc db scaffold` (schema-only re-run is safe)
 
 - Configure OpenSearch security + lifecycle for localhost:
-  - `rbc admin os bootstrap` (removed in PG-only; previous guidance for OpenSearch)
+  - `rbc os bootstrap` (removed in PG-only; previous guidance for OpenSearch)
   - This command tries ILM first; if ILM is not available, it falls back to ISM automatically.
 
 - Initialize OpenSearch index and verify:
-  - `rbc admin db init` (ensures `messages_content` index and Postgres schema)
-  - `rbc admin db status` (reports index presence and lifecycle policy via ILM or ISM)
+  - `rbc db init` (ensures `messages_content` index and Postgres schema)
+  - `rbc db status` (reports index presence and lifecycle policy via ILM or ISM)
 
 OpenSearch Lifecycle (ILM/ISM)
 
 - OpenSearch often uses the Index State Management (ISM) plugin rather than Elasticsearch ILM. The CLI supports both:
-  - ILM commands: `rbc admin os ilm ensure|show|list|delete`
-  - ISM commands: `rbc admin os ism ensure|show|list|delete`
+  - ILM commands: `rbc os ilm ensure|show|list|delete`
+  - ISM commands: `rbc os ism ensure|show|list|delete`
   - For secured local images, `os bootstrap` will configure https and ensure+attach ILM or ISM automatically.
 
 - Example ILM policy (if ILM is available):
@@ -131,12 +131,12 @@ opensearch:
   1. Start services:
      - `docker compose up -d postgres`
      - `docker compose up -d opensearch-node1 opensearch-node2 opensearch-dashboards`
-  2. Create config: `rbc admin config init --overwrite [flags]`
-  3. Plan changes: `rbc admin db plan`
-  4. Scaffold DB: `rbc admin db scaffold --create-roles --create-db --grant-privileges --yes`
-  5. Configure OpenSearch secure localhost and lifecycle: `rbc admin os bootstrap`
-  6. Initialize stores: `rbc admin db init`
-  7. Verify: `rbc admin db status`
+  2. Create config: `rbc config init --overwrite [flags]`
+  3. Plan changes: `rbc db plan`
+  4. Scaffold DB: `rbc db scaffold --create-roles --create-db --grant-privileges --yes`
+  5. Configure OpenSearch secure localhost and lifecycle: `rbc os bootstrap`
+  6. Initialize stores: `rbc db init`
+  7. Verify: `rbc db status`
 
 - Podman users can use `podman-compose` with the same file (adjust commands accordingly).
 
@@ -165,9 +165,9 @@ OpenSearch
 
 ## Current Limitations and Roadmap
 
-- PostgreSQL schema changes are applied ad‑hoc via `rbc admin db init`. Introduce versioned migrations before widening usage.
-- The CLI creates the OpenSearch index but does not create ILM policies. Add `rbc admin os ilm ensure` if you prefer full automation.
-- Add health endpoints and richer diagnostics in `rbc admin db status` (doc counts, table existence, index settings) as needed.
+- PostgreSQL schema changes are applied ad‑hoc via `rbc db init`. Introduce versioned migrations before widening usage.
+- The CLI creates the OpenSearch index but does not create ILM policies. Add `rbc os ilm ensure` if you prefer full automation.
+- Add health endpoints and richer diagnostics in `rbc db status` (doc counts, table existence, index settings) as needed.
 
 ## Credentials Map (Roles → Password Location)
 

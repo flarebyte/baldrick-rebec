@@ -46,20 +46,20 @@ This document outlines how testcase operations flow through the system for both 
 
 ## CLI Flows
 
-### Create: `rbc admin testcase create`
+### Create: `rbc testcase create`
 
 1. Parse flags: `--title` (required), `--role`, `--experiment`, `--status`, plus optional metadata.
 2. Load config and open Postgres pool.
 3. Build DAO entity and call `InsertTestcase`.
 4. Print JSON with `id`, `title`, `status`, and `created`.
 
-### List: `rbc admin testcase list`
+### List: `rbc testcase list`
 
 1. Parse flags: `--role` (required), `--experiment`, `--status`, `--limit`, `--offset`, `--output`.
 2. Load config and open Postgres pool.
 3. Call `ListTestcases` and print as JSON (`--output json`) or table.
 
-### Delete: `rbc admin testcase delete`
+### Delete: `rbc testcase delete`
 
 1. Parse flags: `--id` (required), `--force`, `--ignore-missing`.
 2. Load config and open Postgres pool.
@@ -89,7 +89,7 @@ Two ingress options feed the same DAO logic:
 sequenceDiagram
   autonumber
   actor User
-  participant CLI as CLI (admin testcase ...)
+  participant CLI as CLI (testcase ...)
   participant DB as Postgres
   participant DAO as Testcase DAO
 

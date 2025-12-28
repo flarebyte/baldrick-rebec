@@ -11,7 +11,7 @@ This note bootstraps a new contributor to investigate the remaining graph issues
 - Docker: Postgres service only. No AGE required.
 - Session bootstrap: `SET search_path = "$user", public`.
 - Graph init: not needed. Relations live in SQL tables (`task_replaces`, `stickie_relations`).
-- Scaffold: `rbc admin db scaffold --all --yes` creates schema and re-grants runtime privileges post-schema.
+- Scaffold: `rbc db scaffold --all --yes` creates schema and re-grants runtime privileges post-schema.
 
 ## Current Symptoms
 - test-all.sh still fails at the stickie relationship assertion:
@@ -43,8 +43,8 @@ This note bootstraps a new contributor to investigate the remaining graph issues
 1) Run test-all.sh with fallback disabled (default) and capture the first failing stickie-rel set call:
    - If it errors, the CLI now returns `cmd=stickie-rel set params={...}`. Use this to replicate minimal failing case.
 2) Attempt a minimal manual graph write (no mirror):
-   - `rbc admin stickie-rel set --from <st1> --to <st2> --type uses --labels ref`
-   - Then `rbc admin stickie-rel list --id <st1> --direction out --output json`
+   - `rbc stickie-rel set --from <st1> --to <st2> --type uses --labels ref`
+   - Then `rbc stickie-rel list --id <st1> --direction out --output json`
 3) If still 0 rows, add a temporary write-probe in age-status (optional):
    - Create a temp Stickie pair and INCLUDES edge; check it appears; then delete.
 4) Inspect session role/privs at write time:
@@ -54,7 +54,7 @@ This note bootstraps a new contributor to investigate the remaining graph issues
 ## Repro/Runbook
 - Fresh run:
   - `docker compose up -d`
-  - `rbc admin db scaffold --all --yes`
+  - `rbc db scaffold --all --yes`
   - `sh script/test-all.sh`
 - If failure:
   - Copy the failing command and error (now includes `cmd=... params=...`) into the issue.
@@ -67,14 +67,14 @@ This note bootstraps a new contributor to investigate the remaining graph issues
 
 ## Useful CLI
 - Diagnostics:
-  - `rbc admin db show --output json`
-  - `rbc admin db count --json`
+  - `rbc db show --output json`
+  - `rbc db count --json`
 - Task graph:
-  - `rbc admin task latest --variant unit/go`
-  - `rbc admin task next --id <task-id> --level patch`
+  - `rbc task latest --variant unit/go`
+  - `rbc task next --id <task-id> --level patch`
 - Stickie relations (SQL):
-  - `rbc admin stickie-rel set --from <a> --to <b> --type uses --labels x`
-  - `rbc admin stickie-rel list --id <a> --direction out --output json`
+  - `rbc stickie-rel set --from <a> --to <b> --type uses --labels x`
+  - `rbc stickie-rel list --id <a> --direction out --output json`
 
 ## Risks / Alternatives
 - We removed AGE. Graph features are implemented with SQL tables.

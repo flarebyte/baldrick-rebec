@@ -12,9 +12,9 @@ Goal: Reduce operational complexity by storing message content in PostgreSQL (us
   - Move unique message content from OpenSearch to PostgreSQL (new table).
   - Keep existing events/profiles tables; relate events to content rows via FK.
 - CLI
-  - Remove or deprecate `rbc admin os ...` commands (bootstrap, ilm/ism) once parity is reached.
-  - `rbc admin db init` creates/updates the content table and FTS index.
-  - `rbc admin db status` reports FTS readiness and content table presence.
+  - Remove or deprecate `rbc os ...` commands (bootstrap, ilm/ism) once parity is reached.
+  - `rbc db init` creates/updates the content table and FTS index.
+  - `rbc db status` reports FTS readiness and content table presence.
 - DAOs
   - Delete OpenSearch DAOs (client, messages_content) and replace with PostgreSQL content DAO (CRUD, dedup by hash).
 - Config
@@ -38,12 +38,12 @@ Goal: Reduce operational complexity by storing message content in PostgreSQL (us
 1) Code path switch (feature flag)
    - Add a config flag `features.pg_only = true` to use PG code paths in parallel with OS for a short transition.
 2) Schema
-   - `rbc admin db init` creates the content table and FTS index if missing (no vector).
+   - `rbc db init` creates the content table and FTS index if missing (no vector).
 3) Ingest
-   - `rbc admin message send` writes content to PG (dedupe by hash) and events to PG.
+   - `rbc message send` writes content to PG (dedupe by hash) and events to PG.
 4) Migration & Removal
    - If any content is in OpenSearch, provide a one‑off migration tool/command to read content by `_id` and bulk insert into PG; otherwise skip.
-   - Remove OS code, config, and docs; delete `rbc admin os ...` commands.
+   - Remove OS code, config, and docs; delete `rbc os ...` commands.
    - Remove OpenSearch from `docker-compose.yaml` and dependencies from `go.mod`.
    - Remove feature flags; PG becomes the only path.
 

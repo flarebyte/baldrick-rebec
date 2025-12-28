@@ -1,6 +1,6 @@
 # Task Architecture and Relationships
 
-This document summarizes how the `tasks` entity relates to other parts of the system based on the current codebase. It is grounded in the Go DAOs and CLI commands under `internal/` and `cmd/`, and the schema/relationships reported by `rbc admin db show`.
+This document summarizes how the `tasks` entity relates to other parts of the system based on the current codebase. It is grounded in the Go DAOs and CLI commands under `internal/` and `cmd/`, and the schema/relationships reported by `rbc db show`.
 
 ## Overview
 
