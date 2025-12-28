@@ -160,18 +160,24 @@ func (m taskActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			m.quitting = true
 			return m, tea.Quit
-        case "up", "k":
-            if m.cursor > 0 {
+        case "up":
+            if len(m.tasks) == 0 {
+                return m, nil
+            }
+            if m.cursor <= 0 {
+                m.cursor = len(m.tasks) - 1
+            } else {
                 m.cursor--
             }
             m.scriptIdx = 0
             m.scripts = nil
             m.scriptsLoading = true
             return m, fetchScriptsCmd(m.tasks[m.cursor].ID)
-        case "down", "j":
-            if m.cursor < len(m.tasks)-1 {
-                m.cursor++
+        case "down":
+            if len(m.tasks) == 0 {
+                return m, nil
             }
+            m.cursor = (m.cursor + 1) % len(m.tasks)
             m.scriptIdx = 0
             m.scripts = nil
             m.scriptsLoading = true
@@ -197,7 +203,7 @@ func (m taskActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
                     scriptName = m.scripts[m.scriptIdx].Name
                 }
                 m.running = true; m.lastRun = ""
-                return m, runTaskCmdWithScript(m.tasks[m.cursor].ID, m.tasks[m.cursor].Variant, expID, scriptName)
+                return m, runTaskCmdWithScript(m.tasks[m.cursor].ID, expID, scriptName)
             }
             return m, nil
 		case "n":
@@ -292,7 +298,7 @@ func (m taskActiveModel) View() string {
 	}
 
     b.WriteString(tStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
-    b.WriteString(tStyleHelp.Render("Keys: ↑/k, ↓/j, →=next script, /=search, n=next exp, r=refresh, x=run, q") + "\n")
+    b.WriteString(tStyleHelp.Render("Keys: ↑, ↓, →=next script, /=search, n=next exp, r=refresh, x=run, q") + "\n")
 
 	if len(m.tasks) == 0 {
 		b.WriteString("No tasks.\n")
@@ -423,7 +429,7 @@ func fetchScriptsCmd(taskID string) tea.Cmd {
 // (duplicate Update method removed)
 
 // runTaskCmdWithScript executes the selected script for the given task under the selected experiment context
-func runTaskCmdWithScript(taskID string, variant string, experimentID string, scriptName string) tea.Cmd {
+func runTaskCmdWithScript(taskID string, experimentID string, scriptName string) tea.Cmd {
     return func() tea.Msg {
         cfg, err := cfgpkg.Load()
         if err != nil { return taskRunDoneMsg{err: err} }
