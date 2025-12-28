@@ -1,6 +1,9 @@
-function launchTerminal({profileName, command}) {
+function launchTerminal({profileName, command, title}) {
   const Terminal = Application('Terminal');
-  const targetWindow = Terminal.doScript(command);
+  const safeTitle = (title || '').trim();
+  const setTitle = safeTitle ? `printf '\\e]0;${safeTitle}\\a' ; ` : '';
+  const full = `${setTitle}${command}`;
+  const targetWindow = Terminal.doScript(full);
   targetWindow.numberOfColumns = 120;
   targetWindow.numberOfRows = 40;
   targetWindow.currentSettings = Terminal.settingsSets.byName(profileName);
@@ -19,5 +22,5 @@ if (!conversationId || conversationId.trim() === '') {
   throw new Error('CONVERSATION_ID not provided');
 }
 
-launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin testcase active --conversation ${conversationId}`})
-launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin message active --conversation ${conversationId}`})
+launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin testcase active --conversation ${conversationId}`, title: 'Testcase',})
+launchTerminal({profileName: 'Basic', command: `cd ${rbcHome}; rbc admin message active --conversation ${conversationId}`, title: 'Message'})
