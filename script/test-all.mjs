@@ -32,9 +32,9 @@ import {
   dbCountPerRole,
   dbReset,
   dbScaffoldAll,
+  enableAssertConnect,
   experimentCreate,
   experimentList,
-  enableAssertConnect,
   idFrom,
   listWithRole,
   logStep,
@@ -436,17 +436,15 @@ try {
       name: 'acme/complete',
       role: TEST_ROLE_USER,
     });
-    assert(
-      pj && pj.name === 'acme/complete',
-      'project complete: name mismatch',
-    );
-    assert(
-      pj.description === 'Complete metadata project',
-      'project complete: description missing',
-    );
-    assert(
-      pj.notes === 'Project notes filled',
-      'project complete: notes missing',
+    const okProject =
+      !!pj &&
+      pj.name === 'acme/complete' &&
+      pj.description === 'Complete metadata project' &&
+      pj.notes === 'Project notes filled';
+    await assertStep(
+      'project complete validated',
+      okProject,
+      'project complete: fields mismatch or missing',
     );
   }
   {
@@ -477,26 +475,26 @@ try {
   });
   {
     const tList = await toolListJSON({ role: TEST_ROLE_USER, limit: 50 });
-    assert(
-      Array.isArray(tList) && tList.length >= 2,
-      'expected at least 2 tools in list',
-    );
     const hasLinter = tList.find(
       (x) => x && x.name === 'acme-linter' && x.title === 'Acme Linter',
     );
     const hasFmt = tList.find(
       (x) => x && x.name === 'acme-formatter' && x.title === 'Acme Formatter',
     );
-    assert(!!hasLinter, 'tool list missing acme-linter');
-    assert(!!hasFmt, 'tool list missing acme-formatter');
-    const t1 = await toolGetJSON({ name: 'acme-linter' });
-    assert(
-      t1 && t1.name === 'acme-linter' && t1.role === TEST_ROLE_USER,
-      'tool get failed for acme-linter',
+    await assertStep(
+      'tools listed',
+      Array.isArray(tList) && tList.length >= 2 && !!hasLinter && !!hasFmt,
+      'tools list missing expected entries',
     );
-    assert(
-      t1.settings && t1.settings.autofix === true,
-      'tool get missing settings for acme-linter',
+    const t1 = await toolGetJSON({ name: 'acme-linter' });
+    await assertStep(
+      'tool get validated',
+      t1 &&
+        t1.name === 'acme-linter' &&
+        t1.role === TEST_ROLE_USER &&
+        t1.settings &&
+        t1.settings.autofix === true,
+      'tool get validation failed for acme-linter',
     );
   }
 
@@ -839,16 +837,21 @@ try {
   const convID2 = idFrom(convMeta2);
   {
     const c2 = await conversationGetJSON({ id: convID2 });
-    assert(c2 && c2.id === convID2, 'conv2: id mismatch');
-    assert(c2.title === 'QA Discussion', 'conv2: title mismatch');
-    assert(
-      c2.description === 'Quality assurance planning and triage',
-      'conv2: description missing',
+    const okConv2 =
+      !!c2 &&
+      c2.id === convID2 &&
+      c2.title === 'QA Discussion' &&
+      c2.description === 'Quality assurance planning and triage' &&
+      c2.project === 'acme/quality' &&
+      c2.notes === 'Weekly QA sync notes' &&
+      c2.tags &&
+      typeof c2.tags === 'object' &&
+      c2.tags.area === 'qa';
+    await assertStep(
+      'conversation 2 validated',
+      okConv2,
+      'conv2 fields mismatch',
     );
-    assert(c2.project === 'acme/quality', 'conv2: project missing');
-    assert(c2.notes === 'Weekly QA sync notes', 'conv2: notes missing');
-    assert(c2.tags && typeof c2.tags === 'object', 'conv2: tags missing');
-    assert(c2.tags.area === 'qa', 'conv2: tag area=qa missing');
   }
 
   // 11.5) Testcases
@@ -926,10 +929,6 @@ try {
       experiment: expID,
       limit: 50,
     });
-    assert(
-      Array.isArray(tcs) && tcs.length >= 5,
-      'expected at least 5 testcases',
-    );
     const gotVet = tcs.find(
       (x) => x?.title === 'Unit: go vet' && x?.status === 'OK',
     );
@@ -941,9 +940,15 @@ try {
         x?.title === 'Integration: DB connect smoke' &&
         x?.status?.toUpperCase() === 'TODO',
     );
-    assert(!!gotVet, 'missing testcase: go vet');
-    assert(!!gotMisspell, 'missing testcase: misspell');
-    assert(!!gotTodo, 'missing testcase: integration DB connect (TODO)');
+    await assertStep(
+      'testcases created',
+      Array.isArray(tcs) &&
+        tcs.length >= 5 &&
+        !!gotVet &&
+        !!gotMisspell &&
+        !!gotTodo,
+      'expected testcases missing in first experiment',
+    );
   }
 
   // Create a second experiment and attach a different set of testcases
@@ -995,18 +1000,17 @@ try {
       experiment: expID2,
       limit: 50,
     });
-    assert(
-      Array.isArray(tcs2) && tcs2.length >= 3,
-      'expected at least 3 testcases in second experiment',
-    );
     const gotAPI = tcs2.find(
       (x) => x?.title === 'Integration: API smoke' && x?.status === 'KO',
     );
     const gotStrings = tcs2.find(
       (x) => x?.title === 'Unit: string utils' && x?.status === 'OK',
     );
-    assert(!!gotAPI, 'missing testcase in exp2: API smoke');
-    assert(!!gotStrings, 'missing testcase in exp2: string utils');
+    await assertStep(
+      'testcases exp2 created',
+      Array.isArray(tcs2) && tcs2.length >= 3 && !!gotAPI && !!gotStrings,
+      'expected testcases missing in second experiment',
+    );
   }
 
   // 11.6) Testcases via Connect JSON (start server, create+list+delete one)
@@ -1023,7 +1027,10 @@ try {
       ));
     } catch (e) {
       const msg = e?.message || String(e || '');
-      if (msg.includes("'@connectrpc/connect-node'") || msg.includes('@bufbuild')) {
+      if (
+        msg.includes("'@connectrpc/connect-node'") ||
+        msg.includes('@bufbuild')
+      ) {
         await $`npm --prefix script install --silent`;
         ({ createConnectGrpcJsonClient } = await import(
           './grpc-json-client-connect.mjs'
@@ -1134,23 +1141,21 @@ try {
     const byId = (id) =>
       (stList || []).find((x) => x && (x.id === id || x.ID === id));
     const s1json = byId(st1);
-    assert(
-      s1json && s1json.name === 'Onboarding Refresh',
-      'stickie list json missing or wrong name for st1',
-    );
     const s2json = byId(st2);
-    assert(
-      s2json && s2json.name === 'DevOps Caching',
-      'stickie list json missing or wrong name for st2',
-    );
     const f1 = await stickieFind({
       name: 'Onboarding Refresh',
       variant: '',
       blackboard: bb1,
     });
-    assert(
-      f1 && f1.id === st1,
-      'stickie find did not resolve st1 by complex name within board',
+    await assertStep(
+      'stickies validated',
+      s1json &&
+        s1json.name === 'Onboarding Refresh' &&
+        s2json &&
+        s2json.name === 'DevOps Caching' &&
+        f1 &&
+        f1.id === st1,
+      'stickies list/find validation failed',
     );
   }
   await stickieListByTopic({
@@ -1185,16 +1190,14 @@ try {
     await snapshotList({ limit: 5 });
     await snapshotShow({ id: bkpID });
     const verifyRows = await snapshotVerifyJSON({ id: bkpID });
-    assert(
-      Array.isArray(verifyRows),
-      'snapshot verify did not return JSON array',
-    );
     const prunePreview = await snapshotPrunePreviewJSON({ olderThan: '0d' });
-    assert(
-      prunePreview &&
+    await assertStep(
+      'snapshot verified',
+      Array.isArray(verifyRows) &&
+        prunePreview &&
         typeof prunePreview.candidates === 'number' &&
         prunePreview.candidates >= 1,
-      'snapshot prune preview unexpected',
+      'snapshot verify/prune preview unexpected',
     );
     await snapshotRestoreDry({ id: bkpID, mode: 'append' });
     await snapshotDelete({ id: bkpID });

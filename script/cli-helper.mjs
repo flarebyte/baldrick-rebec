@@ -48,7 +48,10 @@ async function __ensureConnectClient() {
     ));
   } catch (e) {
     const msg = e?.message || String(e || '');
-    if (msg.includes("'@connectrpc/connect-node'") || msg.includes('@bufbuild')) {
+    if (
+      msg.includes("'@connectrpc/connect-node'") ||
+      msg.includes('@bufbuild')
+    ) {
       await $`npm --prefix script install --silent`;
       ({ createConnectGrpcJsonClient } = await import(
         './grpc-json-client-connect.mjs'
