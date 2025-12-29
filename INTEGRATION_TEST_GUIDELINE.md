@@ -3,7 +3,7 @@
 This document is a prompt for AI agents authoring and maintaining our ZX‑based integration tests. It explains what code belongs in each script under `script/`, with clear boundaries and patterns to keep the tests readable, maintainable, and reliable.
 
 ## Purpose
-- Provide a single, end‑to‑end smoke/regression test (`script/test-all.mjs`) that exercises the admin CLI (`rbc`) across core entities.
+- Provide a single, end‑to‑end smoke/regression test (`script/test-all.mjs`) that exercises the CLI (`rbc`) across core entities.
 - Centralize CLI invocation patterns in helpers (`script/cli-helper.mjs`).
 - Centralize JSON contract assertions in a single place (`script/contract-helper.mjs`).
 
@@ -35,7 +35,7 @@ What does NOT belong here:
 - Parsing stdout JSON manually — always use `…JSON` helpers.
 
 ### 2) `script/cli-helper.mjs` (CLI Invocation Wrappers)
-This is the single place to define thin wrappers over the `rbc` admin CLI. It should:
+This is the single place to define thin wrappers over the `rbc` CLI. It should:
 - Export `runRbc` and `runRbcJSON` utility functions and structured wrappers per command (e.g., `workflowListJSON`, `taskListJSON`, `stickieSet`, `messageListJSON`, etc.).
 - Accept plain parameters; do not hardcode environment or defaults beyond CLI flags.
 - For commands requiring stdin, provide a wrapper that wires stdin (e.g., `messageSet`).
@@ -70,14 +70,14 @@ What does NOT belong here:
 - Zod instance: only `contract-helper.mjs` imports Zod directly; do not import Zod elsewhere to avoid multiple instances.
 
 ## How to Add New Coverage
-1. Add a CLI wrapper in `cli-helper.mjs` for the new `rbc admin` command.
+1. Add a CLI wrapper in `cli-helper.mjs` for the new `rbc` command.
 2. Add/extend a Zod schema and validator in `contract-helper.mjs` (keep rules above).
 3. In `test-all.mjs`, call the wrapper and validate with the corresponding contract.
 4. Keep the step readable and deterministic; print minimal but helpful progress.
 
 ## Examples
 - Adding a new list contract:
-  - Helper: `export async function packageListJSON({ role, limit = 100 }) { return await runRbcJSON('admin','package','list','--role',role,'--output','json','--limit',String(limit)); }`
+  - Helper: `export async function packageListJSON({ role, limit = 100 }) { return await runRbcJSON('package','list','--role',role,'--output','json','--limit',String(limit)); }`
   - Contract: `function packageListItemSchemaFactory() { return z.object({ id: z.string().min(1), role: z.string().min(1), task_id: z.string().min(1).optional(), created: z.string().optional() }); } export function validatePackageListContract(a){ return z.array(packageListItemSchemaFactory()).parse(a) }`
   - Test: `const pkgs = await packageListJSON({ role: TEST_ROLE_USER }); validatePackageListContract(pkgs);`
 

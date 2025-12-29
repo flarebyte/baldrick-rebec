@@ -1,14 +1,14 @@
 package task
 
 import (
-    "bytes"
-    "context"
-    "database/sql"
-    "errors"
-    "fmt"
-    "encoding/json"
-    "strings"
-    "time"
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -96,18 +96,18 @@ type taskActiveModel struct {
 	err          string
 
 	// Search
-    search      string
-    inSearch    bool
-    searchInput string
+	search      string
+	inSearch    bool
+	searchInput string
 
-    // Run feedback
-    running  bool
-    lastRun  string
+	// Run feedback
+	running bool
+	lastRun string
 
-    // Scripts for selected task
-    scripts        []pgdao.TaskScript
-    scriptIdx      int
-    scriptsLoading bool
+	// Scripts for selected task
+	scripts        []pgdao.TaskScript
+	scriptIdx      int
+	scriptsLoading bool
 }
 
 func newTaskActiveModel(conversation, role string, exps []pgdao.Experiment, expIdx int, tasks []pgdao.Task) taskActiveModel {
@@ -118,11 +118,11 @@ func newTaskActiveModel(conversation, role string, exps []pgdao.Experiment, expI
 }
 
 func (m taskActiveModel) Init() tea.Cmd {
-    if len(m.tasks) > 0 && m.cursor >= 0 && m.cursor < len(m.tasks) {
-        m.scriptsLoading = true
-        return fetchScriptsCmd(m.tasks[m.cursor].ID)
-    }
-    return nil
+	if len(m.tasks) > 0 && m.cursor >= 0 && m.cursor < len(m.tasks) {
+		m.scriptsLoading = true
+		return fetchScriptsCmd(m.tasks[m.cursor].ID)
+	}
+	return nil
 }
 
 func (m taskActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -160,52 +160,55 @@ func (m taskActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			m.quitting = true
 			return m, tea.Quit
-        case "up":
-            if len(m.tasks) == 0 {
-                return m, nil
-            }
-            if m.cursor <= 0 {
-                m.cursor = len(m.tasks) - 1
-            } else {
-                m.cursor--
-            }
-            m.scriptIdx = 0
-            m.scripts = nil
-            m.scriptsLoading = true
-            return m, fetchScriptsCmd(m.tasks[m.cursor].ID)
-        case "down":
-            if len(m.tasks) == 0 {
-                return m, nil
-            }
-            m.cursor = (m.cursor + 1) % len(m.tasks)
-            m.scriptIdx = 0
-            m.scripts = nil
-            m.scriptsLoading = true
-            return m, fetchScriptsCmd(m.tasks[m.cursor].ID)
-        case "/":
+		case "up":
+			if len(m.tasks) == 0 {
+				return m, nil
+			}
+			if m.cursor <= 0 {
+				m.cursor = len(m.tasks) - 1
+			} else {
+				m.cursor--
+			}
+			m.scriptIdx = 0
+			m.scripts = nil
+			m.scriptsLoading = true
+			return m, fetchScriptsCmd(m.tasks[m.cursor].ID)
+		case "down":
+			if len(m.tasks) == 0 {
+				return m, nil
+			}
+			m.cursor = (m.cursor + 1) % len(m.tasks)
+			m.scriptIdx = 0
+			m.scripts = nil
+			m.scriptsLoading = true
+			return m, fetchScriptsCmd(m.tasks[m.cursor].ID)
+		case "/":
 			m.inSearch = true
 			m.searchInput = m.search
 			return m, nil
-        case "r":
-            return m, refreshTasksCmd(m.role, m.search)
-        case "right":
-            if len(m.scripts) > 0 {
-                m.scriptIdx = (m.scriptIdx + 1) % len(m.scripts)
-            }
-            return m, nil
-        case "x", "X":
-            if m.cursor >= 0 && m.cursor < len(m.tasks) {
-                var expID string
-                if len(m.experiments) > 0 && m.expIdx >= 0 && m.expIdx < len(m.experiments) { expID = m.experiments[m.expIdx].ID }
-                // Determine script to run
-                scriptName := "run"
-                if len(m.scripts) > 0 && m.scriptIdx >= 0 && m.scriptIdx < len(m.scripts) {
-                    scriptName = m.scripts[m.scriptIdx].Name
-                }
-                m.running = true; m.lastRun = ""
-                return m, runTaskCmdWithScript(m.tasks[m.cursor].ID, expID, scriptName)
-            }
-            return m, nil
+		case "r":
+			return m, refreshTasksCmd(m.role, m.search)
+		case "right":
+			if len(m.scripts) > 0 {
+				m.scriptIdx = (m.scriptIdx + 1) % len(m.scripts)
+			}
+			return m, nil
+		case "x", "X":
+			if m.cursor >= 0 && m.cursor < len(m.tasks) {
+				var expID string
+				if len(m.experiments) > 0 && m.expIdx >= 0 && m.expIdx < len(m.experiments) {
+					expID = m.experiments[m.expIdx].ID
+				}
+				// Determine script to run
+				scriptName := "run"
+				if len(m.scripts) > 0 && m.scriptIdx >= 0 && m.scriptIdx < len(m.scripts) {
+					scriptName = m.scripts[m.scriptIdx].Name
+				}
+				m.running = true
+				m.lastRun = ""
+				return m, runTaskCmdWithScript(m.tasks[m.cursor].ID, expID, scriptName)
+			}
+			return m, nil
 		case "n":
 			if len(m.experiments) > 0 {
 				m.expIdx = (m.expIdx + 1) % len(m.experiments)
@@ -223,16 +226,16 @@ func (m taskActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = len(m.tasks) - 1
 			}
 		}
-        if len(m.tasks) > 0 && m.cursor >= 0 && m.cursor < len(m.tasks) {
-            m.scriptIdx = 0
-            m.scripts = nil
-            m.scriptsLoading = true
-            return m, fetchScriptsCmd(m.tasks[m.cursor].ID)
-        }
-        return m, nil
+		if len(m.tasks) > 0 && m.cursor >= 0 && m.cursor < len(m.tasks) {
+			m.scriptIdx = 0
+			m.scripts = nil
+			m.scriptsLoading = true
+			return m, fetchScriptsCmd(m.tasks[m.cursor].ID)
+		}
+		return m, nil
 	case taskErrMsg:
-	    		m.err = msg.err.Error()
-	    		return m, nil
+		m.err = msg.err.Error()
+		return m, nil
 	case taskScriptsMsg:
 		// Only apply if still on same task
 		if len(m.tasks) > 0 && m.cursor >= 0 && m.cursor < len(m.tasks) && m.tasks[m.cursor].ID == msg.taskID {
@@ -247,17 +250,17 @@ func (m taskActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
-    	case taskRunDoneMsg:
-    		m.running = false
-    		if msg.err != nil {
-    			m.lastRun = fmt.Sprintf("failed: %v", msg.err)
-    		} else {
-    			m.lastRun = fmt.Sprintf("%s (exit=%d, msg=%s)", msg.status, msg.exitCode, msg.messageID)
-    		}
-    		return m, nil
-    	}
-    	return m, nil
-    }
+	case taskRunDoneMsg:
+		m.running = false
+		if msg.err != nil {
+			m.lastRun = fmt.Sprintf("failed: %v", msg.err)
+		} else {
+			m.lastRun = fmt.Sprintf("%s (exit=%d, msg=%s)", msg.status, msg.exitCode, msg.messageID)
+		}
+		return m, nil
+	}
+	return m, nil
+}
 
 func (m taskActiveModel) View() string {
 	var b strings.Builder
@@ -297,8 +300,8 @@ func (m taskActiveModel) View() string {
 		b.WriteString(tStyleLabel.Render("Search: ") + tStyleValue.Render(m.search) + "\n")
 	}
 
-    b.WriteString(tStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
-    b.WriteString(tStyleHelp.Render("Keys: ↑, ↓, →=next script, /=search, n=next exp, r=refresh, x=run, q") + "\n")
+	b.WriteString(tStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
+	b.WriteString(tStyleHelp.Render("Keys: ↑, ↓, →=next script, /=search, n=next exp, r=refresh, x=run, q") + "\n")
 
 	if len(m.tasks) == 0 {
 		b.WriteString("No tasks.\n")
@@ -349,41 +352,51 @@ func (m taskActiveModel) View() string {
 			b.WriteString(tStyleLabel.Render("Level: ") + tStyleValue.Render(t.Level.String) + "\n")
 		}
 		b.WriteString(tStyleLabel.Render("Archived: ") + tStyleValue.Render(fmt.Sprintf("%v", t.Archived)) + "\n")
-        if t.Created.Valid {
-            b.WriteString(tStyleLabel.Render("Created: ") + tStyleValue.Render(t.Created.Time.Format(time.RFC3339)) + "\n")
-        }
-        // Scripts attached to this task
-        if m.scriptsLoading {
-            b.WriteString(tStyleLabel.Render("Scripts: ") + tStyleValue.Render("loading…") + "\n")
-        } else if len(m.scripts) > 0 {
-            b.WriteString(tStyleLabel.Render("Scripts: "))
-            var sb strings.Builder
-            for i, s := range m.scripts {
-                if i > 0 { sb.WriteString("  ") }
-                if i == m.scriptIdx {
-                    sb.WriteString(tStyleCursor.Render(s.Name))
-                } else {
-                    sb.WriteString(tStyleValue.Render(s.Name))
-                }
-            }
-            b.WriteString(sb.String() + "\n")
-        } else {
-            b.WriteString(tStyleLabel.Render("Scripts: ") + tStyleValue.Render("(none attached)") + "\n")
-        }
-        if m.running {
-            b.WriteString(tStyleLabel.Render("Run: ") + tStyleValue.Render("running…") + "\n")
-        } else if strings.TrimSpace(m.lastRun) != "" {
-            b.WriteString(tStyleLabel.Render("Run: ") + tStyleValue.Render(m.lastRun) + "\n")
-        }
-    }
-    return b.String()
+		if t.Created.Valid {
+			b.WriteString(tStyleLabel.Render("Created: ") + tStyleValue.Render(t.Created.Time.Format(time.RFC3339)) + "\n")
+		}
+		// Scripts attached to this task
+		if m.scriptsLoading {
+			b.WriteString(tStyleLabel.Render("Scripts: ") + tStyleValue.Render("loading…") + "\n")
+		} else if len(m.scripts) > 0 {
+			b.WriteString(tStyleLabel.Render("Scripts: "))
+			var sb strings.Builder
+			for i, s := range m.scripts {
+				if i > 0 {
+					sb.WriteString("  ")
+				}
+				if i == m.scriptIdx {
+					sb.WriteString(tStyleCursor.Render(s.Name))
+				} else {
+					sb.WriteString(tStyleValue.Render(s.Name))
+				}
+			}
+			b.WriteString(sb.String() + "\n")
+		} else {
+			b.WriteString(tStyleLabel.Render("Scripts: ") + tStyleValue.Render("(none attached)") + "\n")
+		}
+		if m.running {
+			b.WriteString(tStyleLabel.Render("Run: ") + tStyleValue.Render("running…") + "\n")
+		} else if strings.TrimSpace(m.lastRun) != "" {
+			b.WriteString(tStyleLabel.Render("Run: ") + tStyleValue.Render(m.lastRun) + "\n")
+		}
+	}
+	return b.String()
 }
 
 // Messages & commands
 type taskRefreshMsg struct{ tasks []pgdao.Task }
 type taskErrMsg struct{ err error }
-type taskRunDoneMsg struct{ status string; exitCode int; messageID string; err error }
-type taskScriptsMsg struct{ taskID string; scripts []pgdao.TaskScript }
+type taskRunDoneMsg struct {
+	status    string
+	exitCode  int
+	messageID string
+	err       error
+}
+type taskScriptsMsg struct {
+	taskID  string
+	scripts []pgdao.TaskScript
+}
 
 func refreshTasksCmd(role, search string) tea.Cmd {
 	return func() tea.Msg {
@@ -412,85 +425,132 @@ func refreshTasksCmd(role, search string) tea.Cmd {
 }
 
 func fetchScriptsCmd(taskID string) tea.Cmd {
-    return func() tea.Msg {
-        cfg, err := cfgpkg.Load()
-        if err != nil { return taskErrMsg{err} }
-        ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-        defer cancel()
-        db, err := pgdao.OpenApp(ctx, cfg)
-        if err != nil { return taskErrMsg{err} }
-        defer db.Close()
-        rows, err := pgdao.ListTaskScripts(ctx, db, taskID)
-        if err != nil { return taskErrMsg{err} }
-        return taskScriptsMsg{taskID: taskID, scripts: rows}
-    }
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return taskErrMsg{err}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		db, err := pgdao.OpenApp(ctx, cfg)
+		if err != nil {
+			return taskErrMsg{err}
+		}
+		defer db.Close()
+		rows, err := pgdao.ListTaskScripts(ctx, db, taskID)
+		if err != nil {
+			return taskErrMsg{err}
+		}
+		return taskScriptsMsg{taskID: taskID, scripts: rows}
+	}
 }
 
 // (duplicate Update method removed)
 
 // runTaskCmdWithScript executes the selected script for the given task under the selected experiment context
 func runTaskCmdWithScript(taskID string, experimentID string, scriptName string) tea.Cmd {
-    return func() tea.Msg {
-        cfg, err := cfgpkg.Load()
-        if err != nil { return taskRunDoneMsg{err: err} }
-        ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-        defer cancel()
-        db, err := pgdao.OpenApp(ctx, cfg)
-        if err != nil { return taskRunDoneMsg{err: err} }
-        defer db.Close()
-        // Resolve task by ID
-        tk, err := pgdao.GetTaskByID(ctx, db, taskID)
-        if err != nil { return taskRunDoneMsg{err: err} }
-        // Resolve selected script attachment by name (or alias)
-        if strings.TrimSpace(scriptName) == "" { scriptName = "run" }
-        scr, err := pgdao.ResolveTaskScript(ctx, db, tk.ID, scriptName)
-        if err != nil { return taskRunDoneMsg{err: fmt.Errorf("no script %q attached: %w", scriptName, err)} }
-        // Timeout
-        toDur, err := chooseTimeout("", tk.Timeout.String)
-        if err != nil { return taskRunDoneMsg{err: err} }
-        if toDur <= 0 { toDur = 5 * time.Minute }
-        // Role for message
-        roleForMessage := strings.TrimSpace(tk.RoleName)
-        if strings.TrimSpace(experimentID) != "" {
-            if exp, e1 := pgdao.GetExperimentByID(ctx, db, experimentID); e1 == nil && exp != nil {
-                if conv, e2 := pgdao.GetConversationByID(ctx, db, exp.ConversationID); e2 == nil && conv != nil {
-                    if rn := strings.TrimSpace(conv.RoleName); rn != "" { roleForMessage = rn }
-                }
-            }
-        }
-        // Start message
-        startText := fmt.Sprintf("starting task %s (script=%s, shell=%s, timeout=%s)", tk.Variant, scriptName, valueOr(tk.Shell.String, "bash"), toDur)
-        metaStart := map[string]any{"variant": tk.Variant, "status": "starting", "timeout": toDur.String(), "shell": valueOr(tk.Shell.String, "bash"), "script": scriptName}
-        metaStartJSON, _ := json.Marshal(metaStart)
-        startCID, err := pgdao.InsertContent(ctx, db, startText, metaStartJSON)
-        if err != nil { return taskRunDoneMsg{err: err} }
-        ev := &pgdao.MessageEvent{ContentID: startCID, Status: "starting", Tags: map[string]any{"task": true, "run": true}}
-        if roleForMessage != "" { ev.RoleName = roleForMessage }
-        if strings.TrimSpace(tk.ID) != "" { ev.FromTaskID = sql.NullString{String: tk.ID, Valid: true} }
-        if strings.TrimSpace(experimentID) != "" { ev.ExperimentID = sql.NullString{String: experimentID, Valid: true} }
-        msgID, err := pgdao.InsertMessageEvent(ctx, db, ev)
-        if err != nil { return taskRunDoneMsg{err: err} }
-        // Execute
-        body, err := pgdao.GetScriptContent(ctx, db, scr.ScriptContentID)
-        if err != nil { return taskRunDoneMsg{err: err} }
-        runCtx, cancelRun := context.WithTimeout(context.Background(), toDur)
-        defer cancelRun()
-        cmdExec, interpreter := buildCommand(runCtx, tk, body)
-        var outBuf, errBuf bytes.Buffer
-        cmdExec.Stdout = &outBuf; cmdExec.Stderr = &errBuf
-        start := time.Now()
-        runErr := cmdExec.Run()
-        dur := time.Since(start)
-        status := "succeeded"; exitCode := 0; errMsg := ""
-        if runErr != nil { status = "failed"; exitCode = -1; errMsg = runErr.Error() }
-        compMeta := map[string]any{"variant": tk.Variant, "status": status, "duration": dur.String(), "exit_code": exitCode, "shell": interpreter, "script": scriptName}
-        compMetaJSON, _ := json.Marshal(compMeta)
-        content := buildCompletionContent(tk, interpreter, dur, exitCode, &outBuf, &errBuf, errMsg)
-        compCID, err := pgdao.InsertContent(context.Background(), db, content, compMetaJSON)
-        if err != nil { return taskRunDoneMsg{err: err} }
-        upd := pgdao.MessageEvent{ContentID: compCID, Status: status}
-        if errMsg != "" { upd.ErrorMessage = sql.NullString{String: errMsg, Valid: true} }
-        if err := pgdao.UpdateMessageEvent(context.Background(), db, msgID, upd); err != nil { return taskRunDoneMsg{err: err} }
-        return taskRunDoneMsg{status: status, exitCode: exitCode, messageID: msgID}
-    }
+	return func() tea.Msg {
+		cfg, err := cfgpkg.Load()
+		if err != nil {
+			return taskRunDoneMsg{err: err}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		db, err := pgdao.OpenApp(ctx, cfg)
+		if err != nil {
+			return taskRunDoneMsg{err: err}
+		}
+		defer db.Close()
+		// Resolve task by ID
+		tk, err := pgdao.GetTaskByID(ctx, db, taskID)
+		if err != nil {
+			return taskRunDoneMsg{err: err}
+		}
+		// Resolve selected script attachment by name (or alias)
+		if strings.TrimSpace(scriptName) == "" {
+			scriptName = "run"
+		}
+		scr, err := pgdao.ResolveTaskScript(ctx, db, tk.ID, scriptName)
+		if err != nil {
+			return taskRunDoneMsg{err: fmt.Errorf("no script %q attached: %w", scriptName, err)}
+		}
+		// Timeout
+		toDur, err := chooseTimeout("", tk.Timeout.String)
+		if err != nil {
+			return taskRunDoneMsg{err: err}
+		}
+		if toDur <= 0 {
+			toDur = 5 * time.Minute
+		}
+		// Role for message
+		roleForMessage := strings.TrimSpace(tk.RoleName)
+		if strings.TrimSpace(experimentID) != "" {
+			if exp, e1 := pgdao.GetExperimentByID(ctx, db, experimentID); e1 == nil && exp != nil {
+				if conv, e2 := pgdao.GetConversationByID(ctx, db, exp.ConversationID); e2 == nil && conv != nil {
+					if rn := strings.TrimSpace(conv.RoleName); rn != "" {
+						roleForMessage = rn
+					}
+				}
+			}
+		}
+		// Start message
+		startText := fmt.Sprintf("starting task %s (script=%s, shell=%s, timeout=%s)", tk.Variant, scriptName, valueOr(tk.Shell.String, "bash"), toDur)
+		metaStart := map[string]any{"variant": tk.Variant, "status": "starting", "timeout": toDur.String(), "shell": valueOr(tk.Shell.String, "bash"), "script": scriptName}
+		metaStartJSON, _ := json.Marshal(metaStart)
+		startCID, err := pgdao.InsertContent(ctx, db, startText, metaStartJSON)
+		if err != nil {
+			return taskRunDoneMsg{err: err}
+		}
+		ev := &pgdao.MessageEvent{ContentID: startCID, Status: "starting", Tags: map[string]any{"task": true, "run": true}}
+		if roleForMessage != "" {
+			ev.RoleName = roleForMessage
+		}
+		if strings.TrimSpace(tk.ID) != "" {
+			ev.FromTaskID = sql.NullString{String: tk.ID, Valid: true}
+		}
+		if strings.TrimSpace(experimentID) != "" {
+			ev.ExperimentID = sql.NullString{String: experimentID, Valid: true}
+		}
+		msgID, err := pgdao.InsertMessageEvent(ctx, db, ev)
+		if err != nil {
+			return taskRunDoneMsg{err: err}
+		}
+		// Execute
+		body, err := pgdao.GetScriptContent(ctx, db, scr.ScriptContentID)
+		if err != nil {
+			return taskRunDoneMsg{err: err}
+		}
+		runCtx, cancelRun := context.WithTimeout(context.Background(), toDur)
+		defer cancelRun()
+		cmdExec, interpreter := buildCommand(runCtx, tk, body)
+		var outBuf, errBuf bytes.Buffer
+		cmdExec.Stdout = &outBuf
+		cmdExec.Stderr = &errBuf
+		start := time.Now()
+		runErr := cmdExec.Run()
+		dur := time.Since(start)
+		status := "succeeded"
+		exitCode := 0
+		errMsg := ""
+		if runErr != nil {
+			status = "failed"
+			exitCode = -1
+			errMsg = runErr.Error()
+		}
+		compMeta := map[string]any{"variant": tk.Variant, "status": status, "duration": dur.String(), "exit_code": exitCode, "shell": interpreter, "script": scriptName}
+		compMetaJSON, _ := json.Marshal(compMeta)
+		content := buildCompletionContent(tk, interpreter, dur, exitCode, &outBuf, &errBuf, errMsg)
+		compCID, err := pgdao.InsertContent(context.Background(), db, content, compMetaJSON)
+		if err != nil {
+			return taskRunDoneMsg{err: err}
+		}
+		upd := pgdao.MessageEvent{ContentID: compCID, Status: status}
+		if errMsg != "" {
+			upd.ErrorMessage = sql.NullString{String: errMsg, Valid: true}
+		}
+		if err := pgdao.UpdateMessageEvent(context.Background(), db, msgID, upd); err != nil {
+			return taskRunDoneMsg{err: err}
+		}
+		return taskRunDoneMsg{status: status, exitCode: exitCode, messageID: msgID}
+	}
 }

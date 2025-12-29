@@ -1,6 +1,6 @@
 # Task Architecture and Relationships
 
-This document summarizes how the `tasks` entity relates to other parts of the system based on the current codebase. It is grounded in the Go DAOs and CLI commands under `internal/` and `cmd/`, and the schema/relationships reported by `rbc admin db show`.
+This document summarizes how the `tasks` entity relates to other parts of the system based on the current codebase. It is grounded in the Go DAOs and CLI commands under `internal/` and `cmd/`, and the schema/relationships reported by `rbc db show`.
 
 ## Overview
 
@@ -62,7 +62,7 @@ Relevant DAO structs and tables (abbreviated to task-related fields):
 - Workspaces (`tasks.tool_workspace_id`, `queues.target_workspace_id`)
   - Connect tasks and queued work with a specific workspace/tooling context.
 
-- Conversations, experiments, blackboards, stickies (via `cmd/admin/db/show.go` relationships)
+- Conversations, experiments, blackboards, stickies (via `cmd/db/show.go` relationships)
   - `experiments.conversation_id → conversations.id`
   - `blackboards.task_id → tasks.id`
   - `stickies.created_by_task_id → tasks.id`
@@ -70,7 +70,7 @@ Relevant DAO structs and tables (abbreviated to task-related fields):
 
 ## Relationships (as implemented)
 
-Relational FKs and graph edges involving `tasks` (source: DAOs and `cmd/admin/db/show.go`):
+Relational FKs and graph edges involving `tasks` (source: DAOs and `cmd/db/show.go`):
 
 - Messages ↔ Tasks
   - `messages.from_task_id → tasks.id` (a message may be produced by a task)
@@ -142,7 +142,7 @@ Relational FKs and graph edges involving `tasks` (source: DAOs and `cmd/admin/db
 - `internal/dao/postgres/events.go`: `MessageEvent`, CRUD and listing with `from_task_id` linkage.
 - `internal/dao/postgres/queues.go`: `Queue`, `AddQueue`, `TakeQueue`, `PeekQueues` linking tasks/messages/workspaces.
 - `internal/dao/postgres/packages.go`: `Package`, `UpsertPackage`, `GetPackage*`, `ListPackages` linking roles to tasks.
-- `cmd/admin/db/show.go`: authoritative relationships table (FKs and graph-in-SQL edges).
+- `cmd/db/show.go`: authoritative relationships table (FKs and graph-in-SQL edges).
 
 ## Notes
 

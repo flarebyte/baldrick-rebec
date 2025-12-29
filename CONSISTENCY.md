@@ -1,6 +1,6 @@
 # CLI Consistency Guide
 
-This document summarizes shared conventions across the `rbc admin` CLI: common commands, flags, outputs, and core table fields. Use it as a checklist when adding or reviewing commands.
+This document summarizes shared conventions across the `rbc` CLI: common commands, flags, outputs, and core table fields. Use it as a checklist when adding or reviewing commands.
 
 ## Command Shapes (typical)
 - CRUD-style

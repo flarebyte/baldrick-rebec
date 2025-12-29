@@ -85,10 +85,10 @@ When to prefer PostgreSQL
 - Use index aliases to hide reindex/migration steps from the application
 
 10) Local Dev Automation (this CLI)
-- `rbc admin os bootstrap` to set https and attach lifecycle policy (ILM or ISM)
-- `rbc admin db init` to create the `messages_content` index (no lifecycle setting inline)
-- `rbc admin db status --json` to verify index presence and lifecycle attachment
-- `rbc admin os ilm|ism ensure/show/list/delete` to manage policies explicitly
+- `rbc os bootstrap` to set https and attach lifecycle policy (ILM or ISM)
+- `rbc db init` to create the `messages_content` index (no lifecycle setting inline)
+- `rbc db status --json` to verify index presence and lifecycle attachment
+- `rbc os ilm|ism ensure/show/list/delete` to manage policies explicitly
 
 ## Notes on Vector Search
 

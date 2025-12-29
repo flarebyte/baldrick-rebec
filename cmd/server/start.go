@@ -29,7 +29,7 @@ var startCmd = &cobra.Command{
 		pidPath := srv.DefaultPIDPath()
 		if flagDetach {
 			// Spawn a detached child running in foreground mode
-			args := []string{"admin", "server", "start", "--no-detach"}
+			args := []string{"server", "start", "--no-detach"}
 			if flagAddr != "" {
 				args = append(args, "--addr", flagAddr)
 			}
