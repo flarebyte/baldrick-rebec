@@ -38,20 +38,9 @@ export function assert(cond, msg) {
 // -----------------------------
 let __connectClient = null;
 let __assertExperimentId = null;
+let __assertConnectEnabled = false;
 async function __ensureConnectClient() {
   if (__connectClient) return __connectClient;
-  try {
-    await $`go run main.go server start --detach`;
-  } catch {}
-  try {
-    for (let i = 0; i < 50; i++) {
-      try {
-        const r = await fetch('http://127.0.0.1:53051/health');
-        if (r?.ok) break;
-      } catch {}
-      await sleep(100);
-    }
-  } catch {}
   let createConnectGrpcJsonClient;
   try {
     ({ createConnectGrpcJsonClient } = await import(
@@ -59,10 +48,7 @@ async function __ensureConnectClient() {
     ));
   } catch (e) {
     const msg = e?.message || String(e || '');
-    if (
-      msg.includes("'@connectrpc/connect-node'") ||
-      msg.includes('@bufbuild')
-    ) {
+    if (msg.includes("'@connectrpc/connect-node'") || msg.includes('@bufbuild')) {
       await $`npm --prefix script install --silent`;
       ({ createConnectGrpcJsonClient } = await import(
         './grpc-json-client-connect.mjs'
@@ -91,21 +77,56 @@ async function __ensureAssertExperiment() {
 export async function assertStep(stepName, cond, msg = '') {
   const ok = !!cond;
   try {
-    const client = await __ensureConnectClient();
+    if (__assertConnectEnabled) {
+      const client = await __ensureConnectClient();
+      const experiment = await __ensureAssertExperiment();
+      await client.testcase.Create({
+        title: String(stepName || 'unnamed-step'),
+        role: 'rbctest-user',
+        experiment,
+        status: ok ? 'OK' : 'KO',
+        file: 'script/test-all.mjs',
+      });
+      return; // connect-json success
+    }
+  } catch (e) {
+    // Silent fallback to CLI when connect-json isn't available
+  }
+  // Ensure testcase persists via CLI
+  try {
     const experiment = await __ensureAssertExperiment();
-    await client.testcase.Create({
+    await testcaseCreate({
       title: String(stepName || 'unnamed-step'),
       role: 'rbctest-user',
       experiment,
       status: ok ? 'OK' : 'KO',
       file: 'script/test-all.mjs',
     });
-  } catch (e) {
-    console.error('assertStep: testcase create skipped:', e?.message || e);
+  } catch (e2) {
+    console.error('assertStep: CLI fallback failed:', e2?.message || e2);
   }
   if (!ok) {
     throw new Error(msg || `assertStep failed: ${stepName}`);
   }
+}
+
+export async function enableAssertConnect() {
+  try {
+    await $`go run main.go server stop`;
+  } catch {}
+  try {
+    await $`go run main.go server start --detach`;
+  } catch {}
+  try {
+    for (let i = 0; i < 50; i++) {
+      try {
+        const r = await fetch('http://127.0.0.1:53051/health');
+        if (r?.ok) break;
+      } catch {}
+      await sleep(100);
+    }
+  } catch {}
+  __assertConnectEnabled = true;
 }
 
 // Command helpers

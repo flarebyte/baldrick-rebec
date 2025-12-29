@@ -34,6 +34,7 @@ import {
   dbScaffoldAll,
   experimentCreate,
   experimentList,
+  enableAssertConnect,
   idFrom,
   listWithRole,
   logStep,
@@ -148,6 +149,8 @@ try {
     'Scaffolding roles, database, privileges, schema, content index, backup grants',
   );
   await dbScaffoldAll();
+  // Enable connect-json for assert step persistence now that DB is ready
+  await enableAssertConnect();
   await assertStep('db scaffolded', true, 'db scaffold should succeed');
 
   // 2.5) Ensure roles exist for package FKs
@@ -1010,26 +1013,30 @@ try {
   step++;
   logStep(step, TOTAL, 'Testcases via Connect JSON service');
   try {
-    await $`go run main.go server start --detach`;
-    await sleep(1500);
-    // Use fetch against Connect JSON endpoints
-    const endpoint = (m) =>
-      `http://127.0.0.1:53051/testcase.v1.TestcaseService/${m}`;
-    const post = async (m, body) => {
-      const res = await fetch(endpoint(m), {
-        method: 'POST',
-        headers: { 'content-type': 'application/connect+json' },
-        body: JSON.stringify(body || {}),
-      });
-      const txt = await res.text();
-      try {
-        return JSON.parse(txt || 'null');
-      } catch {
-        throw new Error(`invalid json: ${txt}`);
+    // Ensure server is running with handlers mounted
+    await enableAssertConnect();
+    // Import connect client (reuse same pattern as earlier)
+    let createConnectGrpcJsonClient;
+    try {
+      ({ createConnectGrpcJsonClient } = await import(
+        './grpc-json-client-connect.mjs'
+      ));
+    } catch (e) {
+      const msg = e?.message || String(e || '');
+      if (msg.includes("'@connectrpc/connect-node'") || msg.includes('@bufbuild')) {
+        await $`npm --prefix script install --silent`;
+        ({ createConnectGrpcJsonClient } = await import(
+          './grpc-json-client-connect.mjs'
+        ));
+      } else {
+        throw e;
       }
-    };
-    // Create a temporary testcase via Connect JSON
-    const created = await post('Create', {
+    }
+    const client = createConnectGrpcJsonClient({
+      baseUrl: 'http://127.0.0.1:53051',
+    });
+    // Create
+    const created = await client.testcase.Create({
       title: 'GRPC: smoke',
       role: TEST_ROLE_USER,
       experiment: expID,
@@ -1039,7 +1046,7 @@ try {
     });
     assert(created?.id, 'grpc testcase create missing id');
     // List and assert presence
-    const listed = await post('List', {
+    const listed = await client.testcase.List({
       role: TEST_ROLE_USER,
       experiment: expID,
       limit: 10,
@@ -1052,7 +1059,7 @@ try {
     const found = (listed?.items ?? []).find((x) => x?.id === created.id);
     assert(!!found, 'grpc testcase not found in list');
     // Delete
-    const del = await post('Delete', { id: created.id });
+    const del = await client.testcase.Delete({ id: created.id });
     assert(
       del && (del.deleted === 1 || del.deleted === '1'),
       'grpc delete did not report 1',
