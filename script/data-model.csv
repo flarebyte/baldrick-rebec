@@ -1,0 +1,2 @@
+entity,field,fieldType,fieldRequired,fieldSQLType,fieldPersisted
+stickie,topic name,String,false,sql.NullString,true
