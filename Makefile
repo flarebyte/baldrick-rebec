@@ -23,6 +23,9 @@ format:
 test: gen
 	$(ZX) script/test-all.mjs
 
+lintb: 
+	$(ZX) script/bespoke-lint.mjs
+
 # Generate artifacts (e.g., client stubs)
 gen:
 	cd script && npm run gen
