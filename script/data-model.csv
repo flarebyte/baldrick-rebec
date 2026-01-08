@@ -1,2 +1,19 @@
 entity,field,fieldType,fieldRequired,fieldSQLType,fieldPersisted
-stickie,topic name,String,false,sql.NullString,true
+stickie,id,String,true,string,true
+stickie,blackboard_id,String,true,string,true
+stickie,topic_name,String,false,sql.NullString,true
+stickie,topic_role_name,String,false,sql.NullString,true
+stickie,note,String,false,sql.NullString,true
+stickie,code,String,false,sql.NullString,true
+stickie,labels,String[],false,[]string,true
+stickie,created,Time,true,sql.NullTime,true
+stickie,updated,Time,true,sql.NullTime,true
+stickie,created_by_task_id,String,false,sql.NullString,true
+stickie,edit_count,Number,true,int,true
+stickie,priority_level,String,false,sql.NullString,true
+stickie,score,Number,false,sql.NullFloat64,true
+stickie,complex_name,Object,true,JSONB,true
+stickie,complex_name.name,String,false,string,true
+stickie,complex_name.variant,String,false,string,true
+stickie,archived,Boolean,true,bool,true
+stickie,structured,Object,false,JSONB,true
