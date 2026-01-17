@@ -1,0 +1,28 @@
+role: dev
+project: github/flarebyte/baldrick-rebec
+
+# Purpose
+# Maintain a clear, evolving catalogue of features currently supported by baldrick-rebec.
+# This file is human- and AI-friendly. Use rbc blackboard sync to move between DB and folder.
+
+background: >-
+  Maintain a concise, up-to-date list of the features currently
+  supported by baldrick-rebec. This board exists to make capabilities
+  discoverable for humans and easy to parse for AI agents when planning,
+  troubleshooting, or proposing changes.
+
+guidelines: >-
+  One stickie per feature by default. Create additional stickies when
+  distinct aspects of the same feature deserve separate notes
+  (e.g., UXD, accessibility, performance, security, monitoring,
+  operations, compliance, documentation, legal). Keep each note
+  concise and focused on what is not obvious, with emphasis on the
+  “why” (intent, trade-offs, constraints, and rationale). Prefer
+  neutral, implementation-agnostic phrasing. Use labels from this
+  controlled set when relevant: uxd, accessibility, performance,
+  security, monitoring, operations, compliance, documentation, legal,
+  wip, stable. Do not use topics for this board (leave topic fields
+  empty). Make each stickie independently useful: when helpful, include
+  links or identifiers. AI-friendly style: short sentences, explicit
+  nouns, one idea per stickie.
+
