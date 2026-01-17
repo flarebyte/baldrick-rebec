@@ -22,8 +22,9 @@ Tip: Most commands accept `--role`. Replace values to fit your setup.
   `rbc blackboard list --role user --output json`
 
 Create via YAML (optional)
+
 - Prepare a `blackboard.yaml` (project must already exist for the role if provided):
-  
+
   role: user
   store_id: <STORE_ID>
   project: acme/complete
@@ -32,7 +33,7 @@ Create via YAML (optional)
 
 - Pipe it to the CLI (flags override YAML):
   `cat blackboard.yaml | rbc blackboard set --cli-input-yaml`
-  
+
   Notes: `id` is optional (omit to create). Valid YAML keys: id, store_id, role, conversation_id, project, task_id, background, guidelines.
 
 2. Create / Update / Delete Stickies (CLI)
