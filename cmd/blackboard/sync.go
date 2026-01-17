@@ -41,6 +41,10 @@ var syncCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		// Disallow same-kind syncs explicitly for clarity
+		if src.kind == dst.kind {
+			return fmt.Errorf("cannot sync %s -> %s; use id:UUID->folder:PATH or folder:PATH->id:UUID", kindString(src.kind), kindString(dst.kind))
+		}
 
 		if src.kind == epID && dst.kind == epFolder {
 			return syncIDToFolder(src.value, dst.value, flagSyncDelete, flagSyncDryRun)
@@ -70,6 +74,17 @@ const (
 type endpoint struct {
 	kind  endpointKind
 	value string
+}
+
+func kindString(k endpointKind) string {
+	switch k {
+	case epID:
+		return "id"
+	case epFolder:
+		return "folder"
+	default:
+		return "unknown"
+	}
 }
 
 func parseEndpoint(s string) (endpoint, error) {
