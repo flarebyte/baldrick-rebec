@@ -117,7 +117,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 23;
+const TOTAL = 24;
 let step = 0;
 
 try {
@@ -1178,6 +1178,24 @@ try {
       String(st1Yaml.stdout || '').includes('OK') &&
       String(st2Yaml.stdout || '').includes('OK'),
     'expected exported YAML files missing for blackboard/stickies',
+  );
+
+  // Export with --clear-ids: stickie YAMLs should not contain an id field
+  step++;
+  logStep(step, TOTAL, 'Exporting blackboard with --clear-ids');
+  try {
+    await $`rm -rf temp/blackboard-noids`;
+  } catch {}
+  await $`go run main.go blackboard sync id:${bb1} folder:temp/blackboard-noids --clear-ids`;
+  const st1NoId =
+    await $`bash -lc 'grep -q "^id:" temp/blackboard-noids/${st1}.stickie.yaml && echo HAS_ID || echo NO_ID'`;
+  const st2NoId =
+    await $`bash -lc 'grep -q "^id:" temp/blackboard-noids/${st2}.stickie.yaml && echo HAS_ID || echo NO_ID'`;
+  await assertStep(
+    'clear-ids omitted id field',
+    String(st1NoId.stdout || '').includes('NO_ID') &&
+      String(st2NoId.stdout || '').includes('NO_ID'),
+    'expected no id field in stickie YAML when using --clear-ids',
   );
 
   // folder -> id: update existing stickie by id when content hash differs

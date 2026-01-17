@@ -21,8 +21,9 @@ import (
 )
 
 var (
-	flagSyncDelete bool
-	flagSyncDryRun bool
+	flagSyncDelete   bool
+	flagSyncDryRun   bool
+	flagSyncClearIDs bool
 )
 
 // syncCmd implements: rbc blackboard sync id:UUID folder:relative/path
@@ -61,6 +62,7 @@ func init() {
 	BlackboardCmd.AddCommand(syncCmd)
 	syncCmd.Flags().BoolVar(&flagSyncDelete, "delete", false, "Delete files at destination that are not present at source")
 	syncCmd.Flags().BoolVar(&flagSyncDryRun, "dry-run", false, "Show what would change without writing or deleting")
+	syncCmd.Flags().BoolVar(&flagSyncClearIDs, "clear-ids", false, "When exporting id->folder, omit id fields in stickie YAML files")
 }
 
 type endpointKind int
@@ -132,7 +134,7 @@ type stickieComplexNameYAML struct {
 }
 
 type stickieYAML struct {
-	ID            string                 `yaml:"id"`
+	ID            string                 `yaml:"id,omitempty"`
 	TopicName     *string                `yaml:"topic_name,omitempty"`
 	TopicRole     *string                `yaml:"topic_role_name,omitempty"`
 	Note          *string                `yaml:"note,omitempty"`
@@ -268,6 +270,9 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 				Variant: s.ComplexName.Variant,
 			},
 			Archived: s.Archived,
+		}
+		if flagSyncClearIDs {
+			sy.ID = ""
 		}
 		if s.TopicName.Valid && s.TopicName.String != "" {
 			v := s.TopicName.String
