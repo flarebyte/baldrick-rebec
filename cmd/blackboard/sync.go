@@ -2,6 +2,9 @@ package blackboard
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -27,7 +30,7 @@ var (
 var syncCmd = &cobra.Command{
 	Use:   "sync <source> <target>",
 	Short: "Sync a blackboard and stickies between id and folder",
-	Long:  "Sync a blackboard and its stickies between an id:UUID and a folder:RELATIVE_PATH. Currently supports id->folder.",
+	Long:  "Sync a blackboard and its stickies between an id:UUID and a folder:RELATIVE_PATH. Supports id->folder and folder->id.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		src, err := parseEndpoint(args[0])
@@ -42,8 +45,11 @@ var syncCmd = &cobra.Command{
 		if src.kind == epID && dst.kind == epFolder {
 			return syncIDToFolder(src.value, dst.value, flagSyncDelete, flagSyncDryRun)
 		}
+		if src.kind == epFolder && dst.kind == epID {
+			return syncFolderToID(src.value, dst.value, flagSyncDryRun)
+		}
 
-		return errors.New("only id:UUID -> folder:PATH is supported for now")
+		return errors.New("supported directions: id:UUID->folder:PATH and folder:PATH->id:UUID")
 	},
 }
 
@@ -383,4 +389,246 @@ func destIsNewerOrEqual(path string, srcUpdated *string) (bool, error) {
 		}
 	}
 	return !dstT.Before(srcT), nil
+}
+
+// ---- folder -> id implementation ----
+
+func syncFolderToID(relFolder, blackboardID string, dryRun bool) error {
+	// Validate folder
+	srcDir := filepath.Clean(relFolder)
+	if strings.HasPrefix(srcDir, "..") {
+		return errors.New("folder path must not escape current directory")
+	}
+	// Open DB
+	cfg, err := cfgpkg.Load()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	db, err := pgdao.OpenApp(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	// Ensure blackboard exists
+	b, err := pgdao.GetBlackboardByID(ctx, db, blackboardID)
+	if err != nil {
+		return err
+	}
+	_ = b // currently unused beyond existence
+
+	// Iterate stickie files
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return fmt.Errorf("read folder: %w", err)
+	}
+	// Stable order
+	var files []string
+	for _, e := range entries {
+		if e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".stickie.yaml") {
+			files = append(files, filepath.Join(srcDir, e.Name()))
+		}
+	}
+	sort.Strings(files)
+
+	for _, p := range files {
+		y, err := readStickieYAML(p)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", p, err)
+		}
+		// Always target destination blackboard; ignore/override yaml's blackboard_id
+		// Security rule: if yaml has an id, it MUST already exist for this blackboard
+		if strings.TrimSpace(y.ID) != "" {
+			s, err := pgdao.GetStickieByID(ctx, db, y.ID)
+			if err != nil {
+				return fmt.Errorf("stickie %s referenced in %s does not exist: %w", y.ID, p, err)
+			}
+			if strings.TrimSpace(s.BlackboardID) != strings.TrimSpace(blackboardID) {
+				return fmt.Errorf("security: stickie %s in %s does not belong to blackboard %s", y.ID, p, blackboardID)
+			}
+			// Decide update based on content hash
+			hSrc := hashStickieYAML(y)
+			hDst := hashStickieDB(*s)
+			if hSrc == hDst {
+				fmt.Fprintf(os.Stderr, "skip unchanged %s (id=%s)\n", p, y.ID)
+				continue
+			}
+			if dryRun {
+				fmt.Fprintf(os.Stderr, "[dry-run] update stickie id=%s from %s\n", y.ID, p)
+				continue
+			}
+			// Perform update
+			upd := stickieFromYAMLForUpsert(y, blackboardID)
+			upd.ID = y.ID
+			if err := pgdao.UpsertStickie(ctx, db, &upd); err != nil {
+				return fmt.Errorf("update stickie %s from %s: %w", y.ID, p, err)
+			}
+			fmt.Fprintf(os.Stderr, "updated stickie id=%s\n", y.ID)
+		} else {
+			// Create new stickie (no id assigned in yaml) -> assign UUID automatically
+			if dryRun {
+				fmt.Fprintf(os.Stderr, "[dry-run] create stickie from %s\n", p)
+				continue
+			}
+			ins := stickieFromYAMLForUpsert(y, blackboardID)
+			ins.ID = "" // ensure create
+			if err := pgdao.UpsertStickie(ctx, db, &ins); err != nil {
+				return fmt.Errorf("create stickie from %s: %w", p, err)
+			}
+			fmt.Fprintf(os.Stderr, "created stickie id=%s from %s\n", ins.ID, p)
+		}
+	}
+
+	return nil
+}
+
+func readStickieYAML(path string) (stickieYAML, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return stickieYAML{}, err
+	}
+	var y stickieYAML
+	if err := yaml.Unmarshal(b, &y); err != nil {
+		return stickieYAML{}, err
+	}
+	return y, nil
+}
+
+// stickieFromYAMLForUpsert maps YAML into pgdao.Stickie for UpsertStickie.
+func stickieFromYAMLForUpsert(y stickieYAML, blackboardID string) pgdao.Stickie {
+	var s pgdao.Stickie
+	s.BlackboardID = blackboardID
+	// optional simple values
+	if y.TopicName != nil {
+		s.TopicName.Valid = true
+		s.TopicName.String = *y.TopicName
+	}
+	if y.TopicRole != nil {
+		s.TopicRoleName.Valid = true
+		s.TopicRoleName.String = *y.TopicRole
+	}
+	if y.Note != nil {
+		s.Note.Valid = true
+		s.Note.String = *y.Note
+	}
+	if y.Code != nil {
+		s.Code.Valid = true
+		s.Code.String = *y.Code
+	}
+	if len(y.Labels) > 0 {
+		// ensure deterministic order; DB stores array w/o order guarantee
+		cp := append([]string(nil), y.Labels...)
+		sort.Strings(cp)
+		s.Labels = cp
+	}
+	if y.CreatedByTask != nil {
+		s.CreatedByTaskID.Valid = true
+		s.CreatedByTaskID.String = *y.CreatedByTask
+	}
+	if y.Priority != nil {
+		s.PriorityLevel.Valid = true
+		s.PriorityLevel.String = *y.Priority
+	}
+	if y.Score != nil {
+		s.Score.Valid = true
+		s.Score.Float64 = *y.Score
+	}
+	s.ComplexName.Name = y.ComplexName.Name
+	s.ComplexName.Variant = y.ComplexName.Variant
+	s.Archived = y.Archived
+	return s
+}
+
+// Hash utilities (SHA-256) for stickie content comparison
+type stickieHashMaterial struct {
+	TopicName     string   `json:"topic_name"`
+	TopicRoleName string   `json:"topic_role_name"`
+	Note          string   `json:"note"`
+	Code          string   `json:"code"`
+	Labels        []string `json:"labels"`
+	CreatedByTask string   `json:"created_by_task_id"`
+	PriorityLevel string   `json:"priority_level"`
+	Score         *float64 `json:"score,omitempty"`
+	ComplexName   struct {
+		Name    string `json:"name"`
+		Variant string `json:"variant"`
+	} `json:"complex_name"`
+	Archived bool `json:"archived"`
+}
+
+func hashStickieYAML(y stickieYAML) string {
+	mat := stickieHashMaterial{}
+	if y.TopicName != nil {
+		mat.TopicName = *y.TopicName
+	}
+	if y.TopicRole != nil {
+		mat.TopicRoleName = *y.TopicRole
+	}
+	if y.Note != nil {
+		mat.Note = *y.Note
+	}
+	if y.Code != nil {
+		mat.Code = *y.Code
+	}
+	if len(y.Labels) > 0 {
+		cp := append([]string(nil), y.Labels...)
+		sort.Strings(cp)
+		mat.Labels = cp
+	}
+	if y.CreatedByTask != nil {
+		mat.CreatedByTask = *y.CreatedByTask
+	}
+	if y.Priority != nil {
+		mat.PriorityLevel = *y.Priority
+	}
+	if y.Score != nil {
+		mat.Score = y.Score
+	}
+	mat.ComplexName.Name = y.ComplexName.Name
+	mat.ComplexName.Variant = y.ComplexName.Variant
+	mat.Archived = y.Archived
+	return hashMaterial(mat)
+}
+
+func hashStickieDB(s pgdao.Stickie) string {
+	mat := stickieHashMaterial{}
+	if s.TopicName.Valid {
+		mat.TopicName = s.TopicName.String
+	}
+	if s.TopicRoleName.Valid {
+		mat.TopicRoleName = s.TopicRoleName.String
+	}
+	if s.Note.Valid {
+		mat.Note = s.Note.String
+	}
+	if s.Code.Valid {
+		mat.Code = s.Code.String
+	}
+	if len(s.Labels) > 0 {
+		cp := append([]string(nil), s.Labels...)
+		sort.Strings(cp)
+		mat.Labels = cp
+	}
+	if s.CreatedByTaskID.Valid {
+		mat.CreatedByTask = s.CreatedByTaskID.String
+	}
+	if s.PriorityLevel.Valid {
+		mat.PriorityLevel = s.PriorityLevel.String
+	}
+	if s.Score.Valid {
+		v := s.Score.Float64
+		mat.Score = &v
+	}
+	mat.ComplexName.Name = s.ComplexName.Name
+	mat.ComplexName.Variant = s.ComplexName.Variant
+	mat.Archived = s.Archived
+	return hashMaterial(mat)
+}
+
+func hashMaterial(v any) string {
+	b, _ := json.Marshal(v)
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }

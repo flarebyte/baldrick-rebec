@@ -117,7 +117,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 20;
+const TOTAL = 23;
 let step = 0;
 
 try {
@@ -1179,6 +1179,68 @@ try {
       String(st2Yaml.stdout || '').includes('OK'),
     'expected exported YAML files missing for blackboard/stickies',
   );
+
+  // folder -> id: update existing stickie by id when content hash differs
+  step++;
+  logStep(step, TOTAL, 'Folder->ID: updating existing stickie (by id)');
+  // Minimal YAML to update only the note for st1
+  await $`bash -lc 'echo "id: ${st1}" > temp/blackboard-test/${st1}.stickie.yaml'`;
+  await $`bash -lc 'echo "note: Updated via folder->id sync" >> temp/blackboard-test/${st1}.stickie.yaml'`;
+  await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;
+  {
+    const s1after = await stickieGetJSON({ id: st1 });
+    await assertStep(
+      'folder->id updated existing stickie',
+      s1after &&
+        s1after.id === st1 &&
+        s1after.note === 'Updated via folder->id sync',
+      'expected note to be updated on existing stickie',
+    );
+  }
+
+  // folder -> id: create new stickie when YAML has no id
+  step++;
+  logStep(step, TOTAL, 'Folder->ID: creating new stickie (no id)');
+  await $`bash -lc 'echo "complex_name:" > temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "  name: Created by folder sync" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "  variant: test" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "note: This was created via folder->id" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "labels: [sync,created]" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;
+  {
+    const created = await stickieFind({
+      name: 'Created by folder sync',
+      variant: 'test',
+      blackboard: bb1,
+    });
+    await assertStep(
+      'folder->id created new stickie',
+      created && created.id && created.blackboard_id === bb1,
+      'expected new stickie to be created with assigned UUID',
+    );
+  }
+
+  // folder -> id: security check — if YAML has an id not belonging to target board, fail the sync
+  step++;
+  logStep(step, TOTAL, 'Folder->ID: security guard on foreign/nonexistent id');
+  await $`bash -lc 'echo "id: 123e4567-e89b-12d3-a456-426614174000" > temp/blackboard-test/bad.stickie.yaml'`;
+  await $`bash -lc 'echo "note: Should fail due to foreign id" >> temp/blackboard-test/bad.stickie.yaml'`;
+  let failed = false;
+  try {
+    // Suppress stderr to keep logs clean while asserting failure
+    await $`bash -lc ${`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1} 2>/dev/null`}`;
+  } catch (e) {
+    failed = true;
+  }
+  await assertStep(
+    'folder->id rejects unknown/foreign id',
+    failed,
+    'expected sync to fail when a .stickie.yaml contains an id not on destination blackboard',
+  );
+  // cleanup bad file to not affect later steps
+  try {
+    await $`rm -f temp/blackboard-test/bad.stickie.yaml`;
+  } catch {}
   await stickieListByTopic({
     topicName: 'devops',
     topicRole: TEST_ROLE_USER,
