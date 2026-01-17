@@ -277,10 +277,6 @@ export async function taskScriptAdd({ task, script, name, alias = '' }) {
   return await runRbc(...args);
 }
 
-export async function storeGet({ name, role = 'user' }) {
-  return await runRbcJSON('store', 'get', '--name', name, '--role', role);
-}
-
 export async function blackboardSet({
   role = 'user',
   project = '',
@@ -651,33 +647,7 @@ export async function toolDelete({
   return await runRbc(...args);
 }
 
-export async function storeSet({
-  name,
-  role = 'user',
-  title = '',
-  description = '',
-  motivation = '',
-  security = '',
-  privacy = '',
-  notes = '',
-  type = '',
-  scope = '',
-  lifecycle = '',
-  tags = '',
-}) {
-  const args = ['store', 'set', '--name', name, '--role', role];
-  if (title) args.push('--title', title);
-  if (description) args.push('--description', description);
-  if (motivation) args.push('--motivation', motivation);
-  if (security) args.push('--security', security);
-  if (privacy) args.push('--privacy', privacy);
-  if (notes) args.push('--notes', notes);
-  if (type) args.push('--type', type);
-  if (scope) args.push('--scope', scope);
-  if (lifecycle) args.push('--lifecycle', lifecycle);
-  if (tags) args.push('--tags', tags);
-  return await runRbc(...args);
-}
+// store helpers removed
 
 export async function workspaceSet({
   role = 'user',
@@ -814,20 +784,6 @@ export async function snapshotPruneYesJSON({
 export async function projectListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
     'project',
-    'list',
-    '--role',
-    role,
-    '--output',
-    'json',
-    '--limit',
-    String(limit),
-    '--offset',
-    String(offset),
-  );
-}
-export async function storeListJSON({ role, limit = 100, offset = 0 }) {
-  return await runRbcJSON(
-    'store',
     'list',
     '--role',
     role,

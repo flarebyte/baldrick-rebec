@@ -119,22 +119,7 @@ export function validateProjectListContract(arr) {
   return z.array(projectListItemSchemaFactory()).parse(arr);
 }
 
-// Stores
-function storeListItemSchemaFactory() {
-  return z.object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    role: z.string().min(1),
-    title: z.string().min(1),
-    type: z.string().min(1).optional(),
-    scope: z.string().min(1).optional(),
-    lifecycle: z.string().min(1).optional(),
-    updated: z.string().optional(),
-  });
-}
-export function validateStoreListContract(arr) {
-  return z.array(storeListItemSchemaFactory()).parse(arr);
-}
+// Stores removed
 
 // Topics
 function topicListItemSchemaFactory() {

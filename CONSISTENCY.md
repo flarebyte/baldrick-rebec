@@ -78,12 +78,11 @@ High-level view of common fields (not exhaustive).
 - Conversations/Experiments
   - `conversations(id UUID PK, title, description, project, role_name, tags, created, updated, notes)`
   - `experiments(id UUID PK, conversation_id, created)`
-- Tags/Topics/Stores
+- Tags/Topics
   - `tags(name PK, title, description, role_name, created, updated, notes)`
   - `topics(name, role_name) PK, title, description, created, updated, notes, tags`
-  - `stores(id UUID PK, name, role_name UNIQUE per name, title, description, motivation, security, privacy, created, updated, notes, tags, store_type, scope, lifecycle)`
 - Blackboards & Stickies
-  - `blackboards(id UUID PK, store_id, role_name, conversation_id, project_name, task_id, created, updated, background, guidelines)`
+  - `blackboards(id UUID PK, role_name, conversation_id, project_name, task_id, created, updated, background, guidelines, lifecycle)`
   - `stickies(id UUID PK, blackboard_id, topic_name, topic_role_name, note, labels TEXT[], created, updated, created_by_task_id, edit_count, priority_level, structured JSONB)`
   - SQL mirror for graph edges: `stickie_relations(from_id, to_id, rel_type, labels TEXT[], created)`
 
@@ -96,7 +95,7 @@ High-level view of common fields (not exhaustive).
   - tasks.tool_workspace_id → workspaces.id
   - testcases.experiment_id → experiments.id
   - workspaces.build_script_id → scripts.id, workspaces.(project_name,role_name) → projects
-  - blackboards.store_id → stores.id, blackboards.conversation_id → conversations.id, blackboards.task_id → tasks.id
+  - blackboards.conversation_id → conversations.id, blackboards.task_id → tasks.id
   - stickies.blackboard_id → blackboards.id, stickies.created_by_task_id → tasks.id
   - stickies.(topic_name,topic_role_name) → topics
 - Graph (SQL)

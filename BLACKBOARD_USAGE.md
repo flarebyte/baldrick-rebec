@@ -9,15 +9,10 @@ Prerequisites
 
 Tip: Most commands accept `--role`. Replace values to fit your setup.
 
-1. Create a Store and Blackboard
+1. Create a Blackboard
 
-- Create a store for the role (type `blackboard` or any that fits your workflow):
-  `rbc store set --name ideas-main --role user --title "Ideas" --type blackboard`
-- Get the store id (needed to create a blackboard):
-  `rbc store get --name ideas-main --role user`
-  - Note the `id` from JSON output.
-- Create a blackboard linked to that store:
-  `rbc blackboard set --role user --store-id <STORE_ID> --project acme/build-system --background "Ideas board" --guidelines "Keep concise; tag priority"`
+- Create a blackboard (optionally link a project and set lifecycle):
+  `rbc blackboard set --role user --project acme/build-system --background "Ideas board" --guidelines "Keep concise; tag priority" --lifecycle weekly`
 - List blackboards and capture your blackboard id:
   `rbc blackboard list --role user --output json`
 
@@ -26,15 +21,15 @@ Create via YAML (optional)
 - Prepare a `blackboard.yaml` (project must already exist for the role if provided):
 
   role: user
-  store_id: <STORE_ID>
   project: acme/complete
   background: Created via YAML
   guidelines: From YAML
+  lifecycle: weekly
 
 - Pipe it to the CLI (flags override YAML):
   `cat blackboard.yaml | rbc blackboard set --cli-input-yaml`
 
-  Notes: `id` is optional (omit to create). Valid YAML keys: id, store_id, role, conversation_id, project, task_id, background, guidelines.
+  Notes: `id` is optional (omit to create). Valid YAML keys: id, role, conversation_id, project, task_id, background, guidelines, lifecycle.
 
 2. Create / Update / Delete Stickies (CLI)
 

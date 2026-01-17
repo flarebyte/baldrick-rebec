@@ -1,11 +1,10 @@
 # Blackboard Architecture and Relationships
 
-This document summarizes how blackboards, stores, and stickies relate to each other and to adjacent entities like tasks, projects, and conversations, based on the current codebase.
+This document summarizes how blackboards and stickies relate to each other and to adjacent entities like tasks, projects, and conversations, based on the current codebase.
 
 ## Overview
 
-- A Store is a logical container/namespace for blackboards.
-- A Blackboard belongs to a Store and a Role; it may be associated with a specific Conversation, Project, or Task.
+- A Blackboard is scoped by a Role; it may be associated with a specific Conversation, Project, or Task.
 - Stickies belong to a Blackboard and can optionally be tied to a Topic and/or the Task that created them.
 - Stickie relations provide typed edges between stickies (e.g., INCLUDES, USES).
 
@@ -13,7 +12,6 @@ This document summarizes how blackboards, stores, and stickies relate to each ot
 
 ```mermaid
 erDiagram
-  BLACKBOARDS }o--|| STORES : "store_id"
   STICKIES }o--|| BLACKBOARDS : "blackboard_id"
   STICKIE_RELATIONS }o--|| STICKIES : "from_id,to_id"
 
@@ -29,9 +27,8 @@ erDiagram
 
 - Blackboards (`internal/dao/postgres/blackboards.go` → table `blackboards`)
 
-  - Fields: `id`, `store_id`, `role_name`, `conversation_id?`, `project_name?`, `task_id?`, `background?`, `guidelines?`, `created`, `updated`.
+  - Fields: `id`, `role_name`, `conversation_id?`, `project_name?`, `task_id?`, `background?`, `guidelines?`, `lifecycle?`, `created`, `updated`.
   - FKs/refs:
-    - `store_id → stores.id`
     - `conversation_id → conversations.id`
     - `project_name,role_name → projects.name,projects.role_name`
     - `task_id → tasks.id`
@@ -51,9 +48,7 @@ erDiagram
     - `from_id,to_id → stickies.id`
   - Normalized relation types: `INCLUDES`, `CAUSES`, `USES`, `REPRESENTS`, `CONTRASTS_WITH`.
 
-- Stores (`internal/dao/postgres/stores.go` → table `stores`)
-
-  - Blackboard’s `store_id` references this table; stores are partitioned by role.
+// Stores removed from the model
 
 - Projects (`internal/dao/postgres/projects.go` → table `projects`)
 
@@ -66,7 +61,6 @@ erDiagram
 
 - Blackboards
 
-  - `blackboards.store_id → stores.id` (required)
   - `blackboards.conversation_id → conversations.id` (optional)
   - `blackboards.project_name,role_name → projects.name,role_name` (optional)
   - `blackboards.task_id → tasks.id` (optional)
@@ -84,7 +78,7 @@ erDiagram
 
 - Create a board for a project
 
-  - Create `store` then `blackboard` referencing the `store_id` and `(project_name, role_name)`.
+  - Create a `blackboard` scoped by role and optionally set `project_name`.
   - Add `stickies` to capture ideas, tasks, or notes; optionally set `topic_*` fields.
 
 - Create a board for a conversation

@@ -63,7 +63,7 @@ var restoreCmd = &cobra.Command{
 			}
 		}
 		// Insert in FK-safe order
-		order := []string{"roles", "workflows", "tags", "projects", "stores", "tools", "topics", "conversations", "experiments", "task_variants", "tasks", "scripts_content", "scripts", "messages_content", "messages", "workspaces", "blackboards", "stickies", "packages", "testcases"}
+		order := []string{"roles", "workflows", "tags", "projects", "tools", "topics", "conversations", "experiments", "task_variants", "tasks", "scripts_content", "scripts", "messages_content", "messages", "workspaces", "blackboards", "stickies", "packages", "testcases"}
 		for _, tbl := range order {
 			rows := dump[tbl]
 			for _, raw := range rows {
@@ -82,7 +82,7 @@ var restoreCmd = &cobra.Command{
 }
 
 func truncateAll(ctx context.Context, db *pgxpool.Pool) error {
-	_, err := db.Exec(ctx, `TRUNCATE TABLE packages, stickies, blackboards, messages, messages_content, scripts, scripts_content, tasks, task_variants, experiments, conversations, workspaces, topics, tools, stores, projects, workflows, roles, tags RESTART IDENTITY CASCADE`)
+	_, err := db.Exec(ctx, `TRUNCATE TABLE packages, stickies, blackboards, messages, messages_content, scripts, scripts_content, tasks, task_variants, experiments, conversations, workspaces, topics, tools, projects, workflows, roles, tags RESTART IDENTITY CASCADE`)
 	return err
 }
 
@@ -130,8 +130,6 @@ func upsertRow(ctx context.Context, db *pgxpool.Pool, tbl string, obj rowObj, up
 		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"role_name", ""}, {"task_id", ":uuid"}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}}, "id", upsert, obj)
 	case "testcases":
 		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"name", ""}, {"package", ""}, {"classname", ""}, {"title", ""}, {"experiment_id", ":uuid"}, {"role_name", ""}, {"status", ""}, {"error_message", ""}, {"tags", ":jsonb"}, {"level", ""}, {"created", ":timestamptz"}, {"file", ""}, {"line", ""}, {"execution_time", ""}}, "id", upsert, obj)
-	case "stores":
-		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"name", ""}, {"title", ""}, {"description", ""}, {"motivation", ""}, {"security", ""}, {"privacy", ""}, {"role_name", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"notes", ""}, {"tags", ":jsonb"}, {"store_type", ""}, {"scope", ""}, {"lifecycle", ""}}, "id", upsert, obj)
 	case "tools":
 		return insertGeneric(ctx, db, tbl, []col{{"name", ""}, {"title", ""}, {"description", ""}, {"role_name", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"notes", ""}, {"tags", ":jsonb"}, {"settings", ":jsonb"}, {"tool_type", ""}}, "name", upsert, obj)
 	case "topics":

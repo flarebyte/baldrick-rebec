@@ -73,9 +73,6 @@ import {
   stickieRelList,
   stickieRelSet,
   stickieSet,
-  storeGet,
-  storeListJSON,
-  storeSet,
   tagSet,
   taskListJSON,
   taskScriptAdd,
@@ -104,7 +101,6 @@ import {
   validateRoleListContract,
   validateScriptListContract,
   validateStickieListContract,
-  validateStoreListContract,
   validateTaskListContract,
   validateTopicListContract,
   validateVaultListContract,
@@ -589,39 +585,11 @@ try {
     } catch {}
   }
 
-  // 8) Stores & Blackboards
+  // 8) Blackboards
   step++;
-  logStep(step, TOTAL, 'Creating stores and blackboards');
-  await storeSet({
-    name: 'ideas-acme-build',
-    role: TEST_ROLE_USER,
-    title: 'Ideas for acme/build-system',
-    description: 'Idea backlog',
-    motivation: 'Capture and prioritize improvement ideas',
-    security: 'Internal only',
-    privacy: 'No PII expected',
-    notes: 'Markdown allowed: keep entries concise',
-    type: 'journal',
-    scope: 'project',
-    lifecycle: 'monthly',
-    tags: 'topic=ideas,project=acme/build-system',
-  });
-  await storeSet({
-    name: 'blackboard-global',
-    role: TEST_ROLE_USER,
-    title: 'Shared Blackboard',
-    description: 'Scratch space for team',
-    type: 'blackboard',
-    scope: 'shared',
-    lifecycle: 'weekly',
-    tags: 'visibility=team',
-  });
-  {
-    const stores = await storeListJSON({ role: TEST_ROLE_USER, limit: 50 });
-    validateStoreListContract(stores);
-  }
+  logStep(step, TOTAL, 'Creating blackboards');
 
-  // Note: stores created above are used for store list contracts, no need to fetch ids here
+  // Create two sample blackboards for the user role
 
   const bb1 = idFrom(
     await blackboardSet({
@@ -648,13 +616,7 @@ try {
   // 8.1) Create a blackboard via YAML pipe using --cli-input-yaml
   step++;
   logStep(step, TOTAL, 'Creating blackboard via --cli-input-yaml');
-  await storeSet({
-    name: 'ideas-yaml',
-    role: TEST_ROLE_USER,
-    title: 'Ideas (YAML)',
-    type: 'blackboard',
-  });
-  // No need to capture store id for blackboard YAML anymore
+  // No store dependency required
   try {
     await $`mkdir -p temp`;
   } catch {}
@@ -770,52 +732,7 @@ try {
     tags: 'status=active',
   });
 
-  // Ensure one store has all fields populated
-  await storeSet({
-    name: 'complete-store',
-    role: TEST_ROLE_USER,
-    title: 'Complete Store',
-    description: 'Store with all fields',
-    motivation: 'Centralize artifacts',
-    security: 'Internal only',
-    privacy: 'No PII',
-    notes: 'Markdown: some details here',
-    type: 'journal',
-    scope: 'shared',
-    lifecycle: 'weekly',
-    tags: 'env=dev,owner=qa',
-  });
-  {
-    const sfull = await storeGet({
-      name: 'complete-store',
-      role: TEST_ROLE_USER,
-    });
-    assert(
-      sfull && (sfull.id || sfull.ID || sfull.name === 'complete-store'),
-      'store complete: not found',
-    );
-    assert(sfull.title === 'Complete Store', 'store complete: title mismatch');
-    assert(
-      sfull.description === 'Store with all fields',
-      'store complete: description missing',
-    );
-    assert(
-      sfull.motivation === 'Centralize artifacts',
-      'store complete: motivation missing',
-    );
-    assert(
-      sfull.security === 'Internal only',
-      'store complete: security missing',
-    );
-    assert(sfull.privacy === 'No PII', 'store complete: privacy missing');
-    assert(
-      sfull.notes === 'Markdown: some details here',
-      'store complete: notes missing',
-    );
-    assert(sfull.type === 'journal', 'store complete: type missing');
-    assert(sfull.scope === 'shared', 'store complete: scope missing');
-    assert(sfull.lifecycle === 'weekly', 'store complete: lifecycle missing');
-  }
+  // Note: store feature removed; skip store-specific verifications
 
   await packageSet({ role: TEST_ROLE_USER, variant: 'unit/go' });
   await packageSet({ role: TEST_ROLE_QA, variant: 'integration' });
@@ -1157,7 +1074,6 @@ try {
   await listWithRole('project', TEST_ROLE_USER, 50);
   await listWithRole('workspace', TEST_ROLE_USER, 50);
   await listWithRole('script', TEST_ROLE_USER, 50);
-  await listWithRole('store', TEST_ROLE_USER, 50);
   await listWithRole('topic', TEST_ROLE_USER, 50);
   await listWithRole('blackboard', TEST_ROLE_USER, 50);
   await stickieList(50);

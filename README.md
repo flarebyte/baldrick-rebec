@@ -51,7 +51,7 @@ Use the schema-aware snapshot subsystem to capture and restore long‑lived enti
 - Delete backup
   - `rbc snapshot delete <backup-id> --force`
 
-By default, permanent-ish entities like `roles`, `workflows`, `tags`, `projects`, `stores`, `scripts`, `tasks`, `topics`, `workspaces`, `blackboards`, `stickies`, `stickie_relations`, `task_replaces`, `packages`, `task_variants`, and `scripts_content` are included. Ephemeral tables such as `conversations`, `experiments`, `messages`, `messages_content`, `queues`, and `testcases` are excluded unless explicitly included.
+By default, permanent-ish entities like `roles`, `workflows`, `tags`, `projects`, `scripts`, `tasks`, `topics`, `workspaces`, `blackboards`, `stickies`, `stickie_relations`, `task_replaces`, `packages`, `task_variants`, and `scripts_content` are included. Ephemeral tables such as `conversations`, `experiments`, `messages`, `messages_content`, `queues`, and `testcases` are excluded unless explicitly included.
 
 Snapshot connections require a dedicated backup role configured in `~/.baldrick-rebec/config.yaml` (no admin fallback):
 
@@ -88,7 +88,7 @@ Key exports:
 - Roles/Workflows: `runSetRole({name,title,description?,notes?})`, `runSetWorkflow({name,title,description?,role?,notes?})`
 - Scripts: `createScript(role,title,description,body,{name?,variant?,archived?})`, `scriptListJSON({role,...})`, `scriptFind({name,variant?,archived?,role?})`
 - Tasks: `runSetTask({...})`, `taskSetReplacement({...})`
-- Stores/Blackboards: `storeSet({...})`, `storeGet({name,role})`, `blackboardSet({...})`
+- Blackboards: `blackboardSet({...})`
 - Stickies: `stickieSet({...})`, `stickieListJSON({...})`, `stickieFind({...})`, `stickieList`, `stickieListByBlackboard`, `stickieListByTopic`, `stickieRelSet`, `stickieRelList`, `stickieRelGet`
 - Conversations/Experiments: `conversationSet({title,role?})`, `experimentCreate({conversation})`
 - Queue: `queueAdd({...})`, `queuePeek`, `queueSize`, `queueTake`

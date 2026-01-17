@@ -4,7 +4,7 @@ This codebase provides a CLI-first admin and data-manipulation workflow on top o
 
 ## High-level Layers
 - CLI (Cobra)
-  - Commands in `cmd/**` implement subcommands for each entity (roles, workflows, projects, workspaces, scripts, tasks, messages, queues, testcases, tags, topics, stores, blackboards, stickies) and for DB admin (scaffold/init/status/show/count/backup/restore/age-status/age-init) and graph helpers (task latest/next, stickie-rel).
+  - Commands in `cmd/**` implement subcommands for each entity (roles, workflows, projects, workspaces, scripts, tasks, messages, queues, testcases, tags, topics, blackboards, stickies) and for DB admin (scaffold/init/status/show/count/backup/restore/age-status/age-init) and graph helpers (task latest/next, stickie-rel).
   - Conventions: parse flags, load config, open DB connection, call DAO functions, print stderr summary and JSON to stdout.
 
 - Config
@@ -54,7 +54,7 @@ For graph operations (AGE):
 - Most list/mutation commands provide a concise stderr summary and JSON payload on stdout.
 
 ## Data Model (selected)
-- Relational tables: roles, workflows, projects, workspaces, scripts_content, scripts, task_variants, tasks, messages_content, messages, queues, testcases, conversations, experiments, tags, topics, stores, blackboards, stickies.
+- Relational tables: roles, workflows, projects, workspaces, scripts_content, scripts, task_variants, tasks, messages_content, messages, queues, testcases, conversations, experiments, tags, topics, blackboards, stickies.
 - Graph labels: `Task`, `Stickie` with edges `REPLACES` and `INCLUDES|CAUSES|USES|REPRESENTS|CONTRASTS_WITH`.
 - SQL mirror: `stickie_relations(from_id,to_id,rel_type,labels)` to persist stickie relations when fallback is enabled.
 
@@ -68,7 +68,7 @@ For graph operations (AGE):
 
 ## Test & Examples
 - `script/test-all.sh` exercises a full setup scenario:
-  - Resets DB, scaffolds, initializes AGE, creates entities (workflows, scripts, tasks, projects, workspaces, messages, queues, stores, topics, blackboards, stickies), and validates relationships.
+  - Resets DB, scaffolds, initializes AGE, creates entities (workflows, scripts, tasks, projects, workspaces, messages, queues, topics, blackboards, stickies), and validates relationships.
   - Records each step as a testcase via the `testcases` table.
   - Contains guardrails and diagnostics (AGE readiness; graph relation assertions; counts).
 
