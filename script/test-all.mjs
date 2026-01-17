@@ -117,7 +117,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 19;
+const TOTAL = 20;
 let step = 0;
 
 try {
@@ -1158,6 +1158,27 @@ try {
       'stickies list/find validation failed',
     );
   }
+  // Export blackboard to folder via sync (id -> folder)
+  step++;
+  logStep(step, TOTAL, 'Exporting blackboard to temp/blackboard-test');
+  try {
+    await $`rm -rf temp/blackboard-test`;
+  } catch {}
+  await $`go run main.go blackboard sync id:${bb1} folder:temp/blackboard-test`;
+  // Validate files exist
+  const bbYaml =
+    await $`test -f temp/blackboard-test/blackboard.yaml && echo OK || echo MISSING`;
+  const st1Yaml =
+    await $`test -f temp/blackboard-test/${st1}.stickie.yaml && echo OK || echo MISSING`;
+  const st2Yaml =
+    await $`test -f temp/blackboard-test/${st2}.stickie.yaml && echo OK || echo MISSING`;
+  await assertStep(
+    'blackboard synced to folder',
+    String(bbYaml.stdout || '').includes('OK') &&
+      String(st1Yaml.stdout || '').includes('OK') &&
+      String(st2Yaml.stdout || '').includes('OK'),
+    'expected exported YAML files missing for blackboard/stickies',
+  );
   await stickieListByTopic({
     topicName: 'devops',
     topicRole: TEST_ROLE_USER,
