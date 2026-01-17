@@ -117,7 +117,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 24;
+const TOTAL = 25;
 let step = 0;
 
 try {
@@ -648,6 +648,41 @@ try {
   {
     const bbs = await blackboardListJSON({ role: TEST_ROLE_USER, limit: 50 });
     validateBlackboardListContract(bbs);
+  }
+
+  // 8.1) Create a blackboard via YAML pipe using --cli-input-yaml
+  step++;
+  logStep(step, TOTAL, 'Creating blackboard via --cli-input-yaml');
+  await storeSet({
+    name: 'ideas-yaml',
+    role: TEST_ROLE_USER,
+    title: 'Ideas (YAML)',
+    type: 'blackboard',
+  });
+  const sYaml = idFrom(
+    await storeGet({ name: 'ideas-yaml', role: TEST_ROLE_USER }),
+  );
+  try {
+    await $`mkdir -p temp`;
+  } catch {}
+  await $`bash -lc 'echo "role: ${TEST_ROLE_USER}" > temp/blackboard-input.yaml'`;
+  await $`bash -lc 'echo "store_id: ${sYaml}" >> temp/blackboard-input.yaml'`;
+  // Use an existing project to satisfy FK (created earlier)
+  await $`bash -lc 'echo "project: acme/complete" >> temp/blackboard-input.yaml'`;
+  await $`bash -lc 'echo "background: Created via YAML" >> temp/blackboard-input.yaml'`;
+  await $`bash -lc 'echo "guidelines: From YAML" >> temp/blackboard-input.yaml'`;
+  const bbYamlOut =
+    await $`bash -lc 'cat temp/blackboard-input.yaml | go run main.go blackboard set --cli-input-yaml'`;
+  {
+    const meta = JSON.parse(String(bbYamlOut.stdout || 'null'));
+    await assertStep(
+      'blackboard created via yaml',
+      !!meta &&
+        !!meta.id &&
+        meta.role === TEST_ROLE_USER &&
+        meta.store_id === sYaml,
+      'expected blackboard to be created via YAML with matching role/store',
+    );
   }
 
   // 9) Stickies and relations
