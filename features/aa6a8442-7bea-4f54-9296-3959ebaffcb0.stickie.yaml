@@ -1,0 +1,17 @@
+id: aa6a8442-7bea-4f54-9296-3959ebaffcb0
+note: |-
+    Optional lifecycle: permanent|yearly|quarterly|monthly|weekly|daily. Used for
+    filtering, navigation, and retention guidance; not an enforcement mechanism.
+    Omit when a board should not expire (e.g., Features). Keeping lifecycle on the
+    board itself avoids cross-entity indirection.
+labels:
+    - compliance
+    - documentation
+    - stable
+created: "2026-01-17T20:16:56.571826Z"
+updated: "2026-01-17T20:16:56.571826Z"
+priority_level: could
+complex_name:
+    name: blackboard/lifecycle
+    variant: ""
+archived: false

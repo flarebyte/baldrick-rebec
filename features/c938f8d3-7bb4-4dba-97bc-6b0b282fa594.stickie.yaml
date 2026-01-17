@@ -1,0 +1,17 @@
+id: c938f8d3-7bb4-4dba-97bc-6b0b282fa594
+note: |-
+    Security: folder→id sync rejects YAMLs that reference ids not belonging to the
+    destination board. DB FKs enforce referential integrity. CLI deletes require a
+    confirmation or --force. Export writes atomically via temp files and rename to
+    reduce risks of partial writes.
+labels:
+    - compliance
+    - security
+    - stable
+created: "2026-01-17T20:16:56.584846Z"
+updated: "2026-01-17T20:16:56.584846Z"
+priority_level: should
+complex_name:
+    name: blackboard/nfr-security
+    variant: ""
+archived: false

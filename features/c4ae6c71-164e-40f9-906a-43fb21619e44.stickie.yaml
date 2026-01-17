@@ -1,0 +1,17 @@
+id: c4ae6c71-164e-40f9-906a-43fb21619e44
+note: |-
+    Snapshot backups include blackboards and stickies (stores removed). Restore
+    order ensures FKs are satisfied; upsert mode updates or inserts rows; replace
+    mode truncates then loads. Truncate order includes blackboards so dependent
+    stickies cascade on delete when replacing.
+labels:
+    - compliance
+    - operations
+    - stable
+created: "2026-01-17T20:16:56.559513Z"
+updated: "2026-01-17T20:16:56.559513Z"
+priority_level: could
+complex_name:
+    name: blackboard/backup-restore
+    variant: ""
+archived: false

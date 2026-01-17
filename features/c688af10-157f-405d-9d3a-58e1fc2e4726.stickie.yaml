@@ -1,0 +1,16 @@
+id: c688af10-157f-405d-9d3a-58e1fc2e4726
+note: |-
+    Performance: role-scoped listing queries use an index on role_name and sort by
+    updated DESC to keep recent boards cheap to fetch. Pagination defaults (limit,
+    offset) avoid large scans. List-with-refs joins are limited to display fields
+    and kept optional to minimize row expansion.
+labels:
+    - performance
+    - stable
+created: "2026-01-17T20:16:56.580876Z"
+updated: "2026-01-17T20:16:56.580876Z"
+priority_level: could
+complex_name:
+    name: blackboard/nfr-performance
+    variant: ""
+archived: false
