@@ -1192,6 +1192,15 @@ try {
         f1.id === st1,
       'stickies list/find validation failed',
     );
+    // Ensure list JSON includes note and code for items that have them
+    await assertStep(
+      'stickie list includes note/code',
+      typeof s2json?.note === 'string' &&
+        s2json.note.length > 0 &&
+        typeof s2json?.code === 'string' &&
+        s2json.code.length > 0,
+      'expected stickie list json to include note and code',
+    );
   }
   // Export blackboard to folder via sync (id -> folder)
   step++;
