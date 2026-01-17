@@ -1,35 +1,22 @@
-id: 57310d9c-4ae6-4661-a26b-2fe7c3441960
+id: a0bf2d35-eb69-4bca-949d-74abdc4135e0
 role: dev
 project: github/flarebyte/baldrick-rebec
-background: >-
+background: |-
     Maintain a concise, up-to-date list of the features currently supported by
-
     baldrick-rebec. This board exists to make capabilities discoverable for humans
-
     and easy to parse for AI agents when planning, troubleshooting, or proposing
-
     changes.
-guidelines: >-
+guidelines: |-
     One stickie per feature by default. Create additional stickies when distinct
-
     aspects of the same feature deserve separate notes (e.g., UXD, accessibility,
-
     performance, security, monitoring, operations, compliance, documentation,
-
     legal). Keep each note concise and focused on what is not obvious, with emphasis
-
     on the “why” (intent, trade-offs, constraints, and rationale). Prefer neutral,
-
     implementation-agnostic phrasing. Use labels from this controlled set when
-
     relevant: uxd, accessibility, performance, security, monitoring, operations,
-
     compliance, documentation, legal, wip, stable. Do not use topics for this board
-
     (leave topic fields empty). Make each stickie independently useful: when
-
     helpful, include links or identifiers. AI-friendly style: short sentences,
-
     explicit nouns, one idea per stickie.
-created: "2026-01-17T19:39:40.169707Z"
-updated: "2026-01-17T19:39:40.169707Z"
+created: "2026-01-17T19:48:12.501261Z"
+updated: "2026-01-17T19:48:12.501261Z"

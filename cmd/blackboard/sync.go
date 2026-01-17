@@ -135,16 +135,16 @@ func (s LiteralString) MarshalYAML() (any, error) {
 
 // blackboardYAML controls YAML output for blackboard metadata.
 type blackboardYAML struct {
-	ID           string        `yaml:"id"`
-	Role         string        `yaml:"role"`
-	Conversation *string       `yaml:"conversation_id,omitempty"`
-	Project      *string       `yaml:"project,omitempty"`
-	TaskID       *string       `yaml:"task_id,omitempty"`
-	Background   *FoldedString `yaml:"background,omitempty"`
-	Guidelines   *FoldedString `yaml:"guidelines,omitempty"`
-	Lifecycle    *string       `yaml:"lifecycle,omitempty"`
-	Created      *string       `yaml:"created,omitempty"`
-	Updated      *string       `yaml:"updated,omitempty"`
+	ID           string         `yaml:"id"`
+	Role         string         `yaml:"role"`
+	Conversation *string        `yaml:"conversation_id,omitempty"`
+	Project      *string        `yaml:"project,omitempty"`
+	TaskID       *string        `yaml:"task_id,omitempty"`
+	Background   *LiteralString `yaml:"background,omitempty"`
+	Guidelines   *LiteralString `yaml:"guidelines,omitempty"`
+	Lifecycle    *string        `yaml:"lifecycle,omitempty"`
+	Created      *string        `yaml:"created,omitempty"`
+	Updated      *string        `yaml:"updated,omitempty"`
 }
 
 type stickieComplexNameYAML struct {
@@ -222,11 +222,11 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 		by.TaskID = &v
 	}
 	if b.Background.Valid && strings.TrimSpace(b.Background.String) != "" {
-		v := FoldedString(wrapAt(b.Background.String, 80))
+		v := LiteralString(wrapAt(b.Background.String, 80))
 		by.Background = &v
 	}
 	if b.Guidelines.Valid && strings.TrimSpace(b.Guidelines.String) != "" {
-		v := FoldedString(wrapAt(b.Guidelines.String, 80))
+		v := LiteralString(wrapAt(b.Guidelines.String, 80))
 		by.Guidelines = &v
 	}
 	if b.Lifecycle.Valid && b.Lifecycle.String != "" {
