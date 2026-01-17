@@ -21,9 +21,10 @@ import (
 )
 
 var (
-	flagSyncDelete   bool
-	flagSyncDryRun   bool
-	flagSyncClearIDs bool
+	flagSyncDelete     bool
+	flagSyncDryRun     bool
+	flagSyncClearIDs   bool
+	flagSyncForceWrite bool
 )
 
 // syncCmd implements: rbc blackboard sync id:UUID folder:relative/path
@@ -63,6 +64,7 @@ func init() {
 	syncCmd.Flags().BoolVar(&flagSyncDelete, "delete", false, "Delete files at destination that are not present at source")
 	syncCmd.Flags().BoolVar(&flagSyncDryRun, "dry-run", false, "Show what would change without writing or deleting")
 	syncCmd.Flags().BoolVar(&flagSyncClearIDs, "clear-ids", false, "When exporting id->folder, omit id fields in stickie YAML files")
+	syncCmd.Flags().BoolVar(&flagSyncForceWrite, "force-write", false, "Force rewrite files even if destination appears up-to-date")
 }
 
 type endpointKind int
@@ -156,7 +158,7 @@ type stickieYAML struct {
 	ID            string                 `yaml:"id,omitempty"`
 	TopicName     *string                `yaml:"topic_name,omitempty"`
 	TopicRole     *string                `yaml:"topic_role_name,omitempty"`
-	Note          *string                `yaml:"note,omitempty"`
+	Note          *LiteralString         `yaml:"note,omitempty"`
 	Code          *string                `yaml:"code,omitempty"`
 	Labels        []string               `yaml:"labels,omitempty"`
 	Created       *string                `yaml:"created,omitempty"`
@@ -245,10 +247,12 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 	// Write blackboard.yaml if needed
 	bbFile := filepath.Join(destDir, "blackboard.yaml")
 	bbWrite := true
-	if fi, err := os.Stat(bbFile); err == nil && fi.Mode().IsRegular() {
-		// compare updated timestamps
-		if newerOrEqual, err := destIsNewerOrEqual(bbFile, by.Updated); err == nil && newerOrEqual {
-			bbWrite = false
+	if !flagSyncForceWrite {
+		if fi, err := os.Stat(bbFile); err == nil && fi.Mode().IsRegular() {
+			// compare updated timestamps
+			if newerOrEqual, err := destIsNewerOrEqual(bbFile, by.Updated); err == nil && newerOrEqual {
+				bbWrite = false
+			}
 		}
 	}
 	if bbWrite {
@@ -304,8 +308,8 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 			v := s.TopicRoleName.String
 			sy.TopicRole = &v
 		}
-		if s.Note.Valid && s.Note.String != "" {
-			v := s.Note.String
+		if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
+			v := LiteralString(wrapAt(s.Note.String, 80))
 			sy.Note = &v
 		}
 		if s.Code.Valid && s.Code.String != "" {
@@ -336,9 +340,11 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 		fn := filepath.Join(destDir, fmt.Sprintf("%s.stickie.yaml", s.ID))
 		seen[filepath.Base(fn)] = struct{}{}
 		write := true
-		if fi, err := os.Stat(fn); err == nil && fi.Mode().IsRegular() {
-			if newerOrEqual, err := destIsNewerOrEqual(fn, sy.Updated); err == nil && newerOrEqual {
-				write = false
+		if !flagSyncForceWrite {
+			if fi, err := os.Stat(fn); err == nil && fi.Mode().IsRegular() {
+				if newerOrEqual, err := destIsNewerOrEqual(fn, sy.Updated); err == nil && newerOrEqual {
+					write = false
+				}
 			}
 		}
 		if write {
@@ -580,7 +586,7 @@ func stickieFromYAMLForUpsert(y stickieYAML, blackboardID string) pgdao.Stickie 
 	}
 	if y.Note != nil {
 		s.Note.Valid = true
-		s.Note.String = *y.Note
+		s.Note.String = string(*y.Note)
 	}
 	if y.Code != nil {
 		s.Code.Valid = true
@@ -636,7 +642,7 @@ func hashStickieYAML(y stickieYAML) string {
 		mat.TopicRoleName = *y.TopicRole
 	}
 	if y.Note != nil {
-		mat.Note = *y.Note
+		mat.Note = string(*y.Note)
 	}
 	if y.Code != nil {
 		mat.Code = *y.Code

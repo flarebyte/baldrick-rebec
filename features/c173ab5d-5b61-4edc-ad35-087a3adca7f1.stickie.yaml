@@ -1,5 +1,8 @@
 id: c173ab5d-5b61-4edc-ad35-087a3adca7f1
-note: Delete by id with confirmation prompt unless --force is set. We support --ignore-missing for idempotent cleanups in scripts. This reduces accidental data loss and keeps automation safe.
+note: |-
+    Delete by id with confirmation prompt unless --force is set. We support
+    --ignore-missing for idempotent cleanups in scripts. This reduces accidental
+    data loss and keeps automation safe.
 labels:
     - compliance
     - operations
