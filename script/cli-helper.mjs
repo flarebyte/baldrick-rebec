@@ -92,7 +92,7 @@ export async function assertStep(stepName, cond, msg = '') {
       });
       return; // connect-json success
     }
-  } catch (e) {
+  } catch (_e) {
     // Silent fallback to CLI when connect-json isn't available
   }
   // Ensure testcase persists via CLI

@@ -117,7 +117,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 19;
+const TOTAL = 25;
 let step = 0;
 
 try {
@@ -158,6 +158,7 @@ try {
   logStep(step, TOTAL, 'Ensuring roles for test users (FK for packages)');
   await runSetRole({ name: TEST_ROLE_USER, title: 'RBCTest User' });
   await runSetRole({ name: TEST_ROLE_QA, title: 'RBCTest QA' });
+  await runSetRole({ name: 'dev', title: 'Software Engineer' });
   // Contract checks: roles
   {
     const rUser = await roleGetJSON({ name: TEST_ROLE_USER });
@@ -168,9 +169,11 @@ try {
     const parsed = validateRoleListContract(rList, { allowEmptyTitle: false });
     await assertStep(
       'roles seeded',
-      parsed.length >= 2,
-      'expected at least the 2 test roles in role list',
+      parsed.length >= 3,
+      'expected at least the 3 test roles in role list',
     );
+    const rDev = await roleGetJSON({ name: 'dev' });
+    validateRoleContract(rDev, { allowEmptyTitle: false });
   }
 
   // 3) Workflows
@@ -431,6 +434,14 @@ try {
     notes: 'Project notes filled',
     tags: 'area=complete,stage=alpha',
   });
+  // Add a dev project for the software engineer role
+  await projectSet({
+    name: 'github/flarebyte/baldrick-rebec',
+    role: 'dev',
+    description: 'Main repository',
+    notes: 'Project for dev role',
+    tags: 'source=github,org=flarebyte',
+  });
   {
     const pj = await projectGetJSON({
       name: 'acme/complete',
@@ -648,6 +659,41 @@ try {
   {
     const bbs = await blackboardListJSON({ role: TEST_ROLE_USER, limit: 50 });
     validateBlackboardListContract(bbs);
+  }
+
+  // 8.1) Create a blackboard via YAML pipe using --cli-input-yaml
+  step++;
+  logStep(step, TOTAL, 'Creating blackboard via --cli-input-yaml');
+  await storeSet({
+    name: 'ideas-yaml',
+    role: TEST_ROLE_USER,
+    title: 'Ideas (YAML)',
+    type: 'blackboard',
+  });
+  const sYaml = idFrom(
+    await storeGet({ name: 'ideas-yaml', role: TEST_ROLE_USER }),
+  );
+  try {
+    await $`mkdir -p temp`;
+  } catch {}
+  await $`bash -lc 'echo "role: ${TEST_ROLE_USER}" > temp/blackboard-input.yaml'`;
+  await $`bash -lc 'echo "store_id: ${sYaml}" >> temp/blackboard-input.yaml'`;
+  // Use an existing project to satisfy FK (created earlier)
+  await $`bash -lc 'echo "project: acme/complete" >> temp/blackboard-input.yaml'`;
+  await $`bash -lc 'echo "background: Created via YAML" >> temp/blackboard-input.yaml'`;
+  await $`bash -lc 'echo "guidelines: From YAML" >> temp/blackboard-input.yaml'`;
+  const bbYamlOut =
+    await $`bash -lc 'cat temp/blackboard-input.yaml | go run main.go blackboard set --cli-input-yaml'`;
+  {
+    const meta = JSON.parse(String(bbYamlOut.stdout || 'null'));
+    await assertStep(
+      'blackboard created via yaml',
+      !!meta &&
+        !!meta.id &&
+        meta.role === TEST_ROLE_USER &&
+        meta.store_id === sYaml,
+      'expected blackboard to be created via YAML with matching role/store',
+    );
   }
 
   // 9) Stickies and relations
@@ -1157,7 +1203,120 @@ try {
         f1.id === st1,
       'stickies list/find validation failed',
     );
+    // Ensure list JSON includes note and code for items that have them
+    await assertStep(
+      'stickie list includes note/code',
+      typeof s2json?.note === 'string' &&
+        s2json.note.length > 0 &&
+        typeof s2json?.code === 'string' &&
+        s2json.code.length > 0,
+      'expected stickie list json to include note and code',
+    );
   }
+  // Export blackboard to folder via sync (id -> folder)
+  step++;
+  logStep(step, TOTAL, 'Exporting blackboard to temp/blackboard-test');
+  try {
+    await $`rm -rf temp/blackboard-test`;
+  } catch {}
+  await $`go run main.go blackboard sync id:${bb1} folder:temp/blackboard-test`;
+  // Validate files exist
+  const bbYaml =
+    await $`test -f temp/blackboard-test/blackboard.yaml && echo OK || echo MISSING`;
+  const st1Yaml =
+    await $`test -f temp/blackboard-test/${st1}.stickie.yaml && echo OK || echo MISSING`;
+  const st2Yaml =
+    await $`test -f temp/blackboard-test/${st2}.stickie.yaml && echo OK || echo MISSING`;
+  await assertStep(
+    'blackboard synced to folder',
+    String(bbYaml.stdout || '').includes('OK') &&
+      String(st1Yaml.stdout || '').includes('OK') &&
+      String(st2Yaml.stdout || '').includes('OK'),
+    'expected exported YAML files missing for blackboard/stickies',
+  );
+
+  // Export with --clear-ids: stickie YAMLs should not contain an id field
+  step++;
+  logStep(step, TOTAL, 'Exporting blackboard with --clear-ids');
+  try {
+    await $`rm -rf temp/blackboard-noids`;
+  } catch {}
+  await $`go run main.go blackboard sync id:${bb1} folder:temp/blackboard-noids --clear-ids`;
+  const st1NoId =
+    await $`bash -lc 'grep -q "^id:" temp/blackboard-noids/${st1}.stickie.yaml && echo HAS_ID || echo NO_ID'`;
+  const st2NoId =
+    await $`bash -lc 'grep -q "^id:" temp/blackboard-noids/${st2}.stickie.yaml && echo HAS_ID || echo NO_ID'`;
+  await assertStep(
+    'clear-ids omitted id field',
+    String(st1NoId.stdout || '').includes('NO_ID') &&
+      String(st2NoId.stdout || '').includes('NO_ID'),
+    'expected no id field in stickie YAML when using --clear-ids',
+  );
+
+  // folder -> id: update existing stickie by id when content hash differs
+  step++;
+  logStep(step, TOTAL, 'Folder->ID: updating existing stickie (by id)');
+  // Minimal YAML to update only the note for st1
+  const s1before = await stickieGetJSON({ id: st1 });
+  const prevUpdated = s1before?.updated ? String(s1before.updated) : '';
+  await $`bash -lc 'echo "id: ${st1}" > temp/blackboard-test/${st1}.stickie.yaml'`;
+  await $`bash -lc 'echo "note: Updated via folder->id sync" >> temp/blackboard-test/${st1}.stickie.yaml'`;
+  await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;
+  {
+    const s1after = await stickieGetJSON({ id: st1 });
+    await assertStep(
+      'folder->id updated existing stickie',
+      s1after &&
+        s1after.id === st1 &&
+        s1after.note === 'Updated via folder->id sync' &&
+        (prevUpdated ? String(s1after.updated) !== prevUpdated : true),
+      'expected note to be updated and timestamp changed',
+    );
+  }
+
+  // folder -> id: create new stickie when YAML has no id
+  step++;
+  logStep(step, TOTAL, 'Folder->ID: creating new stickie (no id)');
+  await $`bash -lc 'echo "complex_name:" > temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "  name: Created by folder sync" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "  variant: test" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "note: This was created via folder->id" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "labels: [sync,created]" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;
+  {
+    const created = await stickieFind({
+      name: 'Created by folder sync',
+      variant: 'test',
+      blackboard: bb1,
+    });
+    await assertStep(
+      'folder->id created new stickie',
+      created?.id && created.blackboard_id === bb1,
+      'expected new stickie to be created with assigned UUID',
+    );
+  }
+
+  // folder -> id: security check — if YAML has an id not belonging to target board, fail the sync
+  step++;
+  logStep(step, TOTAL, 'Folder->ID: security guard on foreign/nonexistent id');
+  await $`bash -lc 'echo "id: 123e4567-e89b-12d3-a456-426614174000" > temp/blackboard-test/bad.stickie.yaml'`;
+  await $`bash -lc 'echo "note: Should fail due to foreign id" >> temp/blackboard-test/bad.stickie.yaml'`;
+  let failed = false;
+  try {
+    // Suppress stderr to keep logs clean while asserting failure
+    await $`bash -lc ${`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1} 2>/dev/null`}`;
+  } catch (_e) {
+    failed = true;
+  }
+  await assertStep(
+    'folder->id rejects unknown/foreign id',
+    failed,
+    'expected sync to fail when a .stickie.yaml contains an id not on destination blackboard',
+  );
+  // cleanup bad file to not affect later steps
+  try {
+    await $`rm -f temp/blackboard-test/bad.stickie.yaml`;
+  } catch {}
   await stickieListByTopic({
     topicName: 'devops',
     topicRole: TEST_ROLE_USER,

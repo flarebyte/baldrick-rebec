@@ -54,6 +54,15 @@ var listCmd = &cobra.Command{
 				if s.TopicRoleName.Valid {
 					item["topic_role_name"] = s.TopicRoleName.String
 				}
+				if s.Note.Valid && s.Note.String != "" {
+					item["note"] = s.Note.String
+				}
+				if s.Code.Valid && s.Code.String != "" {
+					item["code"] = s.Code.String
+				}
+				if len(s.Labels) > 0 {
+					item["labels"] = s.Labels
+				}
 				if s.Updated.Valid {
 					item["updated"] = s.Updated.Time.Format(time.RFC3339Nano)
 				}

@@ -19,9 +19,15 @@ format:
 	npx @biomejs/biome format script --write
 	npx @biomejs/biome check script --write
 
+format_unsafe:
+	npx @biomejs/biome check script --write --unsafe
 # Generic test: end-to-end script
 test: gen
 	$(ZX) script/test-all.mjs
+
+lintb: 
+	$(ZX) script/generate-bespoke-rules.mjs
+	semgrep --config scratch/bespoke-rules.yml .
 
 # Generate artifacts (e.g., client stubs)
 gen:
