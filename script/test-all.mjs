@@ -1215,7 +1215,7 @@ try {
     });
     await assertStep(
       'folder->id created new stickie',
-      created && created.id && created.blackboard_id === bb1,
+      created?.id && created.blackboard_id === bb1,
       'expected new stickie to be created with assigned UUID',
     );
   }
@@ -1229,7 +1229,7 @@ try {
   try {
     // Suppress stderr to keep logs clean while asserting failure
     await $`bash -lc ${`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1} 2>/dev/null`}`;
-  } catch (e) {
+  } catch (_e) {
     failed = true;
   }
   await assertStep(
