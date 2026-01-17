@@ -158,6 +158,7 @@ try {
   logStep(step, TOTAL, 'Ensuring roles for test users (FK for packages)');
   await runSetRole({ name: TEST_ROLE_USER, title: 'RBCTest User' });
   await runSetRole({ name: TEST_ROLE_QA, title: 'RBCTest QA' });
+  await runSetRole({ name: 'dev', title: 'Software Engineer' });
   // Contract checks: roles
   {
     const rUser = await roleGetJSON({ name: TEST_ROLE_USER });
@@ -168,9 +169,11 @@ try {
     const parsed = validateRoleListContract(rList, { allowEmptyTitle: false });
     await assertStep(
       'roles seeded',
-      parsed.length >= 2,
-      'expected at least the 2 test roles in role list',
+      parsed.length >= 3,
+      'expected at least the 3 test roles in role list',
     );
+    const rDev = await roleGetJSON({ name: 'dev' });
+    validateRoleContract(rDev, { allowEmptyTitle: false });
   }
 
   // 3) Workflows
@@ -430,6 +433,14 @@ try {
     description: 'Complete metadata project',
     notes: 'Project notes filled',
     tags: 'area=complete,stage=alpha',
+  });
+  // Add a dev project for the software engineer role
+  await projectSet({
+    name: 'github/flarebyte/baldrick-rebec',
+    role: 'dev',
+    description: 'Main repository',
+    notes: 'Project for dev role',
+    tags: 'source=github,org=flarebyte',
   });
   {
     const pj = await projectGetJSON({
