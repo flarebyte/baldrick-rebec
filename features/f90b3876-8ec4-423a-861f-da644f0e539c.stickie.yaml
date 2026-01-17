@@ -1,0 +1,13 @@
+id: f90b3876-8ec4-423a-861f-da644f0e539c
+note: Sync a blackboard and its stickies between a DB id and a folder. We ensure safety with a strict direction model (id→folder or folder→id), a security guard for foreign ids, dry-run previews, and timestamp/hash checks to avoid clobbering newer data. Block-scalars are used for human/AI-friendly YAML.
+labels:
+    - documentation
+    - operations
+    - stable
+created: "2026-01-17T19:59:01.86582Z"
+updated: "2026-01-17T19:59:01.86582Z"
+priority_level: must
+complex_name:
+    name: blackboard/sync-id-folder
+    variant: ""
+archived: false

@@ -1,0 +1,13 @@
+id: 6bc3172b-742e-43e5-9ccd-f3fe20f758d5
+note: Create or update a blackboard by id or stdin (YAML). The CLI accepts --cli-input-yaml to merge fields, so teams can version the board definition. We keep fields minimal (role, project, background, guidelines, lifecycle) to reduce coordination overhead.
+labels:
+    - documentation
+    - operations
+    - stable
+created: "2026-01-17T19:59:01.863757Z"
+updated: "2026-01-17T19:59:01.863757Z"
+priority_level: could
+complex_name:
+    name: blackboard/set
+    variant: ""
+archived: false

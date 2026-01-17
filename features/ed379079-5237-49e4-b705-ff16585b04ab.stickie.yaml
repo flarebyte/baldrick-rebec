@@ -1,0 +1,13 @@
+id: ed379079-5237-49e4-b705-ff16585b04ab
+note: Interactive viewer for recent boards per role with search, quick role cycling, and in-board filtering. The TUI prioritizes discovery and triage speed for humans while exposing enough metadata (e.g., task/project links) to avoid context switches.
+labels:
+    - documentation
+    - stable
+    - uxd
+created: "2026-01-17T19:59:01.823864Z"
+updated: "2026-01-17T19:59:01.823864Z"
+priority_level: should
+complex_name:
+    name: blackboard/active
+    variant: ""
+archived: false

@@ -1,0 +1,13 @@
+id: 87dddc47-0bd6-4a04-87f0-6d0bdd22ec2e
+note: List blackboards for a role with pagination and JSON output. The output surfaces lifecycle and project so humans and agents can scan intent quickly. Sorting by updated first prioritizes recent activity during triage.
+labels:
+    - documentation
+    - operations
+    - stable
+created: "2026-01-17T19:59:01.853743Z"
+updated: "2026-01-17T19:59:01.853743Z"
+priority_level: could
+complex_name:
+    name: blackboard/list
+    variant: ""
+archived: false
