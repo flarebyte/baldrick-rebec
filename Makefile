@@ -24,7 +24,8 @@ test: gen
 	$(ZX) script/test-all.mjs
 
 lintb: 
-	$(ZX) script/bespoke-lint.mjs
+	$(ZX) script/generate-bespoke-rules.mjs
+	semgrep --config scratch/bespoke-rules.yml .
 
 # Generate artifacts (e.g., client stubs)
 gen:
