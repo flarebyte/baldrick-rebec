@@ -12,13 +12,13 @@ import (
 
 type Blackboard struct {
 	ID             string
-	StoreID        string
 	RoleName       string
 	ConversationID sql.NullString
 	ProjectName    sql.NullString
 	TaskID         sql.NullString
 	Background     sql.NullString
 	Guidelines     sql.NullString
+	Lifecycle      sql.NullString
 	Created        sql.NullTime
 	Updated        sql.NullTime
 }
@@ -28,24 +28,17 @@ type Blackboard struct {
 type BlackboardWithRefs struct {
 	// Base blackboard fields
 	ID             string
-	StoreID        string
 	RoleName       string
 	ConversationID sql.NullString
 	ProjectName    sql.NullString
 	TaskID         sql.NullString
 	Background     sql.NullString
 	Guidelines     sql.NullString
+	Lifecycle      sql.NullString
 	Created        sql.NullTime
 	Updated        sql.NullTime
 
 	// Related display fields (all optional)
-	StoreName         sql.NullString // stores.name
-	StoreTitle        sql.NullString // stores.title
-	StoreDesc         sql.NullString // stores.description
-	StoreMotivation   sql.NullString // stores.motivation
-	StoreSecurity     sql.NullString // stores.security
-	StorePrivacy      sql.NullString // stores.privacy
-	StoreNotes        sql.NullString // stores.notes
 	TaskVariant       sql.NullString // tasks.variant
 	TaskTitle         sql.NullString // tasks.title
 	ProjectDesc       sql.NullString // projects.description
@@ -57,44 +50,44 @@ type BlackboardWithRefs struct {
 func UpsertBlackboard(ctx context.Context, db *pgxpool.Pool, b *Blackboard) error {
 	if b.ID != "" {
 		q := `UPDATE blackboards
-              SET store_id=$2::uuid,
-                  role_name=$3,
-                  conversation_id=CASE WHEN $4='' THEN NULL ELSE $4::uuid END,
-                  project_name=NULLIF($5,''),
-                  task_id=CASE WHEN $6='' THEN NULL ELSE $6::uuid END,
-                  background=NULLIF($7,''),
-                  guidelines=NULLIF($8,''),
+              SET role_name=$2,
+                  conversation_id=CASE WHEN $3='' THEN NULL ELSE $3::uuid END,
+                  project_name=NULLIF($4,''),
+                  task_id=CASE WHEN $5='' THEN NULL ELSE $5::uuid END,
+                  background=NULLIF($6,''),
+                  guidelines=NULLIF($7,''),
+                  lifecycle=NULLIF($8,''),
                   updated=now()
               WHERE id=$1::uuid
               RETURNING created, updated`
 		if err := db.QueryRow(ctx, q,
-			b.ID, b.StoreID, b.RoleName,
+			b.ID, b.RoleName,
 			stringOrEmpty(b.ConversationID), stringOrEmpty(b.ProjectName), stringOrEmpty(b.TaskID),
-			stringOrEmpty(b.Background), stringOrEmpty(b.Guidelines),
+			stringOrEmpty(b.Background), stringOrEmpty(b.Guidelines), stringOrEmpty(b.Lifecycle),
 		).Scan(&b.Created, &b.Updated); err != nil {
 			return dbutil.ErrWrap("blackboard.upsert.update", err,
-				dbutil.ParamSummary("id", b.ID), dbutil.ParamSummary("store_id", b.StoreID), dbutil.ParamSummary("role", b.RoleName))
+				dbutil.ParamSummary("id", b.ID), dbutil.ParamSummary("role", b.RoleName))
 		}
 		return nil
 	}
-	q := `INSERT INTO blackboards (store_id, role_name, conversation_id, project_name, task_id, background, guidelines)
-          VALUES ($1::uuid, $2, CASE WHEN $3='' THEN NULL ELSE $3::uuid END, NULLIF($4,''), CASE WHEN $5='' THEN NULL ELSE $5::uuid END, NULLIF($6,''), NULLIF($7,''))
+	q := `INSERT INTO blackboards (role_name, conversation_id, project_name, task_id, background, guidelines, lifecycle)
+          VALUES ($1, CASE WHEN $2='' THEN NULL ELSE $2::uuid END, NULLIF($3,''), CASE WHEN $4='' THEN NULL ELSE $4::uuid END, NULLIF($5,''), NULLIF($6,''), NULLIF($7,''))
           RETURNING id::text, created, updated`
 	if err := db.QueryRow(ctx, q,
-		b.StoreID, b.RoleName, stringOrEmpty(b.ConversationID), stringOrEmpty(b.ProjectName), stringOrEmpty(b.TaskID), stringOrEmpty(b.Background), stringOrEmpty(b.Guidelines),
+		b.RoleName, stringOrEmpty(b.ConversationID), stringOrEmpty(b.ProjectName), stringOrEmpty(b.TaskID), stringOrEmpty(b.Background), stringOrEmpty(b.Guidelines), stringOrEmpty(b.Lifecycle),
 	).Scan(&b.ID, &b.Created, &b.Updated); err != nil {
 		return dbutil.ErrWrap("blackboard.upsert.insert", err,
-			dbutil.ParamSummary("store_id", b.StoreID), dbutil.ParamSummary("role", b.RoleName))
+			dbutil.ParamSummary("role", b.RoleName))
 	}
 	return nil
 }
 
 // GetBlackboardByID fetches a blackboard by UUID.
 func GetBlackboardByID(ctx context.Context, db *pgxpool.Pool, id string) (*Blackboard, error) {
-	q := `SELECT id::text, store_id::text, role_name, conversation_id::text, project_name, task_id::text, background, guidelines, created, updated
+	q := `SELECT id::text, role_name, conversation_id::text, project_name, task_id::text, background, guidelines, lifecycle, created, updated
           FROM blackboards WHERE id=$1::uuid`
 	var b Blackboard
-	if err := db.QueryRow(ctx, q, id).Scan(&b.ID, &b.StoreID, &b.RoleName, &b.ConversationID, &b.ProjectName, &b.TaskID, &b.Background, &b.Guidelines, &b.Created, &b.Updated); err != nil {
+	if err := db.QueryRow(ctx, q, id).Scan(&b.ID, &b.RoleName, &b.ConversationID, &b.ProjectName, &b.TaskID, &b.Background, &b.Guidelines, &b.Lifecycle, &b.Created, &b.Updated); err != nil {
 		return nil, dbutil.ErrWrap("blackboard.get", err, dbutil.ParamSummary("id", id))
 	}
 	return &b, nil
@@ -108,7 +101,7 @@ func ListBlackboards(ctx context.Context, db *pgxpool.Pool, roleName string, lim
 	if offset < 0 {
 		offset = 0
 	}
-	q := `SELECT id::text, store_id::text, role_name, conversation_id::text, project_name, task_id::text, background, guidelines, created, updated
+	q := `SELECT id::text, role_name, conversation_id::text, project_name, task_id::text, background, guidelines, lifecycle, created, updated
           FROM blackboards WHERE role_name=$1 ORDER BY updated DESC, created DESC LIMIT $2 OFFSET $3`
 	rows, err := db.Query(ctx, q, roleName, limit, offset)
 	if err != nil {
@@ -119,7 +112,7 @@ func ListBlackboards(ctx context.Context, db *pgxpool.Pool, roleName string, lim
 	var out []Blackboard
 	for rows.Next() {
 		var b Blackboard
-		if err := rows.Scan(&b.ID, &b.StoreID, &b.RoleName, &b.ConversationID, &b.ProjectName, &b.TaskID, &b.Background, &b.Guidelines, &b.Created, &b.Updated); err != nil {
+		if err := rows.Scan(&b.ID, &b.RoleName, &b.ConversationID, &b.ProjectName, &b.TaskID, &b.Background, &b.Guidelines, &b.Lifecycle, &b.Created, &b.Updated); err != nil {
 			return nil, dbutil.ErrWrap("blackboard.list.scan", err, dbutil.ParamSummary("role", roleName))
 		}
 		out = append(out, b)
@@ -142,15 +135,13 @@ func ListBlackboardsWithRefs(ctx context.Context, db *pgxpool.Pool, roleName str
 	}
 	// Base SELECT with joins
 	base := `SELECT 
-            b.id::text, b.store_id::text, b.role_name,
+            b.id::text, b.role_name,
             b.conversation_id::text, b.project_name, b.task_id::text,
-            b.background, b.guidelines, b.created, b.updated,
-            s.name, s.title, s.description, s.motivation, s.security, s.privacy, s.notes,
+            b.background, b.guidelines, b.lifecycle, b.created, b.updated,
             t.variant, t.title,
             p.description, p.notes,
             c.title
           FROM blackboards b
-          LEFT JOIN stores s ON s.id = b.store_id
           LEFT JOIN tasks t ON t.id = b.task_id
           LEFT JOIN projects p ON p.name = b.project_name AND p.role_name = b.role_name
           LEFT JOIN conversations c ON c.id = b.conversation_id
@@ -160,8 +151,7 @@ func ListBlackboardsWithRefs(ctx context.Context, db *pgxpool.Pool, roleName str
 	if strings.TrimSpace(search) != "" {
 		// Case-insensitive pattern search across selected related fields
 		q := base + ` AND (
-              s.name ILIKE $2 OR s.title ILIKE $2 OR s.description ILIKE $2 OR s.motivation ILIKE $2 OR
-              p.name ILIKE $2 OR p.description ILIKE $2
+              p.name ILIKE $2 OR p.description ILIKE $2 OR b.background ILIKE $2 OR b.guidelines ILIKE $2
             )
             ORDER BY b.updated DESC, b.created DESC
             LIMIT $3 OFFSET $4`
@@ -181,10 +171,9 @@ func ListBlackboardsWithRefs(ctx context.Context, db *pgxpool.Pool, roleName str
 	for rows.Next() {
 		var r BlackboardWithRefs
 		if err := rows.Scan(
-			&r.ID, &r.StoreID, &r.RoleName,
+			&r.ID, &r.RoleName,
 			&r.ConversationID, &r.ProjectName, &r.TaskID,
-			&r.Background, &r.Guidelines, &r.Created, &r.Updated,
-			&r.StoreName, &r.StoreTitle, &r.StoreDesc, &r.StoreMotivation, &r.StoreSecurity, &r.StorePrivacy, &r.StoreNotes,
+			&r.Background, &r.Guidelines, &r.Lifecycle, &r.Created, &r.Updated,
 			&r.TaskVariant, &r.TaskTitle,
 			&r.ProjectDesc, &r.ProjectNotes,
 			&r.ConversationTitle,

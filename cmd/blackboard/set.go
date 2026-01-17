@@ -21,12 +21,12 @@ import (
 var (
 	flagBBID           string
 	flagBBRole         string
-	flagBBStoreID      string
 	flagBBConvID       string
 	flagBBProject      string
 	flagBBTaskID       string
 	flagBBBackground   string
 	flagBBGuidelines   string
+	flagBBLifecycle    string
 	flagBBCliInputYAML bool
 )
 
@@ -37,13 +37,13 @@ var setCmd = &cobra.Command{
 		// Optional: read blackboard.yaml from stdin when --cli-input-yaml is set
 		var yml struct {
 			ID           string  `yaml:"id"`
-			StoreID      string  `yaml:"store_id"`
 			Role         string  `yaml:"role"`
 			Conversation *string `yaml:"conversation_id"`
 			Project      *string `yaml:"project"`
 			TaskID       *string `yaml:"task_id"`
 			Background   *string `yaml:"background"`
 			Guidelines   *string `yaml:"guidelines"`
+			Lifecycle    *string `yaml:"lifecycle"`
 		}
 		if flagBBCliInputYAML {
 			fi, err := os.Stdin.Stat()
@@ -79,10 +79,6 @@ var setCmd = &cobra.Command{
 		if id == "" && strings.TrimSpace(yml.ID) != "" {
 			id = strings.TrimSpace(yml.ID)
 		}
-		storeID := strings.TrimSpace(flagBBStoreID)
-		if storeID == "" && strings.TrimSpace(yml.StoreID) != "" {
-			storeID = strings.TrimSpace(yml.StoreID)
-		}
 		convID := strings.TrimSpace(flagBBConvID)
 		if convID == "" && yml.Conversation != nil {
 			convID = strings.TrimSpace(*yml.Conversation)
@@ -103,12 +99,13 @@ var setCmd = &cobra.Command{
 		if strings.TrimSpace(guidelines) == "" && yml.Guidelines != nil {
 			guidelines = *yml.Guidelines
 		}
+		lifecycle := flagBBLifecycle
+		if strings.TrimSpace(lifecycle) == "" && yml.Lifecycle != nil {
+			lifecycle = *yml.Lifecycle
+		}
 
 		if strings.TrimSpace(role) == "" {
 			return errors.New("--role is required (provide flag or in YAML)")
-		}
-		if id == "" && strings.TrimSpace(storeID) == "" {
-			return errors.New("--store-id is required when creating a blackboard (provide flag or in YAML)")
 		}
 		cfg, err := cfgpkg.Load()
 		if err != nil {
@@ -123,9 +120,6 @@ var setCmd = &cobra.Command{
 		defer db.Close()
 
 		b := &pgdao.Blackboard{ID: id, RoleName: role}
-		if storeID != "" {
-			b.StoreID = storeID
-		}
 		if convID != "" {
 			b.ConversationID = sql.NullString{String: convID, Valid: true}
 		}
@@ -141,13 +135,19 @@ var setCmd = &cobra.Command{
 		if strings.TrimSpace(guidelines) != "" {
 			b.Guidelines = sql.NullString{String: guidelines, Valid: true}
 		}
+		if strings.TrimSpace(lifecycle) != "" {
+			b.Lifecycle = sql.NullString{String: lifecycle, Valid: true}
+		}
 
 		if err := pgdao.UpsertBlackboard(ctx, db, b); err != nil {
 			return err
 		}
 
-		fmt.Fprintf(os.Stderr, "blackboard upserted id=%s role=%q store=%s\n", b.ID, b.RoleName, b.StoreID)
-		out := map[string]any{"status": "upserted", "id": b.ID, "role": b.RoleName, "store_id": b.StoreID}
+		fmt.Fprintf(os.Stderr, "blackboard upserted id=%s role=%q\n", b.ID, b.RoleName)
+		out := map[string]any{"status": "upserted", "id": b.ID, "role": b.RoleName}
+		if b.Lifecycle.Valid {
+			out["lifecycle"] = b.Lifecycle.String
+		}
 		if b.Created.Valid {
 			out["created"] = b.Created.Time.Format(time.RFC3339Nano)
 		}
@@ -164,11 +164,11 @@ func init() {
 	BlackboardCmd.AddCommand(setCmd)
 	setCmd.Flags().StringVar(&flagBBID, "id", "", "Blackboard UUID (optional; when omitted, a new id is generated)")
 	setCmd.Flags().StringVar(&flagBBRole, "role", "", "Role name (required)")
-	setCmd.Flags().StringVar(&flagBBStoreID, "store-id", "", "Store UUID (required on create)")
 	setCmd.Flags().StringVar(&flagBBConvID, "conversation", "", "Conversation UUID (optional)")
 	setCmd.Flags().StringVar(&flagBBProject, "project", "", "Project name (optional; must exist for role)")
 	setCmd.Flags().StringVar(&flagBBTaskID, "task", "", "Task UUID (optional)")
 	setCmd.Flags().StringVar(&flagBBBackground, "background", "", "Background text")
 	setCmd.Flags().StringVar(&flagBBGuidelines, "guidelines", "", "Guidelines text")
+	setCmd.Flags().StringVar(&flagBBLifecycle, "lifecycle", "", "Lifecycle: permanent|yearly|quarterly|monthly|weekly|daily")
 	setCmd.Flags().BoolVar(&flagBBCliInputYAML, "cli-input-yaml", false, "Read blackboard.yaml from stdin to set fields; flags override YAML")
 }

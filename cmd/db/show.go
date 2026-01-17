@@ -295,7 +295,6 @@ func relationships() []relRow {
 		{"testcases.experiment_id", "->", "experiments.id", "rel"},
 		{"workspaces.build_script_id", "->", "scripts.id", "rel"},
 		{"workspaces.project_name,role_name", "->", "projects.name,role_name", "rel"},
-		{"blackboards.store_id", "->", "stores.id", "rel"},
 		{"blackboards.conversation_id", "->", "conversations.id", "rel"},
 		{"blackboards.task_id", "->", "tasks.id", "rel"},
 		{"blackboards.project_name,role_name", "->", "projects.name,role_name", "rel"},

@@ -128,17 +128,6 @@ try {
     await dbReset({ dropAppRole: false });
   } else {
     logStep(step, TOTAL, 'Skipping reset (--skip-reset)');
-    // Create a blackboard anchored to the complete-store to surface joined Store fields in the TUI
-    const storeIdFull = sfull.id || sfull.ID || '';
-    if (storeIdFull) {
-      await blackboardSet({
-        role: TEST_ROLE_USER,
-        storeId: storeIdFull,
-        project: 'acme/complete',
-        background: 'Board for complete-store demo',
-        guidelines: 'Keep entries consistent; test UI fields',
-      });
-    }
   }
 
   // 2) Scaffold
@@ -632,28 +621,23 @@ try {
     validateStoreListContract(stores);
   }
 
-  const s1 = idFrom(
-    await storeGet({ name: 'ideas-acme-build', role: TEST_ROLE_USER }),
-  );
-  const s2 = idFrom(
-    await storeGet({ name: 'blackboard-global', role: TEST_ROLE_USER }),
-  );
+  // Note: stores created above are used for store list contracts, no need to fetch ids here
 
   const bb1 = idFrom(
     await blackboardSet({
       role: TEST_ROLE_USER,
-      storeId: s1,
       project: 'acme/build-system',
       background: 'Ideas board for build system',
       guidelines: 'Keep concise; tag items with priority',
+      lifecycle: 'monthly',
     }),
   );
   const bb2 = idFrom(
     await blackboardSet({
       role: TEST_ROLE_USER,
-      storeId: s2,
       background: 'Team-wide blackboard',
       guidelines: 'Wipe weekly on Mondays',
+      lifecycle: 'weekly',
     }),
   );
   {
@@ -670,18 +654,16 @@ try {
     title: 'Ideas (YAML)',
     type: 'blackboard',
   });
-  const sYaml = idFrom(
-    await storeGet({ name: 'ideas-yaml', role: TEST_ROLE_USER }),
-  );
+  // No need to capture store id for blackboard YAML anymore
   try {
     await $`mkdir -p temp`;
   } catch {}
   await $`bash -lc 'echo "role: ${TEST_ROLE_USER}" > temp/blackboard-input.yaml'`;
-  await $`bash -lc 'echo "store_id: ${sYaml}" >> temp/blackboard-input.yaml'`;
   // Use an existing project to satisfy FK (created earlier)
   await $`bash -lc 'echo "project: acme/complete" >> temp/blackboard-input.yaml'`;
   await $`bash -lc 'echo "background: Created via YAML" >> temp/blackboard-input.yaml'`;
   await $`bash -lc 'echo "guidelines: From YAML" >> temp/blackboard-input.yaml'`;
+  await $`bash -lc 'echo "lifecycle: weekly" >> temp/blackboard-input.yaml'`;
   const bbYamlOut =
     await $`bash -lc 'cat temp/blackboard-input.yaml | go run main.go blackboard set --cli-input-yaml'`;
   {
@@ -691,8 +673,8 @@ try {
       !!meta &&
         !!meta.id &&
         meta.role === TEST_ROLE_USER &&
-        meta.store_id === sYaml,
-      'expected blackboard to be created via YAML with matching role/store',
+        meta.lifecycle === 'weekly',
+      'expected blackboard to be created via YAML with matching role and lifecycle',
     );
   }
 

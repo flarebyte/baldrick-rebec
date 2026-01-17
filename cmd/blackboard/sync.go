@@ -117,13 +117,13 @@ func parseEndpoint(s string) (endpoint, error) {
 // Local YAML structures
 type blackboardYAML struct {
 	ID           string  `yaml:"id"`
-	StoreID      string  `yaml:"store_id"`
 	Role         string  `yaml:"role"`
 	Conversation *string `yaml:"conversation_id,omitempty"`
 	Project      *string `yaml:"project,omitempty"`
 	TaskID       *string `yaml:"task_id,omitempty"`
 	Background   *string `yaml:"background,omitempty"`
 	Guidelines   *string `yaml:"guidelines,omitempty"`
+	Lifecycle    *string `yaml:"lifecycle,omitempty"`
 	Created      *string `yaml:"created,omitempty"`
 	Updated      *string `yaml:"updated,omitempty"`
 }
@@ -187,9 +187,8 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 
 	// Prepare YAML for blackboard
 	by := blackboardYAML{
-		ID:      b.ID,
-		StoreID: b.StoreID,
-		Role:    b.RoleName,
+		ID:   b.ID,
+		Role: b.RoleName,
 	}
 	if b.ConversationID.Valid && b.ConversationID.String != "" {
 		v := b.ConversationID.String
@@ -210,6 +209,10 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 	if b.Guidelines.Valid && b.Guidelines.String != "" {
 		v := b.Guidelines.String
 		by.Guidelines = &v
+	}
+	if b.Lifecycle.Valid && b.Lifecycle.String != "" {
+		v := b.Lifecycle.String
+		by.Lifecycle = &v
 	}
 	if b.Created.Valid {
 		v := b.Created.Time.Format(time.RFC3339Nano)

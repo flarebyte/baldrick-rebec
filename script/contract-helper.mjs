@@ -155,8 +155,8 @@ function blackboardListItemSchemaFactory() {
   return z.object({
     id: z.string().min(1),
     role: z.string().min(1),
-    store_id: z.string().min(1),
     project: z.string().min(1).optional(),
+    lifecycle: z.string().min(1).optional(),
     updated: z.string().optional(),
   });
 }

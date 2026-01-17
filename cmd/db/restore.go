@@ -125,7 +125,7 @@ func upsertRow(ctx context.Context, db *pgxpool.Pool, tbl string, obj rowObj, up
 	case "workspaces":
 		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"description", ""}, {"role_name", ""}, {"project_name", ""}, {"build_script_id", ":uuid"}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"tags", ":jsonb"}}, "id", upsert, obj)
 	case "blackboards":
-		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"store_id", ":uuid"}, {"role_name", ""}, {"conversation_id", ":uuid"}, {"project_name", ""}, {"task_id", ":uuid"}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"background", ""}, {"guidelines", ""}}, "id", upsert, obj)
+		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"role_name", ""}, {"conversation_id", ":uuid"}, {"project_name", ""}, {"task_id", ":uuid"}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"background", ""}, {"guidelines", ""}, {"lifecycle", ""}}, "id", upsert, obj)
 	case "packages":
 		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"role_name", ""}, {"task_id", ":uuid"}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}}, "id", upsert, obj)
 	case "testcases":

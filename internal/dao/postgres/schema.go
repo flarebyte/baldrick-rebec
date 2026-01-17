@@ -435,10 +435,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
 		`CREATE INDEX IF NOT EXISTS idx_stores_role_name ON stores(role_name)`,
-		// Blackboards: notes tied to a store with optional links
+		// Blackboards: role-scoped boards with optional links
 		`CREATE TABLE IF NOT EXISTS blackboards (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
             role_name TEXT NOT NULL DEFAULT 'user',
             conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
             project_name TEXT,
@@ -447,6 +446,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             background TEXT,
             guidelines TEXT,
+            lifecycle TEXT CHECK (lifecycle IN ('permanent','yearly','quarterly','monthly','weekly','daily') OR lifecycle IS NULL),
             FOREIGN KEY (project_name, role_name) REFERENCES projects(name, role_name) ON DELETE SET NULL
         )`,
 		`DO $$ BEGIN

@@ -283,15 +283,16 @@ export async function storeGet({ name, role = 'user' }) {
 
 export async function blackboardSet({
   role = 'user',
-  storeId,
   project = '',
   background = '',
   guidelines = '',
+  lifecycle = '',
 }) {
-  const args = ['blackboard', 'set', '--role', role, '--store-id', storeId];
+  const args = ['blackboard', 'set', '--role', role];
   if (project) args.push('--project', project);
   if (background) args.push('--background', background);
   if (guidelines) args.push('--guidelines', guidelines);
+  if (lifecycle) args.push('--lifecycle', lifecycle);
   return await runRbcJSON(...args);
 }
 
