@@ -1184,6 +1184,8 @@ try {
   step++;
   logStep(step, TOTAL, 'Folder->ID: updating existing stickie (by id)');
   // Minimal YAML to update only the note for st1
+  const s1before = await stickieGetJSON({ id: st1 });
+  const prevUpdated = s1before?.updated ? String(s1before.updated) : '';
   await $`bash -lc 'echo "id: ${st1}" > temp/blackboard-test/${st1}.stickie.yaml'`;
   await $`bash -lc 'echo "note: Updated via folder->id sync" >> temp/blackboard-test/${st1}.stickie.yaml'`;
   await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;
@@ -1193,8 +1195,9 @@ try {
       'folder->id updated existing stickie',
       s1after &&
         s1after.id === st1 &&
-        s1after.note === 'Updated via folder->id sync',
-      'expected note to be updated on existing stickie',
+        s1after.note === 'Updated via folder->id sync' &&
+        (prevUpdated ? String(s1after.updated) !== prevUpdated : true),
+      'expected note to be updated and timestamp changed',
     );
   }
 

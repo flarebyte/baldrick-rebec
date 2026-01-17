@@ -118,7 +118,6 @@ type stickieComplexNameYAML struct {
 
 type stickieYAML struct {
 	ID            string                 `yaml:"id"`
-	BlackboardID  string                 `yaml:"blackboard_id"`
 	TopicName     *string                `yaml:"topic_name,omitempty"`
 	TopicRole     *string                `yaml:"topic_role_name,omitempty"`
 	Note          *string                `yaml:"note,omitempty"`
@@ -246,10 +245,9 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 	// Write each stickie YAML if newer
 	for _, s := range stickies {
 		sy := stickieYAML{
-			ID:           s.ID,
-			BlackboardID: s.BlackboardID,
-			Labels:       s.Labels,
-			EditCount:    s.EditCount,
+			ID:        s.ID,
+			Labels:    s.Labels,
+			EditCount: s.EditCount,
 			ComplexName: stickieComplexNameYAML{
 				Name:    s.ComplexName.Name,
 				Variant: s.ComplexName.Variant,
