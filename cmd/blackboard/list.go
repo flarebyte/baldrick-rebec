@@ -49,9 +49,12 @@ var listCmd = &cobra.Command{
 		if out == "json" {
 			arr := make([]map[string]any, 0, len(bb))
 			for _, b := range bb {
-				item := map[string]any{"id": b.ID, "role": b.RoleName, "store_id": b.StoreID}
+				item := map[string]any{"id": b.ID, "role": b.RoleName}
 				if b.ProjectName.Valid && b.ProjectName.String != "" {
 					item["project"] = b.ProjectName.String
+				}
+				if b.Lifecycle.Valid && b.Lifecycle.String != "" {
+					item["lifecycle"] = b.Lifecycle.String
 				}
 				if b.Updated.Valid {
 					item["updated"] = b.Updated.Time.Format(time.RFC3339Nano)
@@ -64,7 +67,7 @@ var listCmd = &cobra.Command{
 		}
 		// table default
 		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"ID", "STORE", "PROJECT", "UPDATED"})
+		table.SetHeader([]string{"ID", "PROJECT", "LIFECYCLE", "UPDATED"})
 		for _, b := range bb {
 			updated := ""
 			if b.Updated.Valid {
@@ -74,7 +77,11 @@ var listCmd = &cobra.Command{
 			if b.ProjectName.Valid {
 				proj = b.ProjectName.String
 			}
-			table.Append([]string{b.ID, b.StoreID, proj, updated})
+			lifecycle := ""
+			if b.Lifecycle.Valid {
+				lifecycle = b.Lifecycle.String
+			}
+			table.Append([]string{b.ID, proj, lifecycle, updated})
 		}
 		table.Render()
 		return nil

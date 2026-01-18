@@ -67,15 +67,11 @@ import {
   stickieGetJSON,
   stickieList,
   stickieListByBlackboard,
-  stickieListByTopic,
   stickieListJSON,
   stickieRelGet,
   stickieRelList,
   stickieRelSet,
   stickieSet,
-  storeGet,
-  storeListJSON,
-  storeSet,
   tagSet,
   taskListJSON,
   taskScriptAdd,
@@ -104,7 +100,6 @@ import {
   validateRoleListContract,
   validateScriptListContract,
   validateStickieListContract,
-  validateStoreListContract,
   validateTaskListContract,
   validateTopicListContract,
   validateVaultListContract,
@@ -128,17 +123,6 @@ try {
     await dbReset({ dropAppRole: false });
   } else {
     logStep(step, TOTAL, 'Skipping reset (--skip-reset)');
-    // Create a blackboard anchored to the complete-store to surface joined Store fields in the TUI
-    const storeIdFull = sfull.id || sfull.ID || '';
-    if (storeIdFull) {
-      await blackboardSet({
-        role: TEST_ROLE_USER,
-        storeId: storeIdFull,
-        project: 'acme/complete',
-        background: 'Board for complete-store demo',
-        guidelines: 'Keep entries consistent; test UI fields',
-      });
-    }
   }
 
   // 2) Scaffold
@@ -600,60 +584,27 @@ try {
     } catch {}
   }
 
-  // 8) Stores & Blackboards
+  // 8) Blackboards
   step++;
-  logStep(step, TOTAL, 'Creating stores and blackboards');
-  await storeSet({
-    name: 'ideas-acme-build',
-    role: TEST_ROLE_USER,
-    title: 'Ideas for acme/build-system',
-    description: 'Idea backlog',
-    motivation: 'Capture and prioritize improvement ideas',
-    security: 'Internal only',
-    privacy: 'No PII expected',
-    notes: 'Markdown allowed: keep entries concise',
-    type: 'journal',
-    scope: 'project',
-    lifecycle: 'monthly',
-    tags: 'topic=ideas,project=acme/build-system',
-  });
-  await storeSet({
-    name: 'blackboard-global',
-    role: TEST_ROLE_USER,
-    title: 'Shared Blackboard',
-    description: 'Scratch space for team',
-    type: 'blackboard',
-    scope: 'shared',
-    lifecycle: 'weekly',
-    tags: 'visibility=team',
-  });
-  {
-    const stores = await storeListJSON({ role: TEST_ROLE_USER, limit: 50 });
-    validateStoreListContract(stores);
-  }
+  logStep(step, TOTAL, 'Creating blackboards');
 
-  const s1 = idFrom(
-    await storeGet({ name: 'ideas-acme-build', role: TEST_ROLE_USER }),
-  );
-  const s2 = idFrom(
-    await storeGet({ name: 'blackboard-global', role: TEST_ROLE_USER }),
-  );
+  // Create two sample blackboards for the user role
 
   const bb1 = idFrom(
     await blackboardSet({
       role: TEST_ROLE_USER,
-      storeId: s1,
       project: 'acme/build-system',
       background: 'Ideas board for build system',
       guidelines: 'Keep concise; tag items with priority',
+      lifecycle: 'monthly',
     }),
   );
   const bb2 = idFrom(
     await blackboardSet({
       role: TEST_ROLE_USER,
-      storeId: s2,
       background: 'Team-wide blackboard',
       guidelines: 'Wipe weekly on Mondays',
+      lifecycle: 'weekly',
     }),
   );
   {
@@ -664,24 +615,16 @@ try {
   // 8.1) Create a blackboard via YAML pipe using --cli-input-yaml
   step++;
   logStep(step, TOTAL, 'Creating blackboard via --cli-input-yaml');
-  await storeSet({
-    name: 'ideas-yaml',
-    role: TEST_ROLE_USER,
-    title: 'Ideas (YAML)',
-    type: 'blackboard',
-  });
-  const sYaml = idFrom(
-    await storeGet({ name: 'ideas-yaml', role: TEST_ROLE_USER }),
-  );
+  // No store dependency required
   try {
     await $`mkdir -p temp`;
   } catch {}
   await $`bash -lc 'echo "role: ${TEST_ROLE_USER}" > temp/blackboard-input.yaml'`;
-  await $`bash -lc 'echo "store_id: ${sYaml}" >> temp/blackboard-input.yaml'`;
   // Use an existing project to satisfy FK (created earlier)
   await $`bash -lc 'echo "project: acme/complete" >> temp/blackboard-input.yaml'`;
   await $`bash -lc 'echo "background: Created via YAML" >> temp/blackboard-input.yaml'`;
   await $`bash -lc 'echo "guidelines: From YAML" >> temp/blackboard-input.yaml'`;
+  await $`bash -lc 'echo "lifecycle: weekly" >> temp/blackboard-input.yaml'`;
   const bbYamlOut =
     await $`bash -lc 'cat temp/blackboard-input.yaml | go run main.go blackboard set --cli-input-yaml'`;
   {
@@ -691,8 +634,8 @@ try {
       !!meta &&
         !!meta.id &&
         meta.role === TEST_ROLE_USER &&
-        meta.store_id === sYaml,
-      'expected blackboard to be created via YAML with matching role/store',
+        meta.lifecycle === 'weekly',
+      'expected blackboard to be created via YAML with matching role and lifecycle',
     );
   }
 
@@ -702,27 +645,21 @@ try {
   const st1 = idFrom(
     await stickieSet({
       blackboard: bb1,
-      topicName: 'onboarding',
-      topicRole: TEST_ROLE_USER,
       note: 'Refresh onboarding guide for new hires',
       labels: ['onboarding', 'docs', 'priority:med'],
       priority: 'should',
       name: 'Onboarding Refresh',
-      variant: '',
       score: 0.42,
     }),
   );
   const st2 = idFrom(
     await stickieSet({
       blackboard: bb1,
-      topicName: 'devops',
-      topicRole: TEST_ROLE_USER,
       note: 'Evaluate GitHub Actions caching for go build',
       code: 'name: CI\n\non: [push]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-go@v5\n      - run: go build ./...\n',
       labels: ['idea', 'devops'],
       priority: 'could',
       name: 'DevOps Caching',
-      variant: '',
     }),
   );
   const st3 = idFrom(
@@ -733,7 +670,6 @@ try {
       labels: ['team', 'ritual'],
       priority: 'must',
       name: 'Team Retro',
-      variant: '',
     }),
   );
 
@@ -788,52 +724,7 @@ try {
     tags: 'status=active',
   });
 
-  // Ensure one store has all fields populated
-  await storeSet({
-    name: 'complete-store',
-    role: TEST_ROLE_USER,
-    title: 'Complete Store',
-    description: 'Store with all fields',
-    motivation: 'Centralize artifacts',
-    security: 'Internal only',
-    privacy: 'No PII',
-    notes: 'Markdown: some details here',
-    type: 'journal',
-    scope: 'shared',
-    lifecycle: 'weekly',
-    tags: 'env=dev,owner=qa',
-  });
-  {
-    const sfull = await storeGet({
-      name: 'complete-store',
-      role: TEST_ROLE_USER,
-    });
-    assert(
-      sfull && (sfull.id || sfull.ID || sfull.name === 'complete-store'),
-      'store complete: not found',
-    );
-    assert(sfull.title === 'Complete Store', 'store complete: title mismatch');
-    assert(
-      sfull.description === 'Store with all fields',
-      'store complete: description missing',
-    );
-    assert(
-      sfull.motivation === 'Centralize artifacts',
-      'store complete: motivation missing',
-    );
-    assert(
-      sfull.security === 'Internal only',
-      'store complete: security missing',
-    );
-    assert(sfull.privacy === 'No PII', 'store complete: privacy missing');
-    assert(
-      sfull.notes === 'Markdown: some details here',
-      'store complete: notes missing',
-    );
-    assert(sfull.type === 'journal', 'store complete: type missing');
-    assert(sfull.scope === 'shared', 'store complete: scope missing');
-    assert(sfull.lifecycle === 'weekly', 'store complete: lifecycle missing');
-  }
+  // Note: store feature removed; skip store-specific verifications
 
   await packageSet({ role: TEST_ROLE_USER, variant: 'unit/go' });
   await packageSet({ role: TEST_ROLE_QA, variant: 'integration' });
@@ -1175,7 +1066,6 @@ try {
   await listWithRole('project', TEST_ROLE_USER, 50);
   await listWithRole('workspace', TEST_ROLE_USER, 50);
   await listWithRole('script', TEST_ROLE_USER, 50);
-  await listWithRole('store', TEST_ROLE_USER, 50);
   await listWithRole('topic', TEST_ROLE_USER, 50);
   await listWithRole('blackboard', TEST_ROLE_USER, 50);
   await stickieList(50);
@@ -1190,7 +1080,6 @@ try {
     const s2json = byId(st2);
     const f1 = await stickieFind({
       name: 'Onboarding Refresh',
-      variant: '',
       blackboard: bb1,
     });
     await assertStep(
@@ -1277,9 +1166,7 @@ try {
   // folder -> id: create new stickie when YAML has no id
   step++;
   logStep(step, TOTAL, 'Folder->ID: creating new stickie (no id)');
-  await $`bash -lc 'echo "complex_name:" > temp/blackboard-test/new-sync.stickie.yaml'`;
-  await $`bash -lc 'echo "  name: Created by folder sync" >> temp/blackboard-test/new-sync.stickie.yaml'`;
-  await $`bash -lc 'echo "  variant: test" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "name: Created by folder sync" > temp/blackboard-test/new-sync.stickie.yaml'`;
   await $`bash -lc 'echo "note: This was created via folder->id" >> temp/blackboard-test/new-sync.stickie.yaml'`;
   await $`bash -lc 'echo "labels: [sync,created]" >> temp/blackboard-test/new-sync.stickie.yaml'`;
   await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;
@@ -1317,11 +1204,7 @@ try {
   try {
     await $`rm -f temp/blackboard-test/bad.stickie.yaml`;
   } catch {}
-  await stickieListByTopic({
-    topicName: 'devops',
-    topicRole: TEST_ROLE_USER,
-    limit: 50,
-  });
+  // topics removed; skip list-by-topic
   await stickieRelList({ id: st1, direction: 'out' });
   await stickieRelGet({
     from: st1,

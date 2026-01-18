@@ -17,7 +17,6 @@ import (
 	snapcmd "github.com/flarebyte/baldrick-rebec/cmd/snapshot"
 	stickcmd "github.com/flarebyte/baldrick-rebec/cmd/stickie"
 	stickrelcmd "github.com/flarebyte/baldrick-rebec/cmd/stickie_rel"
-	storecmd "github.com/flarebyte/baldrick-rebec/cmd/store"
 	tagcmd "github.com/flarebyte/baldrick-rebec/cmd/tag"
 	"github.com/flarebyte/baldrick-rebec/cmd/task"
 	"github.com/flarebyte/baldrick-rebec/cmd/test"
@@ -48,7 +47,6 @@ func init() {
 	rootCmd.AddCommand(dbcmd.DBCmd)
 	rootCmd.AddCommand(qcmd.QueueCmd)
 	rootCmd.AddCommand(tccmd.TestcaseCmd)
-	rootCmd.AddCommand(storecmd.StoreCmd)
 	rootCmd.AddCommand(bbcmd.BlackboardCmd)
 	rootCmd.AddCommand(stickcmd.StickieCmd)
 	rootCmd.AddCommand(stickrelcmd.StickieRelCmd)

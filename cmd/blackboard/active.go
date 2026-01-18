@@ -81,7 +81,7 @@ var activeCmd = &cobra.Command{
 
 func init() {
 	BlackboardCmd.AddCommand(activeCmd)
-	activeCmd.Flags().StringVar(&flagBBActiveSearch, "search", "", "Optional search string (matches store/project fields)")
+	activeCmd.Flags().StringVar(&flagBBActiveSearch, "search", "", "Optional search string (matches project/background/guidelines)")
 }
 
 // Model
@@ -279,7 +279,7 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.inBoard = true
 				bb := m.boards[m.cursor]
 				m.boardID = bb.ID
-				m.boardTitle = firstNonEmpty(strOrNull(bb.ProjectName), strOrNull(bb.ConversationTitle), strOrNull(bb.StoreTitle), bb.StoreID)
+				m.boardTitle = firstNonEmpty(strOrNull(bb.ProjectName), strOrNull(bb.ConversationTitle))
 				if strings.TrimSpace(m.boardTitle) == "" {
 					m.boardTitle = m.boardID
 				}
@@ -380,21 +380,11 @@ func (m bbActiveModel) View() string {
 			b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 			b.WriteString(bStyleHeader.Render("Stickie Details") + "\n")
 			b.WriteString(bStyleLabel.Render("ID: ") + bStyleValue.Render(st.ID) + "\n")
-			// Complex name
-			if strings.TrimSpace(st.ComplexName.Name) != "" {
-				name := st.ComplexName.Name
-				if strings.TrimSpace(st.ComplexName.Variant) != "" {
-					name += "/" + st.ComplexName.Variant
-				}
-				b.WriteString(bStyleLabel.Render("Name: ") + bStyleValue.Render(name) + "\n")
+			// Name
+			if st.Name.Valid && strings.TrimSpace(st.Name.String) != "" {
+				b.WriteString(bStyleLabel.Render("Name: ") + bStyleValue.Render(st.Name.String) + "\n")
 			}
-			// Topic
-			if st.TopicName.Valid {
-				b.WriteString(bStyleLabel.Render("Topic: ") + bStyleValue.Render(st.TopicName.String) + "\n")
-			}
-			if st.TopicRoleName.Valid {
-				b.WriteString(bStyleLabel.Render("Topic.role: ") + bStyleValue.Render(st.TopicRoleName.String) + "\n")
-			}
+			// Topics removed; use labels instead
 			// Note
 			if st.Note.Valid && strings.TrimSpace(st.Note.String) != "" {
 				b.WriteString(bStyleLabel.Render("Note: ") + bStyleValue.Render(st.Note.String) + "\n")
@@ -454,13 +444,13 @@ func (m bbActiveModel) View() string {
 		return b.String()
 	}
 
-	// List rows: show a concise label (project or conversation title, else store)
+	// List rows: show a concise label (project or conversation title)
 	for i, bb := range m.boards {
 		cursor := "  "
 		if i == m.cursor {
 			cursor = bStyleCursor.Render("> ")
 		}
-		primary := firstNonEmpty(strOrNull(bb.ProjectName), strOrNull(bb.ConversationTitle), strOrNull(bb.StoreTitle), bb.StoreID)
+		primary := firstNonEmpty(strOrNull(bb.ProjectName), strOrNull(bb.ConversationTitle))
 		if primary == "" {
 			primary = bb.ID
 		}
@@ -485,28 +475,9 @@ func (m bbActiveModel) View() string {
 		b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 		b.WriteString(bStyleHeader.Render("Details") + "\n")
 		b.WriteString(bStyleLabel.Render("ID: ") + bStyleValue.Render(bb.ID) + "\n")
-		// Store (distinct style)
-		b.WriteString(bStyleStoreLabel.Render("Store: ") + bStyleValue.Render(bb.StoreID) + "\n")
-		if bb.StoreName.Valid {
-			b.WriteString(bStyleStoreLabel.Render("Store.name: ") + bStyleValue.Render(bb.StoreName.String) + "\n")
-		}
-		if bb.StoreTitle.Valid {
-			b.WriteString(bStyleStoreLabel.Render("Store.title: ") + bStyleValue.Render(bb.StoreTitle.String) + "\n")
-		}
-		if bb.StoreDesc.Valid {
-			b.WriteString(bStyleStoreLabel.Render("Store.desc: ") + bStyleValue.Render(bb.StoreDesc.String) + "\n")
-		}
-		if bb.StoreMotivation.Valid {
-			b.WriteString(bStyleStoreLabel.Render("Store.motivation: ") + bStyleValue.Render(bb.StoreMotivation.String) + "\n")
-		}
-		if bb.StoreSecurity.Valid {
-			b.WriteString(bStyleStoreLabel.Render("Store.security: ") + bStyleValue.Render(bb.StoreSecurity.String) + "\n")
-		}
-		if bb.StorePrivacy.Valid {
-			b.WriteString(bStyleStoreLabel.Render("Store.privacy: ") + bStyleValue.Render(bb.StorePrivacy.String) + "\n")
-		}
-		if bb.StoreNotes.Valid {
-			b.WriteString(bStyleStoreLabel.Render("Store.notes: ") + bStyleValue.Render(bb.StoreNotes.String) + "\n")
+		// Lifecycle (if any)
+		if bb.Lifecycle.Valid && strings.TrimSpace(bb.Lifecycle.String) != "" {
+			b.WriteString(bStyleStoreLabel.Render("Lifecycle: ") + bStyleValue.Render(bb.Lifecycle.String) + "\n")
 		}
 		// Role
 		b.WriteString(bStyleLabel.Render("Role: ") + bStyleValue.Render(bb.RoleName) + "\n")
@@ -580,13 +551,8 @@ func refreshBoardsCmd(role string, search string) tea.Cmd {
 }
 
 func stickieTitle(s pgdao.Stickie) string {
-	name := strings.TrimSpace(s.ComplexName.Name)
-	if name != "" {
-		v := strings.TrimSpace(s.ComplexName.Variant)
-		if v != "" {
-			return name + "/" + v
-		}
-		return name
+	if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
+		return s.Name.String
 	}
 	if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
 		return s.Note.String
@@ -607,7 +573,7 @@ func refreshStickiesCmd(boardID string) tea.Cmd {
 			return bbErrMsg{err}
 		}
 		defer db.Close()
-		rows, err := pgdao.ListStickies(ctx, db, boardID, "", "", 100, 0)
+		rows, err := pgdao.ListStickies(ctx, db, boardID, 100, 0)
 		if err != nil {
 			return bbErrMsg{err}
 		}
@@ -634,8 +600,9 @@ func strOrNull(ns sql.NullString) string {
 // relatedChips builds a small inline string with joined fields, styled to stand out.
 func relatedChips(bb pgdao.BlackboardWithRefs) string {
 	var parts []string
-	if bb.StoreName.Valid {
-		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("store:"+bb.StoreName.String))
+	// lifecycle chip
+	if bb.Lifecycle.Valid && strings.TrimSpace(bb.Lifecycle.String) != "" {
+		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("life:"+bb.Lifecycle.String))
 	}
 	if bb.TaskVariant.Valid || bb.TaskTitle.Valid {
 		label := strOrNull(bb.TaskVariant)
@@ -693,19 +660,9 @@ func truncateCodeSnippet(code string) string {
 // Filtering helpers for in-board view
 func (m bbActiveModel) filteredStickyIndices() []int {
 	out := make([]int, 0, len(m.stickies))
-	// Resolve topic filter
-	topic := ""
-	if m.topicIdx > 0 && m.topicIdx < len(m.topicOptions) {
-		topic = m.topicOptions[m.topicIdx]
-	}
+	// Topic filter removed; use labels in future if needed
 	q := strings.ToLower(strings.TrimSpace(m.noteSearch))
 	for i, s := range m.stickies {
-		// Topic filter
-		if topic != "" {
-			if !s.TopicName.Valid || strings.TrimSpace(s.TopicName.String) != topic {
-				continue
-			}
-		}
 		// Note search
 		if q != "" {
 			note := ""
@@ -722,21 +679,8 @@ func (m bbActiveModel) filteredStickyIndices() []int {
 }
 
 func (m *bbActiveModel) recomputeTopicOptions() {
-	seen := map[string]struct{}{}
-	opts := []string{"any"}
-	for _, s := range m.stickies {
-		if s.TopicName.Valid {
-			t := strings.TrimSpace(s.TopicName.String)
-			if t == "" {
-				continue
-			}
-			if _, ok := seen[t]; !ok {
-				seen[t] = struct{}{}
-				opts = append(opts, t)
-			}
-		}
-	}
-	m.topicOptions = opts
+	// topics removed; no recompute
+	m.topicOptions = []string{"any"}
 	if m.topicIdx >= len(m.topicOptions) {
 		m.topicIdx = 0
 	}

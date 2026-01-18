@@ -81,10 +81,10 @@ var showCmd = &cobra.Command{
 
 		// stable order, and prefer our core tables first if present
 		priority := map[string]int{
-			"roles": 0, "workflows": 1, "tags": 2, "projects": 3, "stores": 4,
-			"conversations": 5, "experiments": 6, "task_variants": 7, "tasks": 8,
-			"scripts_content": 9, "scripts": 10, "messages_content": 11, "messages": 12,
-			"workspaces": 13, "packages": 14, "queues": 15, "testcases": 16,
+			"roles": 0, "workflows": 1, "tags": 2, "projects": 3,
+			"conversations": 4, "experiments": 5, "task_variants": 6, "tasks": 7,
+			"scripts_content": 8, "scripts": 9, "messages_content": 10, "messages": 11,
+			"workspaces": 12, "packages": 13, "queues": 14, "testcases": 15,
 		}
 		sort.Slice(tables, func(i, j int) bool {
 			pi, pj := 1000, 1000
@@ -295,13 +295,12 @@ func relationships() []relRow {
 		{"testcases.experiment_id", "->", "experiments.id", "rel"},
 		{"workspaces.build_script_id", "->", "scripts.id", "rel"},
 		{"workspaces.project_name,role_name", "->", "projects.name,role_name", "rel"},
-		{"blackboards.store_id", "->", "stores.id", "rel"},
 		{"blackboards.conversation_id", "->", "conversations.id", "rel"},
 		{"blackboards.task_id", "->", "tasks.id", "rel"},
 		{"blackboards.project_name,role_name", "->", "projects.name,role_name", "rel"},
 		{"stickies.blackboard_id", "->", "blackboards.id", "rel"},
 		{"stickies.created_by_task_id", "->", "tasks.id", "rel"},
-		{"stickies.topic_name,topic_role_name", "->", "topics.name,role_name", "rel"},
+		// topics removed from stickies
 		{"stickie_relations.from_id,to_id", "->", "stickies.id", "rel (graph-sql)"},
 		{"task_replaces.new_task_id,old_task_id", "->", "tasks.id", "rel (graph-sql)"},
 	}

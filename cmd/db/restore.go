@@ -63,7 +63,7 @@ var restoreCmd = &cobra.Command{
 			}
 		}
 		// Insert in FK-safe order
-		order := []string{"roles", "workflows", "tags", "projects", "stores", "tools", "topics", "conversations", "experiments", "task_variants", "tasks", "scripts_content", "scripts", "messages_content", "messages", "workspaces", "blackboards", "stickies", "packages", "testcases"}
+		order := []string{"roles", "workflows", "tags", "projects", "tools", "topics", "conversations", "experiments", "task_variants", "tasks", "scripts_content", "scripts", "messages_content", "messages", "workspaces", "blackboards", "stickies", "packages", "testcases"}
 		for _, tbl := range order {
 			rows := dump[tbl]
 			for _, raw := range rows {
@@ -82,7 +82,7 @@ var restoreCmd = &cobra.Command{
 }
 
 func truncateAll(ctx context.Context, db *pgxpool.Pool) error {
-	_, err := db.Exec(ctx, `TRUNCATE TABLE packages, stickies, blackboards, messages, messages_content, scripts, scripts_content, tasks, task_variants, experiments, conversations, workspaces, topics, tools, stores, projects, workflows, roles, tags RESTART IDENTITY CASCADE`)
+	_, err := db.Exec(ctx, `TRUNCATE TABLE packages, stickies, blackboards, messages, messages_content, scripts, scripts_content, tasks, task_variants, experiments, conversations, workspaces, topics, tools, projects, workflows, roles, tags RESTART IDENTITY CASCADE`)
 	return err
 }
 
@@ -125,19 +125,17 @@ func upsertRow(ctx context.Context, db *pgxpool.Pool, tbl string, obj rowObj, up
 	case "workspaces":
 		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"description", ""}, {"role_name", ""}, {"project_name", ""}, {"build_script_id", ":uuid"}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"tags", ":jsonb"}}, "id", upsert, obj)
 	case "blackboards":
-		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"store_id", ":uuid"}, {"role_name", ""}, {"conversation_id", ":uuid"}, {"project_name", ""}, {"task_id", ":uuid"}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"background", ""}, {"guidelines", ""}}, "id", upsert, obj)
+		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"role_name", ""}, {"conversation_id", ":uuid"}, {"project_name", ""}, {"task_id", ":uuid"}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"background", ""}, {"guidelines", ""}, {"lifecycle", ""}}, "id", upsert, obj)
 	case "packages":
 		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"role_name", ""}, {"task_id", ":uuid"}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}}, "id", upsert, obj)
 	case "testcases":
 		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"name", ""}, {"package", ""}, {"classname", ""}, {"title", ""}, {"experiment_id", ":uuid"}, {"role_name", ""}, {"status", ""}, {"error_message", ""}, {"tags", ":jsonb"}, {"level", ""}, {"created", ":timestamptz"}, {"file", ""}, {"line", ""}, {"execution_time", ""}}, "id", upsert, obj)
-	case "stores":
-		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"name", ""}, {"title", ""}, {"description", ""}, {"motivation", ""}, {"security", ""}, {"privacy", ""}, {"role_name", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"notes", ""}, {"tags", ":jsonb"}, {"store_type", ""}, {"scope", ""}, {"lifecycle", ""}}, "id", upsert, obj)
 	case "tools":
 		return insertGeneric(ctx, db, tbl, []col{{"name", ""}, {"title", ""}, {"description", ""}, {"role_name", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"notes", ""}, {"tags", ":jsonb"}, {"settings", ":jsonb"}, {"tool_type", ""}}, "name", upsert, obj)
 	case "topics":
 		return insertGeneric(ctx, db, tbl, []col{{"name", ""}, {"role_name", ""}, {"title", ""}, {"description", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"notes", ""}, {"tags", ":jsonb"}}, "(name,role_name)", upsert, obj)
 	case "stickies":
-		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"blackboard_id", ":uuid"}, {"topic_name", ""}, {"topic_role_name", ""}, {"note", ""}, {"labels", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"created_by_task_id", ":uuid"}, {"edit_count", ""}, {"priority_level", ""}, {"structured", ":jsonb"}}, "id", upsert, obj)
+		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"blackboard_id", ":uuid"}, {"note", ""}, {"labels", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"created_by_task_id", ":uuid"}, {"edit_count", ""}, {"priority_level", ""}, {"structured", ":jsonb"}}, "id", upsert, obj)
 	default:
 		return errors.New("unknown table: " + tbl)
 	}
