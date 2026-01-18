@@ -42,12 +42,7 @@ var getCmd = &cobra.Command{
 		}
 		fmt.Fprintf(os.Stderr, "stickie id=%s blackboard=%s\n", s.ID, s.BlackboardID)
 		out := map[string]any{"id": s.ID, "blackboard_id": s.BlackboardID, "edit_count": s.EditCount}
-		if s.TopicName.Valid {
-			out["topic_name"] = s.TopicName.String
-		}
-		if s.TopicRoleName.Valid {
-			out["topic_role_name"] = s.TopicRoleName.String
-		}
+		// topics removed
 		if s.Note.Valid {
 			out["note"] = s.Note.String
 		}

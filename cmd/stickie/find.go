@@ -58,12 +58,7 @@ var findCmd = &cobra.Command{
 			"archived":      s.Archived,
 			"edit_count":    s.EditCount,
 		}
-		if s.TopicName.Valid {
-			out["topic_name"] = s.TopicName.String
-		}
-		if s.TopicRoleName.Valid {
-			out["topic_role_name"] = s.TopicRoleName.String
-		}
+		// topics removed
 		if s.Score.Valid {
 			out["score"] = s.Score.Float64
 		}

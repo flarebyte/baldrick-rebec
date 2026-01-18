@@ -90,8 +90,7 @@ function stickieListItemSchemaFactory() {
     id: z.string().min(1),
     blackboard_id: z.string().min(1),
     edit_count: z.number().int().nonnegative().optional(),
-    topic_name: z.string().min(1).optional(),
-    topic_role_name: z.string().min(1).optional(),
+    // topics removed
     name: z.string().min(1).optional(),
     variant: z.string().optional(),
     archived: z.boolean().optional(),

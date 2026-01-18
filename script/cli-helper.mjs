@@ -363,15 +363,11 @@ export async function stickieSet({
 
 export async function stickieListJSON({
   blackboard = '',
-  topicName = '',
-  topicRole = '',
   limit = 100,
   offset = 0,
 }) {
   const args = ['stickie', 'list', '--output', 'json'];
   if (blackboard) args.push('--blackboard', blackboard);
-  if (topicName) args.push('--topic-name', topicName);
-  if (topicRole) args.push('--topic-role', topicRole);
   args.push('--limit', String(limit), '--offset', String(offset));
   return await runRbcJSON(...args);
 }
@@ -688,18 +684,7 @@ export async function stickieListByBlackboard({ blackboard, limit = 50 }) {
     String(limit),
   );
 }
-export async function stickieListByTopic({ topicName, topicRole, limit = 50 }) {
-  return await runRbc(
-    'stickie',
-    'list',
-    '--topic-name',
-    topicName,
-    '--topic-role',
-    topicRole,
-    '--limit',
-    String(limit),
-  );
-}
+// topics removed: use labels filters via higher-level logic if needed
 
 export async function dbCountPerRole() {
   return await runRbc('db', 'count', '--per-role');

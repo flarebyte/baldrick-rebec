@@ -151,8 +151,6 @@ type blackboardYAML struct {
 
 type stickieYAML struct {
 	ID            string         `yaml:"id,omitempty"`
-	TopicName     *string        `yaml:"topic_name,omitempty"`
-	TopicRole     *string        `yaml:"topic_role_name,omitempty"`
 	Note          *LiteralString `yaml:"note,omitempty"`
 	Code          *string        `yaml:"code,omitempty"`
 	Labels        []string       `yaml:"labels,omitempty"`
@@ -267,7 +265,7 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 	stickies := make([]pgdao.Stickie, 0, 256)
 	const page = 1000
 	for off := 0; ; off += page {
-		ss, err := pgdao.ListStickies(ctx, db, b.ID, "", "", page, off)
+		ss, err := pgdao.ListStickies(ctx, db, b.ID, page, off)
 		if err != nil {
 			return err
 		}
@@ -291,14 +289,7 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 		if flagSyncClearIDs {
 			sy.ID = ""
 		}
-		if s.TopicName.Valid && s.TopicName.String != "" {
-			v := s.TopicName.String
-			sy.TopicName = &v
-		}
-		if s.TopicRoleName.Valid && s.TopicRoleName.String != "" {
-			v := s.TopicRoleName.String
-			sy.TopicRole = &v
-		}
+		// topics removed; use labels instead
 		if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
 			v := LiteralString(wrapAt(s.Note.String, 80))
 			sy.Note = &v
@@ -567,14 +558,7 @@ func stickieFromYAMLForUpsert(y stickieYAML, blackboardID string) pgdao.Stickie 
 	var s pgdao.Stickie
 	s.BlackboardID = blackboardID
 	// optional simple values
-	if y.TopicName != nil {
-		s.TopicName.Valid = true
-		s.TopicName.String = *y.TopicName
-	}
-	if y.TopicRole != nil {
-		s.TopicRoleName.Valid = true
-		s.TopicRoleName.String = *y.TopicRole
-	}
+	// topics removed
 	if y.Note != nil {
 		s.Note.Valid = true
 		s.Note.String = string(*y.Note)
@@ -611,8 +595,6 @@ func stickieFromYAMLForUpsert(y stickieYAML, blackboardID string) pgdao.Stickie 
 
 // Hash utilities (SHA-256) for stickie content comparison
 type stickieHashMaterial struct {
-	TopicName     string   `json:"topic_name"`
-	TopicRoleName string   `json:"topic_role_name"`
 	Note          string   `json:"note"`
 	Code          string   `json:"code"`
 	Labels        []string `json:"labels"`
@@ -625,12 +607,7 @@ type stickieHashMaterial struct {
 
 func hashStickieYAML(y stickieYAML) string {
 	mat := stickieHashMaterial{}
-	if y.TopicName != nil {
-		mat.TopicName = *y.TopicName
-	}
-	if y.TopicRole != nil {
-		mat.TopicRoleName = *y.TopicRole
-	}
+	// topics removed
 	if y.Note != nil {
 		mat.Note = string(*y.Note)
 	}
@@ -660,12 +637,6 @@ func hashStickieYAML(y stickieYAML) string {
 
 func hashStickieDB(s pgdao.Stickie) string {
 	mat := stickieHashMaterial{}
-	if s.TopicName.Valid {
-		mat.TopicName = s.TopicName.String
-	}
-	if s.TopicRoleName.Valid {
-		mat.TopicRoleName = s.TopicRoleName.String
-	}
 	if s.Note.Valid {
 		mat.Note = s.Note.String
 	}

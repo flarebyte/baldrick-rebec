@@ -89,7 +89,7 @@ Key exports:
 - Scripts: `createScript(role,title,description,body,{name?,variant?,archived?})`, `scriptListJSON({role,...})`, `scriptFind({name,variant?,archived?,role?})`
 - Tasks: `runSetTask({...})`, `taskSetReplacement({...})`
 - Blackboards: `blackboardSet({...})`
-- Stickies: `stickieSet({...})`, `stickieListJSON({...})`, `stickieFind({...})`, `stickieList`, `stickieListByBlackboard`, `stickieListByTopic`, `stickieRelSet`, `stickieRelList`, `stickieRelGet`
+- Stickies: `stickieSet({...})`, `stickieListJSON({...})`, `stickieFind({...})`, `stickieList`, `stickieListByBlackboard`, `stickieRelSet`, `stickieRelList`, `stickieRelGet`
 - Conversations/Experiments: `conversationSet({title,role?})`, `experimentCreate({conversation})`
 - Queue: `queueAdd({...})`, `queuePeek`, `queueSize`, `queueTake`
 - Lists and counts: `listWithRole(cmd,role,limit)`, `experimentList(limit)`, `dbCountPerRole`, `dbCountJSON`

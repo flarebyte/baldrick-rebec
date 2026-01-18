@@ -67,7 +67,6 @@ import {
   stickieGetJSON,
   stickieList,
   stickieListByBlackboard,
-  stickieListByTopic,
   stickieListJSON,
   stickieRelGet,
   stickieRelList,
@@ -646,8 +645,6 @@ try {
   const st1 = idFrom(
     await stickieSet({
       blackboard: bb1,
-      topicName: 'onboarding',
-      topicRole: TEST_ROLE_USER,
       note: 'Refresh onboarding guide for new hires',
       labels: ['onboarding', 'docs', 'priority:med'],
       priority: 'should',
@@ -658,8 +655,6 @@ try {
   const st2 = idFrom(
     await stickieSet({
       blackboard: bb1,
-      topicName: 'devops',
-      topicRole: TEST_ROLE_USER,
       note: 'Evaluate GitHub Actions caching for go build',
       code: 'name: CI\n\non: [push]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-go@v5\n      - run: go build ./...\n',
       labels: ['idea', 'devops'],
@@ -1209,11 +1204,7 @@ try {
   try {
     await $`rm -f temp/blackboard-test/bad.stickie.yaml`;
   } catch {}
-  await stickieListByTopic({
-    topicName: 'devops',
-    topicRole: TEST_ROLE_USER,
-    limit: 50,
-  });
+  // topics removed; skip list-by-topic
   await stickieRelList({ id: st1, direction: 'out' });
   await stickieRelGet({
     from: st1,

@@ -34,14 +34,14 @@ Create via YAML (optional)
 2. Create / Update / Delete Stickies (CLI)
 
 - Create a stickie on a blackboard (by id):
-  `rbc stickie set --blackboard <BOARD_ID> --topic-name devops --topic-role user --note "Evaluate CI caching for go build" --labels idea,devops --priority could --name "DevOps Caching" --variant ""`
+  `rbc stickie set --blackboard <BOARD_ID> --note "Evaluate CI caching for go build" --labels idea,devops --priority could --name "DevOps Caching"`
 - Update a stickie by id (change any field):
   `rbc stickie set --id <STICKIE_ID> --note "Refine plan; prototype in a branch"`
 - Delete a stickie by id:
   `rbc stickie delete --id <STICKIE_ID> --force`
 - List or find stickies:
   `rbc stickie list --blackboard <BOARD_ID> --output json`
-  `rbc stickie find --name "DevOps Caching" --variant "" --blackboard <BOARD_ID>`
+  `rbc stickie find --name "DevOps Caching" --blackboard <BOARD_ID>`
 
 3. Sync id ↔ folder
    The sync command moves a blackboard’s content between a DB id and a local relative folder.

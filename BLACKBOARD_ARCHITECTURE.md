@@ -20,7 +20,7 @@ erDiagram
   BLACKBOARDS }o--|| TASKS : "task_id"
 
   STICKIES }o--|| TASKS : "created_by_task_id"
-  STICKIES }o--|| TOPICS : "topic_name,topic_role_name"
+  %% topics removed from stickies; use labels for categorization
 ```
 
 ## Core Schemas and Types
@@ -35,10 +35,10 @@ erDiagram
 
 - Stickies (`internal/dao/postgres/stickies.go` → table `stickies`)
 
-  - Fields: `id`, `blackboard_id`, `topic_name?`, `topic_role_name?`, `name?`, `note?`, `labels[]`, `created`, `updated`, `created_by_task_id?`, `edit_count`, `priority_level?`, `score?`, `archived`.
+  - Fields: `id`, `blackboard_id`, `name?`, `note?`, `labels[]`, `created`, `updated`, `created_by_task_id?`, `edit_count`, `priority_level?`, `score?`, `archived`.
   - FKs/refs:
     - `blackboard_id → blackboards.id`
-    - `topic_name,topic_role_name → topics.name,topics.role_name`
+    - topics linkage removed; use labels for categorization
     - `created_by_task_id → tasks.id`
 
 - Stickie relations (`internal/dao/postgres/graph.go` → table `stickie_relations`)

@@ -1,8 +1,6 @@
 entity,field,fieldType,fieldRequired,fieldSQLType,fieldPersisted
 stickie,id,String,true,string,true
 stickie,blackboard_id,String,true,string,true
-stickie,topic_name,String,false,sql.NullString,true
-stickie,topic_role_name,String,false,sql.NullString,true
 stickie,name,String,false,sql.NullString,true
 stickie,note,String,false,sql.NullString,true
 stickie,code,String,false,sql.NullString,true

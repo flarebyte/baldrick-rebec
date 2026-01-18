@@ -18,16 +18,15 @@ import (
 var (
 	flagStID         string
 	flagStBlackboard string
-	flagStTopicName  string
-	flagStTopicRole  string
-	flagStNote       string
-	flagStCode       string
-	flagStLabels     []string
-	flagStCreatedBy  string
-	flagStPriority   string
-	flagStName       string
-	flagStArchived   bool
-	flagStScore      float64
+	// topic flags removed; use labels instead
+	flagStNote      string
+	flagStCode      string
+	flagStLabels    []string
+	flagStCreatedBy string
+	flagStPriority  string
+	flagStName      string
+	flagStArchived  bool
+	flagStScore     float64
 )
 
 var setCmd = &cobra.Command{
@@ -52,12 +51,6 @@ var setCmd = &cobra.Command{
 		st := &pgdao.Stickie{ID: strings.TrimSpace(flagStID)}
 		if strings.TrimSpace(flagStBlackboard) != "" {
 			st.BlackboardID = strings.TrimSpace(flagStBlackboard)
-		}
-		if strings.TrimSpace(flagStTopicName) != "" {
-			st.TopicName = sql.NullString{String: strings.TrimSpace(flagStTopicName), Valid: true}
-		}
-		if strings.TrimSpace(flagStTopicRole) != "" {
-			st.TopicRoleName = sql.NullString{String: strings.TrimSpace(flagStTopicRole), Valid: true}
 		}
 		if strings.TrimSpace(flagStNote) != "" {
 			st.Note = sql.NullString{String: flagStNote, Valid: true}
@@ -106,8 +99,7 @@ func init() {
 	StickieCmd.AddCommand(setCmd)
 	setCmd.Flags().StringVar(&flagStID, "id", "", "Stickie UUID (optional; when omitted, a new id is generated)")
 	setCmd.Flags().StringVar(&flagStBlackboard, "blackboard", "", "Blackboard UUID (required on create)")
-	setCmd.Flags().StringVar(&flagStTopicName, "topic-name", "", "Topic name (optional)")
-	setCmd.Flags().StringVar(&flagStTopicRole, "topic-role", "", "Topic role name (optional)")
+	// topics removed from stickies interface
 	setCmd.Flags().StringVar(&flagStNote, "note", "", "Note text")
 	setCmd.Flags().StringVar(&flagStCode, "code", "", "Code snippet (programming language)")
 	setCmd.Flags().StringSliceVar(&flagStLabels, "labels", nil, "Labels (repeat or comma-separated)")

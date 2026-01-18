@@ -135,7 +135,7 @@ func upsertRow(ctx context.Context, db *pgxpool.Pool, tbl string, obj rowObj, up
 	case "topics":
 		return insertGeneric(ctx, db, tbl, []col{{"name", ""}, {"role_name", ""}, {"title", ""}, {"description", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"notes", ""}, {"tags", ":jsonb"}}, "(name,role_name)", upsert, obj)
 	case "stickies":
-		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"blackboard_id", ":uuid"}, {"topic_name", ""}, {"topic_role_name", ""}, {"note", ""}, {"labels", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"created_by_task_id", ":uuid"}, {"edit_count", ""}, {"priority_level", ""}, {"structured", ":jsonb"}}, "id", upsert, obj)
+		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"blackboard_id", ":uuid"}, {"note", ""}, {"labels", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"created_by_task_id", ":uuid"}, {"edit_count", ""}, {"priority_level", ""}, {"structured", ":jsonb"}}, "id", upsert, obj)
 	default:
 		return errors.New("unknown table: " + tbl)
 	}

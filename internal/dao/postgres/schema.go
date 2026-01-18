@@ -457,8 +457,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
 		`CREATE TABLE IF NOT EXISTS stickies (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             blackboard_id UUID NOT NULL REFERENCES blackboards(id) ON DELETE CASCADE,
-            topic_name TEXT,
-            topic_role_name TEXT,
+            -- removed topic_name/topic_role_name; use labels instead
             note TEXT,
             labels TEXT[],
             created TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -468,8 +467,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             priority_level TEXT CHECK (priority_level IN ('must','should','could','wont') OR priority_level IS NULL),
             score DOUBLE PRECISION,
             name TEXT,
-            archived BOOLEAN NOT NULL DEFAULT FALSE,
-            FOREIGN KEY (topic_name, topic_role_name) REFERENCES topics(name, role_name) ON DELETE SET NULL
+            archived BOOLEAN NOT NULL DEFAULT FALSE
         )`,
 		// Trigger to auto-increment edit_count on any update
 		`CREATE OR REPLACE FUNCTION inc_edit_count()
@@ -500,7 +498,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             END IF;
         END $$;`,
 		`CREATE INDEX IF NOT EXISTS idx_stickies_blackboard ON stickies(blackboard_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_stickies_topic ON stickies(topic_name, topic_role_name)`,
+		/* dropped topic index; labels used instead */
 		`CREATE INDEX IF NOT EXISTS idx_stickies_name ON stickies (name) WHERE archived = FALSE`,
 		`CREATE INDEX IF NOT EXISTS idx_stickies_updated ON stickies (updated DESC)`,
 		/* dropped complex_name GIN index; name is plain text */

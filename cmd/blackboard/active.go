@@ -384,13 +384,7 @@ func (m bbActiveModel) View() string {
 			if st.Name.Valid && strings.TrimSpace(st.Name.String) != "" {
 				b.WriteString(bStyleLabel.Render("Name: ") + bStyleValue.Render(st.Name.String) + "\n")
 			}
-			// Topic
-			if st.TopicName.Valid {
-				b.WriteString(bStyleLabel.Render("Topic: ") + bStyleValue.Render(st.TopicName.String) + "\n")
-			}
-			if st.TopicRoleName.Valid {
-				b.WriteString(bStyleLabel.Render("Topic.role: ") + bStyleValue.Render(st.TopicRoleName.String) + "\n")
-			}
+			// Topics removed; use labels instead
 			// Note
 			if st.Note.Valid && strings.TrimSpace(st.Note.String) != "" {
 				b.WriteString(bStyleLabel.Render("Note: ") + bStyleValue.Render(st.Note.String) + "\n")
@@ -579,7 +573,7 @@ func refreshStickiesCmd(boardID string) tea.Cmd {
 			return bbErrMsg{err}
 		}
 		defer db.Close()
-		rows, err := pgdao.ListStickies(ctx, db, boardID, "", "", 100, 0)
+		rows, err := pgdao.ListStickies(ctx, db, boardID, 100, 0)
 		if err != nil {
 			return bbErrMsg{err}
 		}
@@ -666,19 +660,9 @@ func truncateCodeSnippet(code string) string {
 // Filtering helpers for in-board view
 func (m bbActiveModel) filteredStickyIndices() []int {
 	out := make([]int, 0, len(m.stickies))
-	// Resolve topic filter
-	topic := ""
-	if m.topicIdx > 0 && m.topicIdx < len(m.topicOptions) {
-		topic = m.topicOptions[m.topicIdx]
-	}
+	// Topic filter removed; use labels in future if needed
 	q := strings.ToLower(strings.TrimSpace(m.noteSearch))
 	for i, s := range m.stickies {
-		// Topic filter
-		if topic != "" {
-			if !s.TopicName.Valid || strings.TrimSpace(s.TopicName.String) != topic {
-				continue
-			}
-		}
 		// Note search
 		if q != "" {
 			note := ""
@@ -695,21 +679,8 @@ func (m bbActiveModel) filteredStickyIndices() []int {
 }
 
 func (m *bbActiveModel) recomputeTopicOptions() {
-	seen := map[string]struct{}{}
-	opts := []string{"any"}
-	for _, s := range m.stickies {
-		if s.TopicName.Valid {
-			t := strings.TrimSpace(s.TopicName.String)
-			if t == "" {
-				continue
-			}
-			if _, ok := seen[t]; !ok {
-				seen[t] = struct{}{}
-				opts = append(opts, t)
-			}
-		}
-	}
-	m.topicOptions = opts
+	// topics removed; no recompute
+	m.topicOptions = []string{"any"}
 	if m.topicIdx >= len(m.topicOptions) {
 		m.topicIdx = 0
 	}
