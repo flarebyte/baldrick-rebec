@@ -341,7 +341,6 @@ export async function stickieSet({
   createdByTask = '',
   priority = '',
   name = '',
-  variant = '',
   archived = false,
   score = null,
 }) {
@@ -356,7 +355,6 @@ export async function stickieSet({
   if (createdByTask) args.push('--created-by-task', createdByTask);
   if (priority) args.push('--priority', priority);
   if (name !== undefined) args.push('--name', name);
-  if (variant !== undefined) args.push('--variant', variant);
   if (archived) args.push('--archived');
   if (score !== null && score !== undefined)
     args.push('--score', String(score));
@@ -419,13 +417,8 @@ export async function taskListJSON({
   return await runRbcJSON(...args);
 }
 
-export async function stickieFind({
-  name,
-  variant = '',
-  archived = false,
-  blackboard = '',
-}) {
-  const args = ['stickie', 'find', '--name', name, '--variant', variant];
+export async function stickieFind({ name, archived = false, blackboard = '' }) {
+  const args = ['stickie', 'find', '--name', name];
   if (archived) args.push('--archived');
   if (blackboard) args.push('--blackboard', blackboard);
   return await runRbcJSON(...args);

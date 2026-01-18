@@ -50,7 +50,6 @@ function scriptSchemaFactory({ allowEmptyTitle = false } = {}) {
     role: z.string().min(1),
     content_id: z.string().optional(),
     name: z.string().min(1).optional(),
-    variant: z.string().optional(),
     archived: z.boolean().optional(),
     description: z.string().min(1).optional(),
     motivation: z.string().min(1).optional(),

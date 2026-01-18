@@ -12,7 +12,5 @@ labels:
 created: "2026-01-17T20:16:56.56841Z"
 updated: "2026-01-17T20:16:56.56841Z"
 priority_level: should
-complex_name:
-    name: blackboard/export-format
-    variant: ""
+name: blackboard/export-format
 archived: false

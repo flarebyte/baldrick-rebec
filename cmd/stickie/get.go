@@ -63,6 +63,9 @@ var getCmd = &cobra.Command{
 		if s.Score.Valid {
 			out["score"] = s.Score.Float64
 		}
+		if s.Name.Valid {
+			out["name"] = s.Name.String
+		}
 		if s.Created.Valid {
 			out["created"] = s.Created.Time.Format(time.RFC3339Nano)
 		}

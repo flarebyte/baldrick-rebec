@@ -71,7 +71,7 @@ B) Import: folder → id
 - Reads `*.stickie.yaml` in the folder. One folder = one blackboard.
 - Rules and safety:
   - To update: include `id:` inside the YAML that already exists on that blackboard.
-    - The tool compares content hashes (topic/name/note/code/labels/priority/score/complex_name/archived). If changed, it updates and DB sets `updated=now()` automatically.
+  - The tool compares content hashes (topic/name/note/code/labels/priority/score/archived). If changed, it updates and DB sets `updated=now()` automatically.
   - To create: omit `id:` in YAML; a new UUID is assigned on insert.
   - Security guard: if a YAML has an `id` that does not exist for that blackboard, sync fails.
   - `updated` values in YAML are ignored on import.

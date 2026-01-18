@@ -35,7 +35,7 @@ erDiagram
 
 - Stickies (`internal/dao/postgres/stickies.go` → table `stickies`)
 
-  - Fields: `id`, `blackboard_id`, `topic_name?`, `topic_role_name?`, `note?`, `labels[]`, `created`, `updated`, `created_by_task_id?`, `edit_count`, `priority_level?`, `score?`, `complex_name{name,variant}`, `archived`.
+  - Fields: `id`, `blackboard_id`, `topic_name?`, `topic_role_name?`, `name?`, `note?`, `labels[]`, `created`, `updated`, `created_by_task_id?`, `edit_count`, `priority_level?`, `score?`, `archived`.
   - FKs/refs:
     - `blackboard_id → blackboards.id`
     - `topic_name,topic_role_name → topics.name,topics.role_name`
@@ -97,12 +97,12 @@ erDiagram
 ## Key Files and Functions
 
 - `internal/dao/postgres/blackboards.go`: `Blackboard`, `UpsertBlackboard`, `GetBlackboardByID`, `ListBlackboards`, `DeleteBlackboard`.
-- `internal/dao/postgres/stickies.go`: `Stickie`, `UpsertStickie`, `GetStickieByID`, `ListStickies`, `DeleteStickie`, `GetStickieByComplexName*`.
+- `internal/dao/postgres/stickies.go`: `Stickie`, `UpsertStickie`, `GetStickieByID`, `ListStickies`, `DeleteStickie`, `GetStickieByName*`.
 - `internal/dao/postgres/graph.go`: `CreateStickieEdge`, `ListStickieEdges`, `GetStickieEdge`, `DeleteStickieEdge`.
 - `cmd/db/show.go`: relationships table documents FKs and SQL‑graph edges.
 
 ## Notes
 
 - Graph features are implemented via SQL mirror tables (`stickie_relations`) and normalized relation type handling.
-- `complex_name {name, variant}` on stickies enables stable addressing/lookup beyond UUIDs.
+- `name` on stickies enables stable addressing/lookup beyond UUIDs.
 - Boards can be used as shared canvases across project or conversation contexts; tasks can both create boards and annotate them via stickies.

@@ -380,13 +380,9 @@ func (m bbActiveModel) View() string {
 			b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 			b.WriteString(bStyleHeader.Render("Stickie Details") + "\n")
 			b.WriteString(bStyleLabel.Render("ID: ") + bStyleValue.Render(st.ID) + "\n")
-			// Complex name
-			if strings.TrimSpace(st.ComplexName.Name) != "" {
-				name := st.ComplexName.Name
-				if strings.TrimSpace(st.ComplexName.Variant) != "" {
-					name += "/" + st.ComplexName.Variant
-				}
-				b.WriteString(bStyleLabel.Render("Name: ") + bStyleValue.Render(name) + "\n")
+			// Name
+			if st.Name.Valid && strings.TrimSpace(st.Name.String) != "" {
+				b.WriteString(bStyleLabel.Render("Name: ") + bStyleValue.Render(st.Name.String) + "\n")
 			}
 			// Topic
 			if st.TopicName.Valid {
@@ -561,13 +557,8 @@ func refreshBoardsCmd(role string, search string) tea.Cmd {
 }
 
 func stickieTitle(s pgdao.Stickie) string {
-	name := strings.TrimSpace(s.ComplexName.Name)
-	if name != "" {
-		v := strings.TrimSpace(s.ComplexName.Variant)
-		if v != "" {
-			return name + "/" + v
-		}
-		return name
+	if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
+		return s.Name.String
 	}
 	if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
 		return s.Note.String

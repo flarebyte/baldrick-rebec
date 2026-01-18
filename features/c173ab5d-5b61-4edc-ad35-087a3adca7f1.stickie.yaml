@@ -11,7 +11,5 @@ created: "2026-01-17T19:59:01.846972Z"
 updated: "2026-01-17T20:16:56.594361Z"
 edit_count: 1
 priority_level: could
-complex_name:
-    name: blackboard/delete
-    variant: ""
+name: blackboard/delete
 archived: false

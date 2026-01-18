@@ -11,7 +11,5 @@ labels:
 created: "2026-01-17T20:16:56.565977Z"
 updated: "2026-01-17T20:16:56.565977Z"
 priority_level: should
-complex_name:
-    name: blackboard/dao
-    variant: ""
+name: blackboard/dao
 archived: false

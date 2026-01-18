@@ -11,7 +11,5 @@ labels:
 created: "2026-01-17T20:16:56.559513Z"
 updated: "2026-01-17T20:16:56.559513Z"
 priority_level: could
-complex_name:
-    name: blackboard/backup-restore
-    variant: ""
+name: blackboard/backup-restore
 archived: false

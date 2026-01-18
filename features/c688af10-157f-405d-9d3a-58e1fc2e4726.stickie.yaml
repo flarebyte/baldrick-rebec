@@ -10,7 +10,5 @@ labels:
 created: "2026-01-17T20:16:56.580876Z"
 updated: "2026-01-17T20:16:56.580876Z"
 priority_level: could
-complex_name:
-    name: blackboard/nfr-performance
-    variant: ""
+name: blackboard/nfr-performance
 archived: false

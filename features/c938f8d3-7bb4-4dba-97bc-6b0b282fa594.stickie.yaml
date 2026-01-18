@@ -11,7 +11,5 @@ labels:
 created: "2026-01-17T20:16:56.584846Z"
 updated: "2026-01-17T20:16:56.584846Z"
 priority_level: should
-complex_name:
-    name: blackboard/nfr-security
-    variant: ""
+name: blackboard/nfr-security
 archived: false

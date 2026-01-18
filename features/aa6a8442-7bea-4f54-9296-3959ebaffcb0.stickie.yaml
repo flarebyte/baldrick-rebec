@@ -11,7 +11,5 @@ labels:
 created: "2026-01-17T20:16:56.571826Z"
 updated: "2026-01-17T20:16:56.571826Z"
 priority_level: could
-complex_name:
-    name: blackboard/lifecycle
-    variant: ""
+name: blackboard/lifecycle
 archived: false

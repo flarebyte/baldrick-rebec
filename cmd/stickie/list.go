@@ -66,9 +66,8 @@ var listCmd = &cobra.Command{
 				if s.Updated.Valid {
 					item["updated"] = s.Updated.Time.Format(time.RFC3339Nano)
 				}
-				if s.ComplexName.Name != "" || s.ComplexName.Variant != "" {
-					item["name"] = s.ComplexName.Name
-					item["variant"] = s.ComplexName.Variant
+				if s.Name.Valid && s.Name.String != "" {
+					item["name"] = s.Name.String
 				}
 				if s.Archived {
 					item["archived"] = true
@@ -81,7 +80,7 @@ var listCmd = &cobra.Command{
 		}
 		// table default
 		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"ID", "BLACKBOARD", "TOPIC", "NAME", "VARIANT", "UPDATED", "EDIT#"})
+		table.SetHeader([]string{"ID", "BLACKBOARD", "TOPIC", "NAME", "UPDATED", "EDIT#"})
 		for _, s := range ss {
 			updated := ""
 			if s.Updated.Valid {
@@ -91,7 +90,11 @@ var listCmd = &cobra.Command{
 			if s.TopicName.Valid {
 				topic = s.TopicName.String
 			}
-			table.Append([]string{s.ID, s.BlackboardID, topic, s.ComplexName.Name, s.ComplexName.Variant, updated, fmt.Sprintf("%d", s.EditCount)})
+			name := ""
+			if s.Name.Valid {
+				name = s.Name.String
+			}
+			table.Append([]string{s.ID, s.BlackboardID, topic, name, updated, fmt.Sprintf("%d", s.EditCount)})
 		}
 		table.Render()
 		return nil

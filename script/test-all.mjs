@@ -652,7 +652,6 @@ try {
       labels: ['onboarding', 'docs', 'priority:med'],
       priority: 'should',
       name: 'Onboarding Refresh',
-      variant: '',
       score: 0.42,
     }),
   );
@@ -666,7 +665,6 @@ try {
       labels: ['idea', 'devops'],
       priority: 'could',
       name: 'DevOps Caching',
-      variant: '',
     }),
   );
   const st3 = idFrom(
@@ -677,7 +675,6 @@ try {
       labels: ['team', 'ritual'],
       priority: 'must',
       name: 'Team Retro',
-      variant: '',
     }),
   );
 
@@ -1088,7 +1085,6 @@ try {
     const s2json = byId(st2);
     const f1 = await stickieFind({
       name: 'Onboarding Refresh',
-      variant: '',
       blackboard: bb1,
     });
     await assertStep(
@@ -1175,9 +1171,7 @@ try {
   // folder -> id: create new stickie when YAML has no id
   step++;
   logStep(step, TOTAL, 'Folder->ID: creating new stickie (no id)');
-  await $`bash -lc 'echo "complex_name:" > temp/blackboard-test/new-sync.stickie.yaml'`;
-  await $`bash -lc 'echo "  name: Created by folder sync" >> temp/blackboard-test/new-sync.stickie.yaml'`;
-  await $`bash -lc 'echo "  variant: test" >> temp/blackboard-test/new-sync.stickie.yaml'`;
+  await $`bash -lc 'echo "name: Created by folder sync" > temp/blackboard-test/new-sync.stickie.yaml'`;
   await $`bash -lc 'echo "note: This was created via folder->id" >> temp/blackboard-test/new-sync.stickie.yaml'`;
   await $`bash -lc 'echo "labels: [sync,created]" >> temp/blackboard-test/new-sync.stickie.yaml'`;
   await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;

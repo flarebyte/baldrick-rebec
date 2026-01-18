@@ -10,7 +10,5 @@ labels:
 created: "2026-01-17T20:16:56.587967Z"
 updated: "2026-01-17T20:16:56.587967Z"
 priority_level: should
-complex_name:
-    name: blackboard/no-store
-    variant: ""
+name: blackboard/no-store
 archived: false

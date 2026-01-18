@@ -149,26 +149,21 @@ type blackboardYAML struct {
 	Updated      *string        `yaml:"updated,omitempty"`
 }
 
-type stickieComplexNameYAML struct {
-	Name    string `yaml:"name"`
-	Variant string `yaml:"variant"`
-}
-
 type stickieYAML struct {
-	ID            string                 `yaml:"id,omitempty"`
-	TopicName     *string                `yaml:"topic_name,omitempty"`
-	TopicRole     *string                `yaml:"topic_role_name,omitempty"`
-	Note          *LiteralString         `yaml:"note,omitempty"`
-	Code          *string                `yaml:"code,omitempty"`
-	Labels        []string               `yaml:"labels,omitempty"`
-	Created       *string                `yaml:"created,omitempty"`
-	Updated       *string                `yaml:"updated,omitempty"`
-	CreatedByTask *string                `yaml:"created_by_task_id,omitempty"`
-	EditCount     int                    `yaml:"edit_count,omitempty"`
-	Priority      *string                `yaml:"priority_level,omitempty"`
-	Score         *float64               `yaml:"score,omitempty"`
-	ComplexName   stickieComplexNameYAML `yaml:"complex_name"`
-	Archived      bool                   `yaml:"archived"`
+	ID            string         `yaml:"id,omitempty"`
+	TopicName     *string        `yaml:"topic_name,omitempty"`
+	TopicRole     *string        `yaml:"topic_role_name,omitempty"`
+	Note          *LiteralString `yaml:"note,omitempty"`
+	Code          *string        `yaml:"code,omitempty"`
+	Labels        []string       `yaml:"labels,omitempty"`
+	Created       *string        `yaml:"created,omitempty"`
+	Updated       *string        `yaml:"updated,omitempty"`
+	CreatedByTask *string        `yaml:"created_by_task_id,omitempty"`
+	EditCount     int            `yaml:"edit_count,omitempty"`
+	Priority      *string        `yaml:"priority_level,omitempty"`
+	Score         *float64       `yaml:"score,omitempty"`
+	Name          *string        `yaml:"name,omitempty"`
+	Archived      bool           `yaml:"archived"`
 }
 
 type minimalUpdatedYAML struct {
@@ -291,11 +286,7 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 			ID:        s.ID,
 			Labels:    s.Labels,
 			EditCount: s.EditCount,
-			ComplexName: stickieComplexNameYAML{
-				Name:    s.ComplexName.Name,
-				Variant: s.ComplexName.Variant,
-			},
-			Archived: s.Archived,
+			Archived:  s.Archived,
 		}
 		if flagSyncClearIDs {
 			sy.ID = ""
@@ -610,8 +601,10 @@ func stickieFromYAMLForUpsert(y stickieYAML, blackboardID string) pgdao.Stickie 
 		s.Score.Valid = true
 		s.Score.Float64 = *y.Score
 	}
-	s.ComplexName.Name = y.ComplexName.Name
-	s.ComplexName.Variant = y.ComplexName.Variant
+	if y.Name != nil {
+		s.Name.Valid = true
+		s.Name.String = *y.Name
+	}
 	s.Archived = y.Archived
 	return s
 }
@@ -626,11 +619,8 @@ type stickieHashMaterial struct {
 	CreatedByTask string   `json:"created_by_task_id"`
 	PriorityLevel string   `json:"priority_level"`
 	Score         *float64 `json:"score,omitempty"`
-	ComplexName   struct {
-		Name    string `json:"name"`
-		Variant string `json:"variant"`
-	} `json:"complex_name"`
-	Archived bool `json:"archived"`
+	Name          string   `json:"name"`
+	Archived      bool     `json:"archived"`
 }
 
 func hashStickieYAML(y stickieYAML) string {
@@ -661,8 +651,9 @@ func hashStickieYAML(y stickieYAML) string {
 	if y.Score != nil {
 		mat.Score = y.Score
 	}
-	mat.ComplexName.Name = y.ComplexName.Name
-	mat.ComplexName.Variant = y.ComplexName.Variant
+	if y.Name != nil {
+		mat.Name = *y.Name
+	}
 	mat.Archived = y.Archived
 	return hashMaterial(mat)
 }
@@ -696,8 +687,9 @@ func hashStickieDB(s pgdao.Stickie) string {
 		v := s.Score.Float64
 		mat.Score = &v
 	}
-	mat.ComplexName.Name = s.ComplexName.Name
-	mat.ComplexName.Variant = s.ComplexName.Variant
+	if s.Name.Valid {
+		mat.Name = s.Name.String
+	}
 	mat.Archived = s.Archived
 	return hashMaterial(mat)
 }

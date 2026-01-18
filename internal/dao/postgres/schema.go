@@ -467,7 +467,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             edit_count INT NOT NULL DEFAULT 0,
             priority_level TEXT CHECK (priority_level IN ('must','should','could','wont') OR priority_level IS NULL),
             score DOUBLE PRECISION,
-            complex_name JSONB NOT NULL DEFAULT '{"name":"","variant":""}',
+            name TEXT,
             archived BOOLEAN NOT NULL DEFAULT FALSE,
             FOREIGN KEY (topic_name, topic_role_name) REFERENCES topics(name, role_name) ON DELETE SET NULL
         )`,
@@ -501,9 +501,9 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
         END $$;`,
 		`CREATE INDEX IF NOT EXISTS idx_stickies_blackboard ON stickies(blackboard_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_stickies_topic ON stickies(topic_name, topic_role_name)`,
-		`CREATE INDEX IF NOT EXISTS idx_stickies_complex_name ON stickies ((complex_name->>'name'), (complex_name->>'variant')) WHERE archived = FALSE`,
+		`CREATE INDEX IF NOT EXISTS idx_stickies_name ON stickies (name) WHERE archived = FALSE`,
 		`CREATE INDEX IF NOT EXISTS idx_stickies_updated ON stickies (updated DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_stickies_complex_name_gin ON stickies USING GIN (complex_name jsonb_path_ops)`,
+		/* dropped complex_name GIN index; name is plain text */
 		// Ensure optional code column exists for stickies (programming code snippet)
 		`ALTER TABLE stickies ADD COLUMN IF NOT EXISTS code TEXT`,
 		// Ensure new optional structured JSONB column exists for stickies
