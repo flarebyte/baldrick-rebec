@@ -1,3 +1,4 @@
+id: 784c3991-33a6-4926-a9a1-5a9e8586238c
 note: |-
     Performance: role-scoped listing queries use an index on role_name and sort by
     updated DESC to keep recent boards cheap to fetch. Pagination defaults (limit,
@@ -6,8 +7,7 @@ note: |-
 labels:
     - performance
     - stable
-created: "2026-01-17T20:16:56.580876Z"
-updated: "2026-01-17T20:16:56.580876Z"
+created: "2026-01-19T09:27:24.364651Z"
+updated: "2026-01-19T09:27:24.364651Z"
 priority_level: could
-name: blackboard/nfr-performance
 archived: false

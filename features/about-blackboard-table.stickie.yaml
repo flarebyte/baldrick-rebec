@@ -1,3 +1,4 @@
+id: 701fbd42-b613-4707-ab99-650054575541
 note: |-
     Table schema: blackboards(id UUID PK, role_name TEXT, conversation_id UUID?,
     project_name TEXT?, task_id UUID?, background TEXT?, guidelines TEXT?, lifecycle
@@ -9,8 +10,7 @@ labels:
     - documentation
     - operations
     - stable
-created: "2026-01-17T20:16:56.591019Z"
-updated: "2026-01-17T20:16:56.591019Z"
+created: "2026-01-19T09:27:24.34057Z"
+updated: "2026-01-19T09:27:24.34057Z"
 priority_level: should
-name: blackboard/table
 archived: false

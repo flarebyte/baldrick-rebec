@@ -1,3 +1,4 @@
+id: 28265da9-d8f8-41b1-bf45-96f77ef99d4b
 note: |-
     Security: folder→id sync rejects YAMLs that reference ids not belonging to the
     destination board. DB FKs enforce referential integrity. CLI deletes require a
@@ -7,8 +8,7 @@ labels:
     - compliance
     - security
     - stable
-created: "2026-01-17T20:16:56.584846Z"
-updated: "2026-01-17T20:16:56.584846Z"
+created: "2026-01-19T09:27:24.368564Z"
+updated: "2026-01-19T09:27:24.368564Z"
 priority_level: should
-name: blackboard/nfr-security
 archived: false

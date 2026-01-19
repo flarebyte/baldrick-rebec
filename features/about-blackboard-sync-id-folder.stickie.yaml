@@ -1,3 +1,4 @@
+id: 70e969ba-7449-4c4a-882b-46c5c949a1c2
 note: |-
     Sync a blackboard and its stickies between a DB id and a folder. We ensure
     safety with a strict direction model (id→folder or folder→id), a security guard
@@ -7,9 +8,7 @@ labels:
     - documentation
     - operations
     - stable
-created: "2026-01-17T19:59:01.86582Z"
-updated: "2026-01-17T20:16:56.602151Z"
-edit_count: 1
+created: "2026-01-19T09:27:24.376952Z"
+updated: "2026-01-19T09:27:24.376952Z"
 priority_level: must
-name: blackboard/sync-id-folder
 archived: false

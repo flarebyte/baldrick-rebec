@@ -1,3 +1,4 @@
+id: 1cdea7cb-8091-497c-bf62-595705f3aefb
 note: |-
     Interactive viewer for recent boards per role with search, quick role cycling,
     and in-board filtering. The TUI prioritizes discovery and triage speed for
@@ -7,9 +8,7 @@ labels:
     - documentation
     - stable
     - uxd
-created: "2026-01-17T19:59:01.823864Z"
-updated: "2026-01-17T20:16:56.598214Z"
-edit_count: 1
+created: "2026-01-19T09:27:24.372428Z"
+updated: "2026-01-19T09:27:24.372428Z"
 priority_level: should
-name: blackboard/active
 archived: false

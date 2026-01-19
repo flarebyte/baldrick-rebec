@@ -1,3 +1,4 @@
+id: ef6095c0-3f8e-411c-a914-1a61aa33c914
 note: |-
     Snapshot backups include blackboards and stickies (stores removed). Restore
     order ensures FKs are satisfied; upsert mode updates or inserts rows; replace
@@ -7,8 +8,7 @@ labels:
     - compliance
     - operations
     - stable
-created: "2026-01-17T20:16:56.559513Z"
-updated: "2026-01-17T20:16:56.559513Z"
+created: "2026-01-19T09:27:24.360732Z"
+updated: "2026-01-19T09:27:24.360732Z"
 priority_level: could
-name: blackboard/backup-restore
 archived: false
