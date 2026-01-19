@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
 	pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
@@ -325,7 +326,7 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 			sy.Score = &v
 		}
 
-		fn := filepath.Join(destDir, fmt.Sprintf("%s.stickie.yaml", s.ID))
+		fn := filepath.Join(destDir, stickieFileName(s))
 		seen[filepath.Base(fn)] = struct{}{}
 		write := true
 		if !flagSyncForceWrite {
@@ -675,4 +676,50 @@ func hashMaterial(v any) string {
 	b, _ := json.Marshal(v)
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
+}
+
+// stickieFileName returns the filename for a stickie when exporting.
+// If the stickie has a non-empty Name, it uses a sanitized version prefixed by
+// "about-" (e.g., about-my-feature.stickie.yaml). Otherwise, it falls back to
+// the UUID-based filename (<id>.stickie.yaml).
+func stickieFileName(s pgdao.Stickie) string {
+	if s.Name.Valid {
+		base := strings.TrimSpace(s.Name.String)
+		if base != "" {
+			safe := sanitizeForFile(base)
+			if safe != "" {
+				return fmt.Sprintf("about-%s.stickie.yaml", safe)
+			}
+		}
+	}
+	return fmt.Sprintf("%s.stickie.yaml", s.ID)
+}
+
+// sanitizeForFile replaces any rune that is not alphanumeric, '_' or '-' with '-'.
+// It also lowercases the result and collapses consecutive '-' and trims leading/trailing '-'.
+func sanitizeForFile(s string) string {
+	// lowercase
+	s = strings.ToLower(s)
+	// replace invalid runes with '-'
+	var b strings.Builder
+	b.Grow(len(s))
+	prevDash := false
+	for _, r := range s {
+		valid := unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
+		if !valid {
+			r = '-'
+		}
+		if r == '-' {
+			if prevDash {
+				continue
+			}
+			prevDash = true
+			b.WriteRune(r)
+			continue
+		}
+		prevDash = false
+		b.WriteRune(r)
+	}
+	out := strings.Trim(b.String(), "-")
+	return out
 }

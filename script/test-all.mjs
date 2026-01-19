@@ -1112,10 +1112,11 @@ try {
   // Validate files exist
   const bbYaml =
     await $`test -f temp/blackboard-test/blackboard.yaml && echo OK || echo MISSING`;
+  // File names use about-<sanitized-name>.stickie.yaml
   const st1Yaml =
-    await $`test -f temp/blackboard-test/${st1}.stickie.yaml && echo OK || echo MISSING`;
+    await $`test -f temp/blackboard-test/about-onboarding-refresh.stickie.yaml && echo OK || echo MISSING`;
   const st2Yaml =
-    await $`test -f temp/blackboard-test/${st2}.stickie.yaml && echo OK || echo MISSING`;
+    await $`test -f temp/blackboard-test/about-devops-caching.stickie.yaml && echo OK || echo MISSING`;
   await assertStep(
     'blackboard synced to folder',
     String(bbYaml.stdout || '').includes('OK') &&
@@ -1132,9 +1133,9 @@ try {
   } catch {}
   await $`go run main.go blackboard sync id:${bb1} folder:temp/blackboard-noids --clear-ids`;
   const st1NoId =
-    await $`bash -lc 'grep -q "^id:" temp/blackboard-noids/${st1}.stickie.yaml && echo HAS_ID || echo NO_ID'`;
+    await $`bash -lc 'grep -q "^id:" temp/blackboard-noids/about-onboarding-refresh.stickie.yaml && echo HAS_ID || echo NO_ID'`;
   const st2NoId =
-    await $`bash -lc 'grep -q "^id:" temp/blackboard-noids/${st2}.stickie.yaml && echo HAS_ID || echo NO_ID'`;
+    await $`bash -lc 'grep -q "^id:" temp/blackboard-noids/about-devops-caching.stickie.yaml && echo HAS_ID || echo NO_ID'`;
   await assertStep(
     'clear-ids omitted id field',
     String(st1NoId.stdout || '').includes('NO_ID') &&
