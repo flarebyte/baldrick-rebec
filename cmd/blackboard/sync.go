@@ -21,10 +21,11 @@ import (
 )
 
 var (
-	flagSyncDelete     bool
-	flagSyncDryRun     bool
-	flagSyncClearIDs   bool
-	flagSyncForceWrite bool
+	flagSyncDelete          bool
+	flagSyncDryRun          bool
+	flagSyncClearIDs        bool
+	flagSyncForceWrite      bool
+	flagSyncIncludeArchived bool
 )
 
 // syncCmd implements: rbc blackboard sync id:UUID folder:relative/path
@@ -65,6 +66,7 @@ func init() {
 	syncCmd.Flags().BoolVar(&flagSyncDryRun, "dry-run", false, "Show what would change without writing or deleting")
 	syncCmd.Flags().BoolVar(&flagSyncClearIDs, "clear-ids", false, "When exporting id->folder, omit id fields in stickie YAML files")
 	syncCmd.Flags().BoolVar(&flagSyncForceWrite, "force-write", false, "Force rewrite files even if destination appears up-to-date")
+	syncCmd.Flags().BoolVar(&flagSyncIncludeArchived, "include-archived", false, "Include archived stickies when syncing id->folder (default: active only)")
 }
 
 type endpointKind int
@@ -280,6 +282,10 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 
 	// Write each stickie YAML if newer
 	for _, s := range stickies {
+		// Skip archived unless explicitly included
+		if !flagSyncIncludeArchived && s.Archived {
+			continue
+		}
 		sy := stickieYAML{
 			ID:        s.ID,
 			Labels:    s.Labels,
