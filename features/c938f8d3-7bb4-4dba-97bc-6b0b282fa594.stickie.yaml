@@ -1,4 +1,3 @@
-id: c938f8d3-7bb4-4dba-97bc-6b0b282fa594
 note: |-
     Security: folder→id sync rejects YAMLs that reference ids not belonging to the
     destination board. DB FKs enforce referential integrity. CLI deletes require a

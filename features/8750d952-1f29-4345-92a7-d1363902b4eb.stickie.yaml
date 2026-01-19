@@ -1,4 +1,3 @@
-id: 8750d952-1f29-4345-92a7-d1363902b4eb
 note: |-
     Table schema: blackboards(id UUID PK, role_name TEXT, conversation_id UUID?,
     project_name TEXT?, task_id UUID?, background TEXT?, guidelines TEXT?, lifecycle

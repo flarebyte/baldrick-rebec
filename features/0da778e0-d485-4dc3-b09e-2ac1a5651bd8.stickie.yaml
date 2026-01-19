@@ -1,4 +1,3 @@
-id: 0da778e0-d485-4dc3-b09e-2ac1a5651bd8
 note: |-
     Stores removed: blackboards no longer require store_id and are scoped solely by
     role. DAO, schema, CLI, and docs updated accordingly. Benefits: fewer moving

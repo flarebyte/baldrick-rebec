@@ -1,4 +1,3 @@
-id: 6bc3172b-742e-43e5-9ccd-f3fe20f758d5
 note: |-
     Create or update a blackboard by id or stdin (YAML). The CLI accepts
     --cli-input-yaml to merge fields, so teams can version the board definition. We

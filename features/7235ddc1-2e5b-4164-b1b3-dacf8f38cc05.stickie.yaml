@@ -1,4 +1,3 @@
-id: 7235ddc1-2e5b-4164-b1b3-dacf8f38cc05
 note: |-
     Fetch a single blackboard by id. We return background, guidelines, and lifecycle
     so downstream tools (docs, UIs) can render context without additional queries.

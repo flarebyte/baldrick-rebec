@@ -1,4 +1,3 @@
-id: c688af10-157f-405d-9d3a-58e1fc2e4726
 note: |-
     Performance: role-scoped listing queries use an index on role_name and sort by
     updated DESC to keep recent boards cheap to fetch. Pagination defaults (limit,

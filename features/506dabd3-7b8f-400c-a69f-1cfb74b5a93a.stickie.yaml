@@ -1,4 +1,3 @@
-id: 506dabd3-7b8f-400c-a69f-1cfb74b5a93a
 note: |-
     DAO functions: UpsertBlackboard (insert/update with NULL handling),
     GetBlackboardByID, ListBlackboards (role-scoped, updated DESC),

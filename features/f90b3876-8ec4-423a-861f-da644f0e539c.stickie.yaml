@@ -1,4 +1,3 @@
-id: f90b3876-8ec4-423a-861f-da644f0e539c
 note: |-
     Sync a blackboard and its stickies between a DB id and a folder. We ensure
     safety with a strict direction model (id→folder or folder→id), a security guard
