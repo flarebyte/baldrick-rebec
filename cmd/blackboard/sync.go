@@ -50,6 +50,23 @@ var syncCmd = &cobra.Command{
 			return fmt.Errorf("cannot sync %s -> %s; use id:UUID->folder:PATH or folder:PATH->id:UUID", kindString(src.kind), kindString(dst.kind))
 		}
 
+		// Shortcut: allow id:_ to read id from the folder's blackboard.yaml
+		if src.kind == epID && src.value == "_" && dst.kind == epFolder {
+			bbid, e := readBlackboardIDFromFolder(dst.value)
+			if e != nil {
+				return e
+			}
+			src.value = bbid
+		}
+		// Shortcut: allow id:_ to read id from the folder's blackboard.yaml
+		if src.kind == epFolder && dst.kind == epID && dst.value == "_" {
+			bbid, e := readBlackboardIDFromFolder(src.value)
+			if e != nil {
+				return e
+			}
+			dst.value = bbid
+		}
+
 		if src.kind == epID && dst.kind == epFolder {
 			return syncIDToFolder(src.value, dst.value, flagSyncDelete, flagSyncDryRun)
 		}
@@ -676,6 +693,32 @@ func hashMaterial(v any) string {
 	b, _ := json.Marshal(v)
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
+}
+
+// readBlackboardIDFromFolder reads blackboard.yaml in the given relative folder
+// and returns the blackboard id. Errors when the file cannot be read or id is empty.
+func readBlackboardIDFromFolder(relFolder string) (string, error) {
+	if strings.TrimSpace(relFolder) == "" {
+		return "", errors.New("folder path is empty for id:_ shortcut")
+	}
+	dir := filepath.Clean(relFolder)
+	if strings.HasPrefix(dir, "..") {
+		return "", errors.New("folder path must not escape current directory")
+	}
+	p := filepath.Join(dir, "blackboard.yaml")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", p, err)
+	}
+	var y blackboardYAML
+	if err := yaml.Unmarshal(data, &y); err != nil {
+		return "", fmt.Errorf("parse %s: %w", p, err)
+	}
+	id := strings.TrimSpace(y.ID)
+	if id == "" {
+		return "", fmt.Errorf("blackboard id not found in %s", p)
+	}
+	return id, nil
 }
 
 // stickieFileName returns the filename for a stickie when exporting.

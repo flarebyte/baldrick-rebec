@@ -522,7 +522,7 @@ try {
       assert(typeof out.model === 'string', 'prompt: model string');
       assert(Array.isArray(out.output), 'prompt: output array');
     }
-  } catch (e) {
+  } catch (_e) {
     console.error('prompt (ollama) skipped:', e?.message || String(e));
   }
 
@@ -1008,7 +1008,7 @@ try {
       del && (del.deleted === 1 || del.deleted === '1'),
       'grpc delete did not report 1',
     );
-  } catch (e) {
+  } catch (_e) {
     const msg = e?.message ?? String(e);
     if (msg?.includes('404')) {
       console.error('grpc testcase step skipped:', msg);
@@ -1109,6 +1109,17 @@ try {
     await $`rm -rf temp/blackboard-test`;
   } catch {}
   await $`go run main.go blackboard sync id:${bb1} folder:temp/blackboard-test`;
+  // Shortcut: id:_ reads id from folder's blackboard.yaml (should succeed)
+  try {
+    await $`go run main.go blackboard sync id:_ folder:temp/blackboard-test --dry-run`;
+    await assertStep('sync id:_ (id->folder) ok', true);
+  } catch (_e) {
+    await assertStep(
+      'sync id:_ (id->folder) ok',
+      false,
+      'expected id:_ shortcut to resolve from folder',
+    );
+  }
   // Validate files exist
   const bbYaml =
     await $`test -f temp/blackboard-test/blackboard.yaml && echo OK || echo MISSING`;
@@ -1149,9 +1160,20 @@ try {
   // Minimal YAML to update only the note for st1
   const s1before = await stickieGetJSON({ id: st1 });
   const prevUpdated = s1before?.updated ? String(s1before.updated) : '';
-  await $`bash -lc 'echo "id: ${st1}" > temp/blackboard-test/${st1}.stickie.yaml'`;
-  await $`bash -lc 'echo "note: Updated via folder->id sync" >> temp/blackboard-test/${st1}.stickie.yaml'`;
+  await $`bash -lc 'echo "id: ${st1}" > temp/blackboard-test/about-onboarding-refresh.stickie.yaml'`;
+  await $`bash -lc 'echo "note: Updated via folder->id sync" >> temp/blackboard-test/about-onboarding-refresh.stickie.yaml'`;
   await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;
+  // Shortcut: folder->id with id:_ reads id from blackboard.yaml (should succeed)
+  try {
+    await $`go run main.go blackboard sync folder:temp/blackboard-test id:_ --dry-run`;
+    await assertStep('sync id:_ (folder->id) ok', true);
+  } catch (_e) {
+    await assertStep(
+      'sync id:_ (folder->id) ok',
+      false,
+      'expected id:_ shortcut to resolve from folder',
+    );
+  }
   {
     const s1after = await stickieGetJSON({ id: st1 });
     await assertStep(

@@ -53,6 +53,13 @@ General shape:
 
 Not allowed: `id→id` and `folder→folder` (returns an error).
 
+Shortcuts
+- When using folder paths that contain a `blackboard.yaml`, you can use `_` as a
+  placeholder for the id and it will be resolved from the YAML:
+  - `rbc blackboard sync id:_ folder:<RELATIVE_PATH>` reads the id from `<RELATIVE_PATH>/blackboard.yaml`.
+  - `rbc blackboard sync folder:<RELATIVE_PATH> id:_` reads the id from `<RELATIVE_PATH>/blackboard.yaml`.
+  - Errors if `blackboard.yaml` is missing or does not contain an `id:`.
+
 A) Export: id → folder
 
 - `rbc blackboard sync id:<BOARD_ID> folder:board/ideas`
