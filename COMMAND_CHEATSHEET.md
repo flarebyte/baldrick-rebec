@@ -18,6 +18,8 @@ Quick reference of common `rbc` commands with concise examples. Use `go run main
 | `rbc blackboard get`    | Get a blackboard by id                                                    | `--id`                                                                                                           | `rbc blackboard get --id <uuid>`                                  |
 | `rbc blackboard list`   | List blackboards for a role                                               | `--role`, `--limit`, `--offset`, `--output`                                                                      | `rbc blackboard list --role user --output json`                   |
 | `rbc blackboard delete` | Delete a blackboard                                                       | `--id`                                                                                                           | `rbc blackboard delete --id <uuid>`                               |
+| `rbc blackboard sync`   | Sync blackboard and stickies id ↔ folder                                   | `id:<uuid> folder:<rel>`, `--dry-run`, `--delete`, `--clear-ids`, `--force-write`, `--include-archived`, id:`_` shortcut | `rbc blackboard sync id:_ folder:features`                         |
+| `rbc blackboard diff`   | Show differences between id and folder                                     | `id:<uuid> folder:<rel>`, `--detailed`, `--include-archived`, id:`_` shortcut                                      | `rbc blackboard diff id:_ folder:features --detailed`             |
 
 ## Stickies
 

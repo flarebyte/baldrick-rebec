@@ -83,9 +83,34 @@ B) Import: folder → id
   - Security guard: if a YAML has an `id` that does not exist for that blackboard, sync fails.
   - `updated` values in YAML are ignored on import.
   - `blackboard_id` is not used in YAML (one folder per board).
-  - `--dry-run`: prints planned creates/updates without writing.
+ - `--dry-run`: prints planned creates/updates without writing.
 
 Tip: Keep folder paths relative (e.g., `board/ideas`). The export step will create the folder if missing.
+
+3. Diff id vs folder
+
+Use diff to preview differences without changing anything. The command compares the remote blackboard/stickies with local YAML files.
+
+- Concise (default): one line per entity, listing changed fields.
+- Detailed: per-field remote/local values (strings truncated and large fields hashed).
+
+Examples:
+
+- Concise diff using explicit id:
+  `rbc blackboard diff id:<BOARD_ID> folder:board/ideas`
+- Detailed diff using id from folder’s blackboard.yaml:
+  `rbc blackboard diff id:_ folder:board/ideas --detailed`
+
+Options:
+
+- `--include-archived`: include archived stickies (default: excluded)
+- `--detailed`: show per-field values/hashes
+
+Output legend:
+- `=` unchanged
+- `~` changed
+- `+` remote-only (exists in DB, not in folder)
+- `-` local-only (exists in folder, not in DB). If YAML has no `id`, it’s reported as “local-only, no id”.
 
 4. Handy Checks
 

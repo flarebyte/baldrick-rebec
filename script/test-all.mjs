@@ -1136,6 +1136,24 @@ try {
     'expected exported YAML files missing for blackboard/stickies',
   );
 
+  // Diff: unchanged after fresh export (concise and with id:_ shortcut)
+  step++;
+  logStep(step, TOTAL, 'Diff: unchanged right after export');
+  const diffUnchanged = await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test`;
+  await assertStep(
+    'diff unchanged concise',
+    String(diffUnchanged.stdout || '').includes('= blackboard id=') &&
+      String(diffUnchanged.stdout || '').includes('= stickie id='),
+    'expected concise diff to show unchanged blackboard and at least one stickie',
+  );
+  const diffUnchangedAlias = await $`go run main.go blackboard diff id:_ folder:temp/blackboard-test`;
+  await assertStep(
+    'diff id:_ shortcut works',
+    String(diffUnchangedAlias.stdout || '').includes('= blackboard id=') &&
+      String(diffUnchangedAlias.stdout || '').includes('= stickie id='),
+    'expected diff id:_ to resolve id from folder',
+  );
+
   // Export with --clear-ids: stickie YAMLs should not contain an id field
   step++;
   logStep(step, TOTAL, 'Exporting blackboard with --clear-ids');
@@ -1162,6 +1180,22 @@ try {
   const prevUpdated = s1before?.updated ? String(s1before.updated) : '';
   await $`bash -lc 'echo "id: ${st1}" > temp/blackboard-test/about-onboarding-refresh.stickie.yaml'`;
   await $`bash -lc 'echo "note: Updated via folder->id sync" >> temp/blackboard-test/about-onboarding-refresh.stickie.yaml'`;
+  // Diff before applying folder->id: should detect change on st1
+  step++;
+  logStep(step, TOTAL, 'Diff: detect local change before import');
+  const diffChanged = await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test`;
+  await assertStep(
+    'diff detects stickie change (concise)',
+    String(diffChanged.stdout || '').includes(`~ stickie id=${st1}`),
+    'expected diff to show changed stickie for st1',
+  );
+  const diffChangedDet = await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test --detailed`;
+  await assertStep(
+    'diff detailed shows field info',
+    String(diffChangedDet.stdout || '').includes(`~ stickie id=${st1}`) &&
+      String(diffChangedDet.stdout || '').includes('note['),
+    'expected detailed diff to include note[...] details',
+  );
   await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;
   // Shortcut: folder->id with id:_ reads id from blackboard.yaml (should succeed)
   try {

@@ -29,6 +29,11 @@ Then run the scaffold step again.
 
 See DATABASES.md for full workflow and a setup checklist. For ops-focused learning prompts, see LEARNING.md.
 
+## Blackboard CLI
+
+- Sync id ↔ folder: `rbc blackboard sync id:_ folder:features [--dry-run] [--delete] [--clear-ids] [--force-write] [--include-archived]`
+- Diff id vs folder: `rbc blackboard diff id:_ folder:features [--detailed] [--include-archived]`
+
 ## Snapshot Backups
 
 Use the schema-aware snapshot subsystem to capture and restore long‑lived entities into a dedicated Postgres schema (default: `backup`). It stores full JSONB row snapshots plus tracked entity schemas, and supports append/replace restores.
