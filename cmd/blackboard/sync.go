@@ -342,6 +342,10 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 			v := s.Score.Float64
 			sy.Score = &v
 		}
+		if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
+			v := s.Name.String
+			sy.Name = &v
+		}
 
 		fn := filepath.Join(destDir, stickieFileName(s))
 		seen[filepath.Base(fn)] = struct{}{}
