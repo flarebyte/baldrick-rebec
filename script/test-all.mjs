@@ -1139,14 +1139,16 @@ try {
   // Diff: unchanged after fresh export (concise and with id:_ shortcut)
   step++;
   logStep(step, TOTAL, 'Diff: unchanged right after export');
-  const diffUnchanged = await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test`;
+  const diffUnchanged =
+    await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test`;
   await assertStep(
     'diff unchanged concise',
     String(diffUnchanged.stdout || '').includes('= blackboard id=') &&
       String(diffUnchanged.stdout || '').includes('= stickie id='),
     'expected concise diff to show unchanged blackboard and at least one stickie',
   );
-  const diffUnchangedAlias = await $`go run main.go blackboard diff id:_ folder:temp/blackboard-test`;
+  const diffUnchangedAlias =
+    await $`go run main.go blackboard diff id:_ folder:temp/blackboard-test`;
   await assertStep(
     'diff id:_ shortcut works',
     String(diffUnchangedAlias.stdout || '').includes('= blackboard id=') &&
@@ -1183,13 +1185,15 @@ try {
   // Diff before applying folder->id: should detect change on st1
   step++;
   logStep(step, TOTAL, 'Diff: detect local change before import');
-  const diffChanged = await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test`;
+  const diffChanged =
+    await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test`;
   await assertStep(
     'diff detects stickie change (concise)',
     String(diffChanged.stdout || '').includes(`~ stickie id=${st1}`),
     'expected diff to show changed stickie for st1',
   );
-  const diffChangedDet = await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test --detailed`;
+  const diffChangedDet =
+    await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test --detailed`;
   await assertStep(
     'diff detailed shows field info',
     String(diffChangedDet.stdout || '').includes(`~ stickie id=${st1}`) &&

@@ -630,12 +630,12 @@ type stickieHashMaterial struct {
 }
 
 func hashStickieYAML(y stickieYAML) string {
-    mat := stickieHashMaterial{}
-    // topics removed
-    if y.Note != nil {
-        // Normalize to match exporter behavior (wrap at 80)
-        mat.Note = wrapAt(string(*y.Note), 80)
-    }
+	mat := stickieHashMaterial{}
+	// topics removed
+	if y.Note != nil {
+		// Normalize to match exporter behavior (wrap at 80)
+		mat.Note = wrapAt(string(*y.Note), 80)
+	}
 	if y.Code != nil {
 		mat.Code = *y.Code
 	}
@@ -661,11 +661,11 @@ func hashStickieYAML(y stickieYAML) string {
 }
 
 func hashStickieDB(s pgdao.Stickie) string {
-    mat := stickieHashMaterial{}
-    if s.Note.Valid {
-        // Normalize like exporter which wraps notes at 80 columns
-        mat.Note = wrapAt(s.Note.String, 80)
-    }
+	mat := stickieHashMaterial{}
+	if s.Note.Valid {
+		// Normalize like exporter which wraps notes at 80 columns
+		mat.Note = wrapAt(s.Note.String, 80)
+	}
 	if s.Code.Valid {
 		mat.Code = s.Code.String
 	}
