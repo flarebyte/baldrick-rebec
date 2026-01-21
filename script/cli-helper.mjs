@@ -77,7 +77,7 @@ async function __ensureAssertExperiment() {
   return __assertExperimentId;
 }
 
-export async function assertStep(stepName, cond, msg = '') {
+export async function assertStep(stepName, cond, msg = '', details = '') {
   const ok = !!cond;
   try {
     if (__assertConnectEnabled) {
@@ -109,7 +109,10 @@ export async function assertStep(stepName, cond, msg = '') {
     console.error('assertStep: CLI fallback failed:', e2?.message || e2);
   }
   if (!ok) {
-    throw new Error(msg || `assertStep failed: ${stepName}`);
+    const detailStr = details
+      ? `\nGot:\n${String(details).slice(0, 2000)}`
+      : '';
+    throw new Error((msg || `assertStep failed: ${stepName}`) + detailStr);
   }
 }
 

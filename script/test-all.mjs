@@ -1146,6 +1146,7 @@ try {
     String(diffUnchanged.stdout || '').includes('= blackboard id=') &&
       String(diffUnchanged.stdout || '').includes('= stickie id='),
     'expected concise diff to show unchanged blackboard and at least one stickie',
+    diffUnchanged.stdout || diffUnchanged.stderr || '',
   );
   const diffUnchangedAlias =
     await $`go run main.go blackboard diff id:_ folder:temp/blackboard-test`;
@@ -1154,6 +1155,7 @@ try {
     String(diffUnchangedAlias.stdout || '').includes('= blackboard id=') &&
       String(diffUnchangedAlias.stdout || '').includes('= stickie id='),
     'expected diff id:_ to resolve id from folder',
+    diffUnchangedAlias.stdout || diffUnchangedAlias.stderr || '',
   );
 
   // Export with --clear-ids: stickie YAMLs should not contain an id field
@@ -1191,6 +1193,7 @@ try {
     'diff detects stickie change (concise)',
     String(diffChanged.stdout || '').includes(`~ stickie id=${st1}`),
     'expected diff to show changed stickie for st1',
+    diffChanged.stdout || diffChanged.stderr || '',
   );
   const diffChangedDet =
     await $`go run main.go blackboard diff id:${bb1} folder:temp/blackboard-test --detailed`;
@@ -1199,6 +1202,7 @@ try {
     String(diffChangedDet.stdout || '').includes(`~ stickie id=${st1}`) &&
       String(diffChangedDet.stdout || '').includes('note['),
     'expected detailed diff to include note[...] details',
+    diffChangedDet.stdout || diffChangedDet.stderr || '',
   );
   await $`go run main.go blackboard sync folder:temp/blackboard-test id:${bb1}`;
   // Shortcut: folder->id with id:_ reads id from blackboard.yaml (should succeed)
