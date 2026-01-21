@@ -1008,7 +1008,7 @@ try {
       del && (del.deleted === 1 || del.deleted === '1'),
       'grpc delete did not report 1',
     );
-  } catch (_e) {
+  } catch (e) {
     const msg = e?.message ?? String(e);
     if (msg?.includes('404')) {
       console.error('grpc testcase step skipped:', msg);

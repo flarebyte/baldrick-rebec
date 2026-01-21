@@ -250,10 +250,10 @@ func printBlackboardDiff(remote *pgdao.Blackboard, local blackboardYAML, localEr
 	cmp("project", nullOrString(remote.ProjectName), deref(local.Project))
 	// task_id
 	cmp("task_id", nullOrString(remote.TaskID), deref(local.TaskID))
-	// background
-	cmp("background", nullOrString(remote.Background), derefLS(local.Background))
-	// guidelines
-	cmp("guidelines", nullOrString(remote.Guidelines), derefLS(local.Guidelines))
+    // background (export wraps at 80)
+    cmp("background", wrapIfValid(remote.Background), derefLS(local.Background))
+    // guidelines (export wraps at 80)
+    cmp("guidelines", wrapIfValid(remote.Guidelines), derefLS(local.Guidelines))
 	// lifecycle
 	cmp("lifecycle", nullOrString(remote.Lifecycle), deref(local.Lifecycle))
 
@@ -281,10 +281,18 @@ func printBlackboardDiff(remote *pgdao.Blackboard, local blackboardYAML, localEr
 }
 
 func nullOrString(ns sql.NullString) string {
-	if ns.Valid {
-		return ns.String
-	}
-	return ""
+    if ns.Valid {
+        return ns.String
+    }
+    return ""
+}
+
+// wrapIfValid mirrors exporter behavior for prose fields (wrap at 80 columns)
+func wrapIfValid(ns sql.NullString) string {
+    if ns.Valid {
+        return wrapAt(ns.String, 80)
+    }
+    return ""
 }
 
 func deref(p *string) string {
@@ -356,7 +364,7 @@ func listChangedStickieFields(r pgdao.Stickie, l stickieYAML) []string {
 	}
 	add("name", strings.TrimSpace(getNS(r.Name)) != strings.TrimSpace(getStrPtr(l.Name)))
 	add("archived", r.Archived != l.Archived)
-	add("note", norm(getNS(r.Note)) != norm(getLitPtr(l.Note)))
+    add("note", norm(wrapIfValid(r.Note)) != norm(getLitPtr(l.Note)))
 	add("code", norm(getNS(r.Code)) != norm(getStrPtr(l.Code)))
 	add("labels", !equalStringSets(r.Labels, l.Labels))
 	add("priority_level", strings.TrimSpace(getNS(r.PriorityLevel)) != strings.TrimSpace(getStrPtr(l.Priority)))
@@ -384,9 +392,9 @@ func computeStickieFieldDiff(r pgdao.Stickie, l stickieYAML) []fieldDetail {
 	if r.Archived != l.Archived {
 		add("archived", fmt.Sprintf("%v", r.Archived), fmt.Sprintf("%v", l.Archived), true)
 	}
-	if norm(getNS(r.Note)) != norm(getLitPtr(l.Note)) {
-		add("note", shortHash(getNS(r.Note)), shortHash(getLitPtr(l.Note)), true)
-	}
+    if norm(wrapIfValid(r.Note)) != norm(getLitPtr(l.Note)) {
+        add("note", shortHash(wrapIfValid(r.Note)), shortHash(getLitPtr(l.Note)), true)
+    }
 	if norm(getNS(r.Code)) != norm(getStrPtr(l.Code)) {
 		add("code", shortHash(getNS(r.Code)), shortHash(getStrPtr(l.Code)), true)
 	}
