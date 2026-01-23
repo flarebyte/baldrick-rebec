@@ -100,11 +100,16 @@ func runBlackboardDiff(blackboardID, relFolder string, detailed, includeArchived
 	}
 	defer db.Close()
 
-	// Load remote blackboard
-	rb, err := pgdao.GetBlackboardByID(ctx, db, blackboardID)
-	if err != nil {
-		return err
-	}
+    // Load remote blackboard
+    rb, err := pgdao.GetBlackboardByID(ctx, db, blackboardID)
+    if err != nil {
+        // Friendlier message when the id does not exist in DB
+        msg := err.Error()
+        if strings.Contains(strings.ToLower(msg), "no rows in result set") {
+            return fmt.Errorf("blackboard not found in database: id=%s (check %s/blackboard.yaml)", blackboardID, relFolder)
+        }
+        return err
+    }
 
 	// Present blackboard diff
 	printBlackboardDiff(rb, localBB, localBBErr, detailed)
