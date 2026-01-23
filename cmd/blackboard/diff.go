@@ -100,33 +100,33 @@ func runBlackboardDiff(blackboardID, relFolder string, detailed, includeArchived
 	}
 	defer db.Close()
 
-    // Load remote blackboard
-    rb, err := pgdao.GetBlackboardByID(ctx, db, blackboardID)
-    if err != nil {
-        // Friendlier message when the id does not exist in DB
-        msg := err.Error()
-        if strings.Contains(strings.ToLower(msg), "no rows in result set") {
-            return fmt.Errorf("blackboard not found in database: id=%s (check %s/blackboard.yaml)", blackboardID, relFolder)
-        }
-        return err
+    // Load remote blackboard but do not fail hard if missing
+    var rb *pgdao.Blackboard
+    if b, e := pgdao.GetBlackboardByID(ctx, db, blackboardID); e == nil {
+        rb = b
+    } else {
+        // Keep going to provide a deep diff on local contents
+        rb = nil
     }
 
-	// Present blackboard diff
-	printBlackboardDiff(rb, localBB, localBBErr, detailed)
+    // Present blackboard diff (handles nil remote or missing local)
+    printBlackboardDiff(rb, localBB, localBBErr, detailed)
 
-	// Load remote stickies (paged)
-	remoteStickies := make([]pgdao.Stickie, 0, 256)
-	const page = 1000
-	for off := 0; ; off += page {
-		ss, err := pgdao.ListStickies(ctx, db, blackboardID, page, off)
-		if err != nil {
-			return err
-		}
-		remoteStickies = append(remoteStickies, ss...)
-		if len(ss) < page {
-			break
-		}
-	}
+    // Load remote stickies (paged) only if the blackboard exists in DB
+    remoteStickies := make([]pgdao.Stickie, 0, 256)
+    if rb != nil {
+        const page = 1000
+        for off := 0; ; off += page {
+            ss, err := pgdao.ListStickies(ctx, db, blackboardID, page, off)
+            if err != nil {
+                return err
+            }
+            remoteStickies = append(remoteStickies, ss...)
+            if len(ss) < page {
+                break
+            }
+        }
+    }
 	// Filter archived optionally
 	if !includeArchived {
 		filtered := remoteStickies[:0]
@@ -189,17 +189,27 @@ func runBlackboardDiff(blackboardID, relFolder string, detailed, includeArchived
 		}
 	}
 
-	// Local-only stickies (with id)
-	for _, id := range localIDs {
-		if _, ok := remoteByID[id]; !ok {
-			ls := localByID[id]
-			lname := ""
-			if ls.yaml.Name != nil {
-				lname = *ls.yaml.Name
-			}
-			fmt.Fprintf(os.Stdout, "- stickie id=%s name=%q file=%s (local-only)\n", id, lname, ls.filename)
-		}
-	}
+    // Local-only stickies (with id). Also check if they belong to a different board in DB.
+    for _, id := range localIDs {
+        if _, ok := remoteByID[id]; ok {
+            continue
+        }
+        ls := localByID[id]
+        lname := ""
+        if ls.yaml.Name != nil {
+            lname = *ls.yaml.Name
+        }
+        // Default annotation
+        note := "local-only"
+        // Try to resolve in DB to see if it belongs to any board
+        if s, e := pgdao.GetStickieByID(ctx, db, id); e == nil && s != nil {
+            // If it belongs to a different board, show that id
+            if strings.TrimSpace(s.BlackboardID) != strings.TrimSpace(blackboardID) {
+                note = fmt.Sprintf("local-only, belongs to board %s", s.BlackboardID)
+            }
+        }
+        fmt.Fprintf(os.Stdout, "- stickie id=%s name=%q file=%s (%s)\n", id, lname, ls.filename, note)
+    }
 	// Local-only stickies without id
 	for _, lc := range localAnon {
 		lname := ""
@@ -231,10 +241,22 @@ func yamlUnmarshalCompat(b []byte, v any) error {
 }
 
 func printBlackboardDiff(remote *pgdao.Blackboard, local blackboardYAML, localErr error, detailed bool) {
-	if localErr != nil {
-		fmt.Fprintf(os.Stdout, "+ blackboard id=%s role=%q (remote-only: no local blackboard.yaml)\n", remote.ID, remote.RoleName)
-		return
-	}
+    // Remote-only
+    if remote != nil && localErr != nil {
+        fmt.Fprintf(os.Stdout, "+ blackboard id=%s role=%q (remote-only: no local blackboard.yaml)\n", remote.ID, remote.RoleName)
+        return
+    }
+    // Local-only
+    if remote == nil && localErr == nil {
+        rid := strings.TrimSpace(local.ID)
+        fmt.Fprintf(os.Stdout, "- blackboard id=%s role=%q (local-only)\n", rid, local.Role)
+        return
+    }
+    if remote == nil && localErr != nil {
+        // Neither side present; nothing to compare
+        fmt.Fprintln(os.Stdout, "- blackboard (local missing and remote missing)")
+        return
+    }
 	// Compare selected fields (ignore timestamps)
 	changed := make([]string, 0, 8)
 	det := make(map[string][2]string)
