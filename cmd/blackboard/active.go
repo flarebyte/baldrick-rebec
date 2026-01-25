@@ -572,13 +572,30 @@ func refreshBoardsCmd(role string, search string) tea.Cmd {
 }
 
 func stickieTitle(s pgdao.Stickie) string {
-	if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
-		return s.Name.String
-	}
-	if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
-		return s.Note.String
-	}
-	return s.ID
+    const maxCols = 80
+    if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
+        return inlinePreview(s.Name.String, maxCols)
+    }
+    if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
+        return inlinePreview(s.Note.String, maxCols)
+    }
+    return s.ID
+}
+
+// inlinePreview returns a single-line preview up to maxCols runes, using the first line and trimming with ellipsis when needed.
+func inlinePreview(text string, maxCols int) string {
+    if maxCols <= 0 { maxCols = 80 }
+    // Use only the first line
+    line := text
+    if i := strings.IndexRune(line, '\n'); i >= 0 {
+        line = line[:i]
+    }
+    line = strings.TrimSpace(line)
+    r := []rune(line)
+    if len(r) > maxCols {
+        return string(r[:maxCols-1]) + "…"
+    }
+    return line
 }
 
 func refreshStickiesCmd(boardID string) tea.Cmd {
