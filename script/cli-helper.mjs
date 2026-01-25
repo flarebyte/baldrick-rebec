@@ -544,28 +544,6 @@ export async function tagSet({ name, title, role = 'user' }) {
   );
 }
 
-export async function topicSet({
-  name,
-  role = 'user',
-  title,
-  description = '',
-  tags = '',
-}) {
-  const args = [
-    'topic',
-    'set',
-    '--name',
-    name,
-    '--role',
-    role,
-    '--title',
-    title,
-  ];
-  if (description) args.push('--description', description);
-  if (tags) args.push('--tags', tags);
-  return await runRbc(...args);
-}
-
 export async function projectSet({
   name,
   role = 'user',
@@ -765,20 +743,6 @@ export async function snapshotPruneYesJSON({
 export async function projectListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
     'project',
-    'list',
-    '--role',
-    role,
-    '--output',
-    'json',
-    '--limit',
-    String(limit),
-    '--offset',
-    String(offset),
-  );
-}
-export async function topicListJSON({ role, limit = 100, offset = 0 }) {
-  return await runRbcJSON(
-    'topic',
     'list',
     '--role',
     role,

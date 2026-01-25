@@ -81,8 +81,6 @@ import {
   toolGetJSON,
   toolListJSON,
   toolSet,
-  topicListJSON,
-  topicSet,
   vaultBackendCurrent,
   vaultDoctor,
   vaultList,
@@ -101,7 +99,6 @@ import {
   validateScriptListContract,
   validateStickieListContract,
   validateTaskListContract,
-  validateTopicListContract,
   validateVaultListContract,
   validateVaultShowContract,
   validateWorkflowListContract,
@@ -366,32 +363,14 @@ try {
     replaceComment: 'Add -race',
   });
 
-  // 6) Tags & Topics
+  // 6) Tags
   step++;
-  logStep(step, TOTAL, 'Creating tags and topics');
+  logStep(step, TOTAL, 'Creating tags');
   await tagSet({
     name: 'priority-high',
     title: 'High Priority',
     role: TEST_ROLE_USER,
   });
-  await topicSet({
-    name: 'onboarding',
-    role: TEST_ROLE_USER,
-    title: 'Onboarding',
-    description: 'New hires onboarding',
-    tags: 'area=people,priority=med',
-  });
-  await topicSet({
-    name: 'devops',
-    role: TEST_ROLE_USER,
-    title: 'DevOps',
-    description: 'Build, deploy, CI/CD',
-    tags: 'area=platform,priority=high',
-  });
-  {
-    const topics = await topicListJSON({ role: TEST_ROLE_USER, limit: 50 });
-    validateTopicListContract(topics);
-  }
 
   // 7) Projects
   step++;
@@ -1066,7 +1045,6 @@ try {
   await listWithRole('project', TEST_ROLE_USER, 50);
   await listWithRole('workspace', TEST_ROLE_USER, 50);
   await listWithRole('script', TEST_ROLE_USER, 50);
-  await listWithRole('topic', TEST_ROLE_USER, 50);
   await listWithRole('blackboard', TEST_ROLE_USER, 50);
   await stickieList(50);
   await stickieListByBlackboard({ blackboard: bb1, limit: 50 });

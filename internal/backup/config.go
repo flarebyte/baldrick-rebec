@@ -19,7 +19,6 @@ func DefaultEntities() []BackupEntityConfig {
 		{EntityName: "tools", TableName: "tools", PKColumns: []string{"name"}, HasRoleName: true, IncludeByDefault: true},
 		{EntityName: "scripts", TableName: "scripts", PKColumns: []string{"id"}, HasRoleName: true, IncludeByDefault: true},
 		{EntityName: "tasks", TableName: "tasks", PKColumns: []string{"id"}, HasRoleName: true, IncludeByDefault: true},
-		{EntityName: "topics", TableName: "topics", PKColumns: []string{"name", "role_name"}, HasRoleName: true, IncludeByDefault: true},
 		{EntityName: "workspaces", TableName: "workspaces", PKColumns: []string{"id"}, HasRoleName: true, IncludeByDefault: true},
 		{EntityName: "blackboards", TableName: "blackboards", PKColumns: []string{"id"}, HasRoleName: true, IncludeByDefault: true},
 		{EntityName: "stickies", TableName: "stickies", PKColumns: []string{"id"}, HasRoleName: false, IncludeByDefault: true},

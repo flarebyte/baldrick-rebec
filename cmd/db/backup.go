@@ -24,7 +24,6 @@ var backupTables = []string{
 	"tags",
 	"projects",
 	"tools",
-	"topics",
 	"blackboards",
 	"stickies",
 	"conversations",

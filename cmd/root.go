@@ -22,7 +22,6 @@ import (
 	"github.com/flarebyte/baldrick-rebec/cmd/test"
 	tccmd "github.com/flarebyte/baldrick-rebec/cmd/testcase"
 	toolcmd "github.com/flarebyte/baldrick-rebec/cmd/tool"
-	topiccmd "github.com/flarebyte/baldrick-rebec/cmd/topic"
 	vaultcmd "github.com/flarebyte/baldrick-rebec/cmd/vault"
 	"github.com/flarebyte/baldrick-rebec/cmd/workflow"
 	wscmd "github.com/flarebyte/baldrick-rebec/cmd/workspace"
@@ -56,7 +55,6 @@ func init() {
 	rootCmd.AddCommand(role.RoleCmd)
 	rootCmd.AddCommand(prjcmd.ProjectCmd)
 	rootCmd.AddCommand(tagcmd.TagCmd)
-	rootCmd.AddCommand(topiccmd.TopicCmd)
 	rootCmd.AddCommand(pkgcmd.PackageCmd)
 	rootCmd.AddCommand(workflow.WorkflowCmd)
 	rootCmd.AddCommand(task.TaskCmd)

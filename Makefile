@@ -26,6 +26,7 @@ format_unsafe:
 test: gen
 	$(ZX) script/test-all.mjs
 	$(RBC) blackboard import features
+	$(RBC) conversation set --role dev --title "rebec dev" --project "github/flarebyte/baldrick-rebec"
 
 lintb: 
 	$(ZX) script/generate-bespoke-rules.mjs
