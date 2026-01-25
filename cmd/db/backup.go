@@ -19,14 +19,14 @@ var (
 
 // deterministic table order for backup/restore
 var backupTables = []string{
-    "roles",
-    "workflows",
-    "tags",
-    "projects",
-    "tools",
-    "blackboards",
-    "stickies",
-    "conversations",
+	"roles",
+	"workflows",
+	"tags",
+	"projects",
+	"tools",
+	"blackboards",
+	"stickies",
+	"conversations",
 	"experiments",
 	"task_variants",
 	"tasks",
