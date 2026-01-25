@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -101,8 +102,8 @@ type bbActiveModel struct {
 	stickies    []pgdao.Stickie
 	stickCursor int
 	// In-board filters
-	topicOptions []string // 0:"any", others topic names
-	topicIdx     int
+	labelOptions []string // 0:"any", others are labels; includes "none" when present
+	labelIdx     int
 	noteSearch   string
 	inNoteSearch bool
 	noteInput    string
@@ -183,11 +184,11 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.noteInput = m.noteSearch
 				return m, nil
 			case "t":
-				if len(m.topicOptions) == 0 {
-					m.recomputeTopicOptions()
+				if len(m.labelOptions) == 0 {
+					m.recomputeLabelOptions()
 				}
-				if len(m.topicOptions) > 0 {
-					m.topicIdx = (m.topicIdx + 1) % len(m.topicOptions)
+				if len(m.labelOptions) > 0 {
+					m.labelIdx = (m.labelIdx + 1) % len(m.labelOptions)
 					if m.stickCursor >= len(m.visibleStickyIndices()) {
 						m.stickCursor = 0
 					}
@@ -313,7 +314,7 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case stickRefreshMsg:
 		m.stickies = msg.stickies
-		m.recomputeTopicOptions()
+		m.recomputeLabelOptions()
 		if m.stickCursor >= len(m.stickies) {
 			m.stickCursor = len(m.stickies) - 1
 			if m.stickCursor < 0 {
@@ -341,11 +342,11 @@ func (m bbActiveModel) View() string {
 		b.WriteString(bStyleLabel.Render("Board: ") + bStyleValue.Render(m.boardTitle) + "\n")
 		b.WriteString(bStyleHelp.Render("ID: ") + bStyleValue.Render(m.boardID) + "\n")
 		// Filter/search section
-		topic := "any"
-		if m.topicIdx > 0 && m.topicIdx < len(m.topicOptions) {
-			topic = m.topicOptions[m.topicIdx]
+		flabel := "any"
+		if m.labelIdx > 0 && m.labelIdx < len(m.labelOptions) {
+			flabel = m.labelOptions[m.labelIdx]
 		}
-		b.WriteString(bStyleLabel.Render("Filter.topic: ") + bStyleValue.Render(topic) + bStyleHelp.Render(" (t=cycle)") + "\n")
+		b.WriteString(bStyleLabel.Render("Filter.label: ") + bStyleValue.Render(flabel) + bStyleHelp.Render(" (t=cycle)") + "\n")
 		if m.inNoteSearch {
 			b.WriteString(bStyleLabel.Render("Search.note*: ") + bStyleValue.Render(m.noteInput) + "\n")
 			b.WriteString(bStyleHelp.Render("enter=apply, esc=cancel") + "\n")
@@ -353,7 +354,7 @@ func (m bbActiveModel) View() string {
 			b.WriteString(bStyleLabel.Render("Search.note: ") + bStyleValue.Render(m.noteSearch) + bStyleHelp.Render(" (/ to edit)") + "\n")
 		}
 		b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
-		b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, /=search, t=topic, m=multi-select, space=toggle, a=all, n=none, b/esc=back, r=refresh, q") + "\n")
+		b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, /=search, t=label, m=multi-select, space=toggle, a=all, n=none, b/esc=back, r=refresh, q") + "\n")
 		filtered := m.filteredStickyIndices()
 		// Compute visible window
 		visible := filtered
@@ -572,31 +573,35 @@ func refreshBoardsCmd(role string, search string) tea.Cmd {
 }
 
 func stickieTitle(s pgdao.Stickie) string {
-    const maxCols = 60
-    if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
-        return inlinePreview(s.Name.String, maxCols)
-    }
-    if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
-        return inlinePreview(s.Note.String, maxCols)
-    }
-    return s.ID
+	const maxCols = 60
+	if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
+		return inlinePreview(s.Name.String, maxCols)
+	}
+	if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
+		return inlinePreview(s.Note.String, maxCols)
+	}
+	return s.ID
 }
 
 // inlinePreview returns a single-line preview up to maxCols runes, using the first line and trimming with ellipsis when needed.
 func inlinePreview(text string, maxCols int) string {
-    if maxCols <= 0 { maxCols = 80 }
-    if maxCols <= 3 { maxCols = 4 }
-    // Use only the first line
-    line := text
-    if i := strings.IndexRune(line, '\n'); i >= 0 {
-        line = line[:i]
-    }
-    line = strings.TrimSpace(line)
-    r := []rune(line)
-    if len(r) > maxCols {
-        return string(r[:maxCols-3]) + "..."
-    }
-    return line
+	if maxCols <= 0 {
+		maxCols = 80
+	}
+	if maxCols <= 3 {
+		maxCols = 4
+	}
+	// Use only the first line
+	line := text
+	if i := strings.IndexRune(line, '\n'); i >= 0 {
+		line = line[:i]
+	}
+	line = strings.TrimSpace(line)
+	r := []rune(line)
+	if len(r) > maxCols {
+		return string(r[:maxCols-3]) + "..."
+	}
+	return line
 }
 
 func refreshStickiesCmd(boardID string) tea.Cmd {
@@ -699,7 +704,11 @@ func truncateCodeSnippet(code string) string {
 // Filtering helpers for in-board view
 func (m bbActiveModel) filteredStickyIndices() []int {
 	out := make([]int, 0, len(m.stickies))
-	// Topic filter removed; use labels in future if needed
+	// Label filter (single label)
+	var wantLabel string
+	if m.labelIdx > 0 && m.labelIdx < len(m.labelOptions) {
+		wantLabel = strings.ToLower(strings.TrimSpace(m.labelOptions[m.labelIdx]))
+	}
 	q := strings.ToLower(strings.TrimSpace(m.noteSearch))
 	for i, s := range m.stickies {
 		// Note search
@@ -712,16 +721,59 @@ func (m bbActiveModel) filteredStickyIndices() []int {
 				continue
 			}
 		}
+		// Label filter
+		if wantLabel != "" {
+			if wantLabel == "none" {
+				if len(s.Labels) != 0 {
+					continue
+				}
+			} else {
+				found := false
+				for _, lb := range s.Labels {
+					if strings.ToLower(strings.TrimSpace(lb)) == wantLabel {
+						found = true
+						break
+					}
+				}
+				if !found {
+					continue
+				}
+			}
+		}
 		out = append(out, i)
 	}
 	return out
 }
 
-func (m *bbActiveModel) recomputeTopicOptions() {
-	// topics removed; no recompute
-	m.topicOptions = []string{"any"}
-	if m.topicIdx >= len(m.topicOptions) {
-		m.topicIdx = 0
+func (m *bbActiveModel) recomputeLabelOptions() {
+	// Build set of labels from current stickies
+	set := map[string]struct{}{}
+	none := false
+	for _, s := range m.stickies {
+		if len(s.Labels) == 0 {
+			none = true
+			continue
+		}
+		for _, lb := range s.Labels {
+			v := strings.ToLower(strings.TrimSpace(lb))
+			if v != "" {
+				set[v] = struct{}{}
+			}
+		}
+	}
+	// Collect sorted options
+	opts := make([]string, 0, len(set)+2)
+	opts = append(opts, "any")
+	if none {
+		opts = append(opts, "none")
+	}
+	for k := range set {
+		opts = append(opts, k)
+	}
+	sort.Strings(opts[1:])
+	m.labelOptions = opts
+	if m.labelIdx >= len(m.labelOptions) {
+		m.labelIdx = 0
 	}
 }
 
