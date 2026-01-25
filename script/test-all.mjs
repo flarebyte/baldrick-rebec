@@ -1295,10 +1295,12 @@ try {
   // Copy exported YAMLs
   await $`cp temp/blackboard-test/blackboard.yaml temp/blackboard-import/blackboard.yaml`;
   await $`bash -lc 'cp temp/blackboard-test/*.stickie.yaml temp/blackboard-import/'`;
-  // Assign fresh UUIDs (deterministic hex sequences)
-  const BB_IMPORT = '11111111-1111-4111-8111-111111111111';
-  const ST_IMPORT_1 = '22222222-2222-4222-8222-222222222222';
-  const ST_IMPORT_2 = '33333333-3333-4333-8333-333333333333';
+  // Remove any stickie YAML without an id (e.g., created earlier without id)
+  await $`bash -lc 'for f in temp/blackboard-import/*.stickie.yaml; do grep -q "^id:" "$f" || rm -f "$f"; done'`;
+  // Assign fresh UUIDs (generate to avoid clashes on repeated runs)
+  const BB_IMPORT = String((await $`bash -lc 'uuidgen | tr "[:upper:]" "[:lower:]"'`).stdout || '').trim();
+  const ST_IMPORT_1 = String((await $`bash -lc 'uuidgen | tr "[:upper:]" "[:lower:]"'`).stdout || '').trim();
+  const ST_IMPORT_2 = String((await $`bash -lc 'uuidgen | tr "[:upper:]" "[:lower:]"'`).stdout || '').trim();
   // Update blackboard.yaml id
   await $`bash -lc ${`sed -i'' -e 's/^id:.*/id: ${BB_IMPORT}/' temp/blackboard-import/blackboard.yaml`}`;
   // Update stickie ids (assume two files exist: about-onboarding-refresh and about-devops-caching)
@@ -1328,6 +1330,23 @@ try {
       'import: stickies inserted',
       !!has1 && !!has2,
       'expected both imported stickies',
+    );
+  }
+  // Import should fail when ids already exist
+  {
+    let failed = false;
+    let details = '';
+    try {
+      await $`go run main.go blackboard import temp/blackboard-import`;
+    } catch (e) {
+      failed = true;
+      details = e?.stderr || e?.stdout || String(e || '');
+    }
+    await assertStep(
+      'import: duplicates rejected',
+      failed,
+      'expected import to fail when ids already exist',
+      details,
     );
   }
 
