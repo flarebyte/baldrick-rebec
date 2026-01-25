@@ -572,7 +572,7 @@ func refreshBoardsCmd(role string, search string) tea.Cmd {
 }
 
 func stickieTitle(s pgdao.Stickie) string {
-    const maxCols = 80
+    const maxCols = 60
     if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
         return inlinePreview(s.Name.String, maxCols)
     }
@@ -585,6 +585,7 @@ func stickieTitle(s pgdao.Stickie) string {
 // inlinePreview returns a single-line preview up to maxCols runes, using the first line and trimming with ellipsis when needed.
 func inlinePreview(text string, maxCols int) string {
     if maxCols <= 0 { maxCols = 80 }
+    if maxCols <= 3 { maxCols = 4 }
     // Use only the first line
     line := text
     if i := strings.IndexRune(line, '\n'); i >= 0 {
@@ -593,7 +594,7 @@ func inlinePreview(text string, maxCols int) string {
     line = strings.TrimSpace(line)
     r := []rune(line)
     if len(r) > maxCols {
-        return string(r[:maxCols-1]) + "…"
+        return string(r[:maxCols-3]) + "..."
     }
     return line
 }
