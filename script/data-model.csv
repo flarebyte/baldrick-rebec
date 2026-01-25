@@ -23,14 +23,6 @@ blackboard,guidelines,String,false,sql.NullString,true
 blackboard,lifecycle,String,false,sql.NullString,true
 blackboard,created,Time,true,sql.NullTime,true
 blackboard,updated,Time,true,sql.NullTime,true
-topic,name,String,true,string,true
-topic,role_name,String,true,string,true
-topic,title,String,true,string,true
-topic,description,String,false,sql.NullString,true
-topic,notes,String,false,sql.NullString,true
-topic,tags,Object,false,JSONB,true
-topic,created,Time,true,sql.NullTime,true
-topic,updated,Time,true,sql.NullTime,true
 stickie_relation,from_id,String,true,string,true
 stickie_relation,to_id,String,true,string,true
 stickie_relation,rel_type,String,true,string,true

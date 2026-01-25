@@ -119,20 +119,6 @@ export function validateProjectListContract(arr) {
 
 // Stores removed
 
-// Topics
-function topicListItemSchemaFactory() {
-  return z.object({
-    name: z.string().min(1),
-    role: z.string().min(1),
-    title: z.string().min(1),
-    created: z.string().optional(),
-    updated: z.string().optional(),
-  });
-}
-export function validateTopicListContract(arr) {
-  return z.array(topicListItemSchemaFactory()).parse(arr);
-}
-
 // Blackboards
 function blackboardListItemSchemaFactory() {
   return z.object({
