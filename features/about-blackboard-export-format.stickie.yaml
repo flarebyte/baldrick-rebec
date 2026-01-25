@@ -1,0 +1,15 @@
+id: a7ec43c3-bcad-4c10-b8fd-3284c36bcb63
+note: |-
+    Export format: blackboard.yaml plus one *.stickie.yaml per stickie. Background
+    and guidelines use literal YAML blocks (|) with ~80-column wrapping; stickie
+    note is also wrapped for readability. Complex names provide stable addressing;
+    folder→id sync enforces a foreign-id guard. The --force-write flag can rewrite
+    files even when timestamps suggest they are current.
+labels:
+    - documentation
+    - operations
+    - stable
+created: "2026-01-19T09:27:24.351625Z"
+updated: "2026-01-19T09:27:24.351625Z"
+priority_level: should
+archived: false

@@ -135,7 +135,7 @@ opensearch:
   3. Plan changes: `rbc db plan`
   4. Scaffold DB: `rbc db scaffold --create-roles --create-db --grant-privileges --yes`
   5. Configure OpenSearch secure localhost and lifecycle: `rbc os bootstrap`
-  6. Initialize stores: `rbc db init`
+  6. Initialize schema: `rbc db init`
   7. Verify: `rbc db status`
 
 - Podman users can use `podman-compose` with the same file (adjust commands accordingly).

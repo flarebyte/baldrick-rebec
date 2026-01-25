@@ -77,7 +77,7 @@ async function __ensureAssertExperiment() {
   return __assertExperimentId;
 }
 
-export async function assertStep(stepName, cond, msg = '') {
+export async function assertStep(stepName, cond, msg = '', details = '') {
   const ok = !!cond;
   try {
     if (__assertConnectEnabled) {
@@ -109,7 +109,10 @@ export async function assertStep(stepName, cond, msg = '') {
     console.error('assertStep: CLI fallback failed:', e2?.message || e2);
   }
   if (!ok) {
-    throw new Error(msg || `assertStep failed: ${stepName}`);
+    const detailStr = details
+      ? `\nGot:\n${String(details).slice(0, 2000)}`
+      : '';
+    throw new Error((msg || `assertStep failed: ${stepName}`) + detailStr);
   }
 }
 
@@ -277,21 +280,18 @@ export async function taskScriptAdd({ task, script, name, alias = '' }) {
   return await runRbc(...args);
 }
 
-export async function storeGet({ name, role = 'user' }) {
-  return await runRbcJSON('store', 'get', '--name', name, '--role', role);
-}
-
 export async function blackboardSet({
   role = 'user',
-  storeId,
   project = '',
   background = '',
   guidelines = '',
+  lifecycle = '',
 }) {
-  const args = ['blackboard', 'set', '--role', role, '--store-id', storeId];
+  const args = ['blackboard', 'set', '--role', role];
   if (project) args.push('--project', project);
   if (background) args.push('--background', background);
   if (guidelines) args.push('--guidelines', guidelines);
+  if (lifecycle) args.push('--lifecycle', lifecycle);
   return await runRbcJSON(...args);
 }
 
@@ -344,7 +344,6 @@ export async function stickieSet({
   createdByTask = '',
   priority = '',
   name = '',
-  variant = '',
   archived = false,
   score = null,
 }) {
@@ -359,7 +358,6 @@ export async function stickieSet({
   if (createdByTask) args.push('--created-by-task', createdByTask);
   if (priority) args.push('--priority', priority);
   if (name !== undefined) args.push('--name', name);
-  if (variant !== undefined) args.push('--variant', variant);
   if (archived) args.push('--archived');
   if (score !== null && score !== undefined)
     args.push('--score', String(score));
@@ -368,15 +366,11 @@ export async function stickieSet({
 
 export async function stickieListJSON({
   blackboard = '',
-  topicName = '',
-  topicRole = '',
   limit = 100,
   offset = 0,
 }) {
   const args = ['stickie', 'list', '--output', 'json'];
   if (blackboard) args.push('--blackboard', blackboard);
-  if (topicName) args.push('--topic-name', topicName);
-  if (topicRole) args.push('--topic-role', topicRole);
   args.push('--limit', String(limit), '--offset', String(offset));
   return await runRbcJSON(...args);
 }
@@ -422,13 +416,8 @@ export async function taskListJSON({
   return await runRbcJSON(...args);
 }
 
-export async function stickieFind({
-  name,
-  variant = '',
-  archived = false,
-  blackboard = '',
-}) {
-  const args = ['stickie', 'find', '--name', name, '--variant', variant];
+export async function stickieFind({ name, archived = false, blackboard = '' }) {
+  const args = ['stickie', 'find', '--name', name];
   if (archived) args.push('--archived');
   if (blackboard) args.push('--blackboard', blackboard);
   return await runRbcJSON(...args);
@@ -650,33 +639,7 @@ export async function toolDelete({
   return await runRbc(...args);
 }
 
-export async function storeSet({
-  name,
-  role = 'user',
-  title = '',
-  description = '',
-  motivation = '',
-  security = '',
-  privacy = '',
-  notes = '',
-  type = '',
-  scope = '',
-  lifecycle = '',
-  tags = '',
-}) {
-  const args = ['store', 'set', '--name', name, '--role', role];
-  if (title) args.push('--title', title);
-  if (description) args.push('--description', description);
-  if (motivation) args.push('--motivation', motivation);
-  if (security) args.push('--security', security);
-  if (privacy) args.push('--privacy', privacy);
-  if (notes) args.push('--notes', notes);
-  if (type) args.push('--type', type);
-  if (scope) args.push('--scope', scope);
-  if (lifecycle) args.push('--lifecycle', lifecycle);
-  if (tags) args.push('--tags', tags);
-  return await runRbc(...args);
-}
+// store helpers removed
 
 export async function workspaceSet({
   role = 'user',
@@ -724,18 +687,7 @@ export async function stickieListByBlackboard({ blackboard, limit = 50 }) {
     String(limit),
   );
 }
-export async function stickieListByTopic({ topicName, topicRole, limit = 50 }) {
-  return await runRbc(
-    'stickie',
-    'list',
-    '--topic-name',
-    topicName,
-    '--topic-role',
-    topicRole,
-    '--limit',
-    String(limit),
-  );
-}
+// topics removed: use labels filters via higher-level logic if needed
 
 export async function dbCountPerRole() {
   return await runRbc('db', 'count', '--per-role');
@@ -813,20 +765,6 @@ export async function snapshotPruneYesJSON({
 export async function projectListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
     'project',
-    'list',
-    '--role',
-    role,
-    '--output',
-    'json',
-    '--limit',
-    String(limit),
-    '--offset',
-    String(offset),
-  );
-}
-export async function storeListJSON({ role, limit = 100, offset = 0 }) {
-  return await runRbcJSON(
-    'store',
     'list',
     '--role',
     role,

@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	cfgpkg "github.com/flarebyte/baldrick-rebec/internal/config"
 	pgdao "github.com/flarebyte/baldrick-rebec/internal/dao/postgres"
@@ -21,9 +22,11 @@ import (
 )
 
 var (
-	flagSyncDelete   bool
-	flagSyncDryRun   bool
-	flagSyncClearIDs bool
+	flagSyncDelete          bool
+	flagSyncDryRun          bool
+	flagSyncClearIDs        bool
+	flagSyncForceWrite      bool
+	flagSyncIncludeArchived bool
 )
 
 // syncCmd implements: rbc blackboard sync id:UUID folder:relative/path
@@ -47,6 +50,23 @@ var syncCmd = &cobra.Command{
 			return fmt.Errorf("cannot sync %s -> %s; use id:UUID->folder:PATH or folder:PATH->id:UUID", kindString(src.kind), kindString(dst.kind))
 		}
 
+		// Shortcut: allow id:_ to read id from the folder's blackboard.yaml
+		if src.kind == epID && src.value == "_" && dst.kind == epFolder {
+			bbid, e := readBlackboardIDFromFolder(dst.value)
+			if e != nil {
+				return e
+			}
+			src.value = bbid
+		}
+		// Shortcut: allow id:_ to read id from the folder's blackboard.yaml
+		if src.kind == epFolder && dst.kind == epID && dst.value == "_" {
+			bbid, e := readBlackboardIDFromFolder(src.value)
+			if e != nil {
+				return e
+			}
+			dst.value = bbid
+		}
+
 		if src.kind == epID && dst.kind == epFolder {
 			return syncIDToFolder(src.value, dst.value, flagSyncDelete, flagSyncDryRun)
 		}
@@ -63,6 +83,8 @@ func init() {
 	syncCmd.Flags().BoolVar(&flagSyncDelete, "delete", false, "Delete files at destination that are not present at source")
 	syncCmd.Flags().BoolVar(&flagSyncDryRun, "dry-run", false, "Show what would change without writing or deleting")
 	syncCmd.Flags().BoolVar(&flagSyncClearIDs, "clear-ids", false, "When exporting id->folder, omit id fields in stickie YAML files")
+	syncCmd.Flags().BoolVar(&flagSyncForceWrite, "force-write", false, "Force rewrite files even if destination appears up-to-date")
+	syncCmd.Flags().BoolVar(&flagSyncIncludeArchived, "include-archived", false, "Include archived stickies when syncing id->folder (default: active only)")
 }
 
 type endpointKind int
@@ -115,39 +137,51 @@ func parseEndpoint(s string) (endpoint, error) {
 }
 
 // Local YAML structures
-type blackboardYAML struct {
-	ID           string  `yaml:"id"`
-	StoreID      string  `yaml:"store_id"`
-	Role         string  `yaml:"role"`
-	Conversation *string `yaml:"conversation_id,omitempty"`
-	Project      *string `yaml:"project,omitempty"`
-	TaskID       *string `yaml:"task_id,omitempty"`
-	Background   *string `yaml:"background,omitempty"`
-	Guidelines   *string `yaml:"guidelines,omitempty"`
-	Created      *string `yaml:"created,omitempty"`
-	Updated      *string `yaml:"updated,omitempty"`
+// YAML scalar helpers
+// FoldedString renders as a YAML folded block scalar (>), suitable for prose paragraphs.
+type FoldedString string
+
+func (s FoldedString) MarshalYAML() (any, error) {
+	n := yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.FoldedStyle, Value: string(s)}
+	return &n, nil
 }
 
-type stickieComplexNameYAML struct {
-	Name    string `yaml:"name"`
-	Variant string `yaml:"variant"`
+// LiteralString renders as a YAML literal block scalar (|), preserving newlines exactly.
+// Available for stickies if needed (e.g., multi-line code blocks).
+type LiteralString string
+
+func (s LiteralString) MarshalYAML() (any, error) {
+	n := yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.LiteralStyle, Value: string(s)}
+	return &n, nil
+}
+
+// blackboardYAML controls YAML output for blackboard metadata.
+type blackboardYAML struct {
+	ID           string         `yaml:"id"`
+	Role         string         `yaml:"role"`
+	Conversation *string        `yaml:"conversation_id,omitempty"`
+	Project      *string        `yaml:"project,omitempty"`
+	TaskID       *string        `yaml:"task_id,omitempty"`
+	Background   *LiteralString `yaml:"background,omitempty"`
+	Guidelines   *LiteralString `yaml:"guidelines,omitempty"`
+	Lifecycle    *string        `yaml:"lifecycle,omitempty"`
+	Created      *string        `yaml:"created,omitempty"`
+	Updated      *string        `yaml:"updated,omitempty"`
 }
 
 type stickieYAML struct {
-	ID            string                 `yaml:"id,omitempty"`
-	TopicName     *string                `yaml:"topic_name,omitempty"`
-	TopicRole     *string                `yaml:"topic_role_name,omitempty"`
-	Note          *string                `yaml:"note,omitempty"`
-	Code          *string                `yaml:"code,omitempty"`
-	Labels        []string               `yaml:"labels,omitempty"`
-	Created       *string                `yaml:"created,omitempty"`
-	Updated       *string                `yaml:"updated,omitempty"`
-	CreatedByTask *string                `yaml:"created_by_task_id,omitempty"`
-	EditCount     int                    `yaml:"edit_count,omitempty"`
-	Priority      *string                `yaml:"priority_level,omitempty"`
-	Score         *float64               `yaml:"score,omitempty"`
-	ComplexName   stickieComplexNameYAML `yaml:"complex_name"`
-	Archived      bool                   `yaml:"archived"`
+	ID            string         `yaml:"id,omitempty"`
+	Note          *LiteralString `yaml:"note,omitempty"`
+	Code          *string        `yaml:"code,omitempty"`
+	Labels        []string       `yaml:"labels,omitempty"`
+	Created       *string        `yaml:"created,omitempty"`
+	Updated       *string        `yaml:"updated,omitempty"`
+	CreatedByTask *string        `yaml:"created_by_task_id,omitempty"`
+	EditCount     int            `yaml:"edit_count,omitempty"`
+	Priority      *string        `yaml:"priority_level,omitempty"`
+	Score         *float64       `yaml:"score,omitempty"`
+	Name          *string        `yaml:"name,omitempty"`
+	Archived      bool           `yaml:"archived"`
 }
 
 type minimalUpdatedYAML struct {
@@ -187,9 +221,8 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 
 	// Prepare YAML for blackboard
 	by := blackboardYAML{
-		ID:      b.ID,
-		StoreID: b.StoreID,
-		Role:    b.RoleName,
+		ID:   b.ID,
+		Role: b.RoleName,
 	}
 	if b.ConversationID.Valid && b.ConversationID.String != "" {
 		v := b.ConversationID.String
@@ -203,13 +236,17 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 		v := b.TaskID.String
 		by.TaskID = &v
 	}
-	if b.Background.Valid && b.Background.String != "" {
-		v := b.Background.String
+	if b.Background.Valid && strings.TrimSpace(b.Background.String) != "" {
+		v := LiteralString(wrapAt(b.Background.String, 80))
 		by.Background = &v
 	}
-	if b.Guidelines.Valid && b.Guidelines.String != "" {
-		v := b.Guidelines.String
+	if b.Guidelines.Valid && strings.TrimSpace(b.Guidelines.String) != "" {
+		v := LiteralString(wrapAt(b.Guidelines.String, 80))
 		by.Guidelines = &v
+	}
+	if b.Lifecycle.Valid && b.Lifecycle.String != "" {
+		v := b.Lifecycle.String
+		by.Lifecycle = &v
 	}
 	if b.Created.Valid {
 		v := b.Created.Time.Format(time.RFC3339Nano)
@@ -223,10 +260,12 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 	// Write blackboard.yaml if needed
 	bbFile := filepath.Join(destDir, "blackboard.yaml")
 	bbWrite := true
-	if fi, err := os.Stat(bbFile); err == nil && fi.Mode().IsRegular() {
-		// compare updated timestamps
-		if newerOrEqual, err := destIsNewerOrEqual(bbFile, by.Updated); err == nil && newerOrEqual {
-			bbWrite = false
+	if !flagSyncForceWrite {
+		if fi, err := os.Stat(bbFile); err == nil && fi.Mode().IsRegular() {
+			// compare updated timestamps
+			if newerOrEqual, err := destIsNewerOrEqual(bbFile, by.Updated); err == nil && newerOrEqual {
+				bbWrite = false
+			}
 		}
 	}
 	if bbWrite {
@@ -246,7 +285,7 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 	stickies := make([]pgdao.Stickie, 0, 256)
 	const page = 1000
 	for off := 0; ; off += page {
-		ss, err := pgdao.ListStickies(ctx, db, b.ID, "", "", page, off)
+		ss, err := pgdao.ListStickies(ctx, db, b.ID, page, off)
 		if err != nil {
 			return err
 		}
@@ -261,29 +300,22 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 
 	// Write each stickie YAML if newer
 	for _, s := range stickies {
+		// Skip archived unless explicitly included
+		if !flagSyncIncludeArchived && s.Archived {
+			continue
+		}
 		sy := stickieYAML{
 			ID:        s.ID,
 			Labels:    s.Labels,
 			EditCount: s.EditCount,
-			ComplexName: stickieComplexNameYAML{
-				Name:    s.ComplexName.Name,
-				Variant: s.ComplexName.Variant,
-			},
-			Archived: s.Archived,
+			Archived:  s.Archived,
 		}
 		if flagSyncClearIDs {
 			sy.ID = ""
 		}
-		if s.TopicName.Valid && s.TopicName.String != "" {
-			v := s.TopicName.String
-			sy.TopicName = &v
-		}
-		if s.TopicRoleName.Valid && s.TopicRoleName.String != "" {
-			v := s.TopicRoleName.String
-			sy.TopicRole = &v
-		}
-		if s.Note.Valid && s.Note.String != "" {
-			v := s.Note.String
+		// topics removed; use labels instead
+		if s.Note.Valid && strings.TrimSpace(s.Note.String) != "" {
+			v := LiteralString(wrapAt(s.Note.String, 80))
 			sy.Note = &v
 		}
 		if s.Code.Valid && s.Code.String != "" {
@@ -310,13 +342,19 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 			v := s.Score.Float64
 			sy.Score = &v
 		}
+		if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
+			v := s.Name.String
+			sy.Name = &v
+		}
 
-		fn := filepath.Join(destDir, fmt.Sprintf("%s.stickie.yaml", s.ID))
+		fn := filepath.Join(destDir, stickieFileName(s))
 		seen[filepath.Base(fn)] = struct{}{}
 		write := true
-		if fi, err := os.Stat(fn); err == nil && fi.Mode().IsRegular() {
-			if newerOrEqual, err := destIsNewerOrEqual(fn, sy.Updated); err == nil && newerOrEqual {
-				write = false
+		if !flagSyncForceWrite {
+			if fi, err := os.Stat(fn); err == nil && fi.Mode().IsRegular() {
+				if newerOrEqual, err := destIsNewerOrEqual(fn, sy.Updated); err == nil && newerOrEqual {
+					write = false
+				}
 			}
 		}
 		if write {
@@ -360,6 +398,35 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 	}
 
 	return nil
+}
+
+// wrapAt inserts newlines so that lines are at most width runes, breaking at spaces.
+// Existing newlines are preserved; multiple spaces are treated as breakable.
+func wrapAt(s string, width int) string {
+	if width <= 0 {
+		return s
+	}
+	// Normalize line endings and split existing lines first
+	lines := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+	var out []string
+	for _, line := range lines {
+		words := strings.FieldsFunc(line, func(r rune) bool { return r == ' ' || r == '\t' })
+		if len(words) == 0 {
+			out = append(out, "")
+			continue
+		}
+		cur := words[0]
+		for _, w := range words[1:] {
+			if len([]rune(cur))+1+len([]rune(w)) <= width {
+				cur += " " + w
+			} else {
+				out = append(out, cur)
+				cur = w
+			}
+		}
+		out = append(out, cur)
+	}
+	return strings.Join(out, "\n")
 }
 
 func writeYAML(path string, v any) error {
@@ -519,17 +586,10 @@ func stickieFromYAMLForUpsert(y stickieYAML, blackboardID string) pgdao.Stickie 
 	var s pgdao.Stickie
 	s.BlackboardID = blackboardID
 	// optional simple values
-	if y.TopicName != nil {
-		s.TopicName.Valid = true
-		s.TopicName.String = *y.TopicName
-	}
-	if y.TopicRole != nil {
-		s.TopicRoleName.Valid = true
-		s.TopicRoleName.String = *y.TopicRole
-	}
+	// topics removed
 	if y.Note != nil {
 		s.Note.Valid = true
-		s.Note.String = *y.Note
+		s.Note.String = string(*y.Note)
 	}
 	if y.Code != nil {
 		s.Code.Valid = true
@@ -553,39 +613,32 @@ func stickieFromYAMLForUpsert(y stickieYAML, blackboardID string) pgdao.Stickie 
 		s.Score.Valid = true
 		s.Score.Float64 = *y.Score
 	}
-	s.ComplexName.Name = y.ComplexName.Name
-	s.ComplexName.Variant = y.ComplexName.Variant
+	if y.Name != nil {
+		s.Name.Valid = true
+		s.Name.String = *y.Name
+	}
 	s.Archived = y.Archived
 	return s
 }
 
 // Hash utilities (SHA-256) for stickie content comparison
 type stickieHashMaterial struct {
-	TopicName     string   `json:"topic_name"`
-	TopicRoleName string   `json:"topic_role_name"`
 	Note          string   `json:"note"`
 	Code          string   `json:"code"`
 	Labels        []string `json:"labels"`
 	CreatedByTask string   `json:"created_by_task_id"`
 	PriorityLevel string   `json:"priority_level"`
 	Score         *float64 `json:"score,omitempty"`
-	ComplexName   struct {
-		Name    string `json:"name"`
-		Variant string `json:"variant"`
-	} `json:"complex_name"`
-	Archived bool `json:"archived"`
+	Name          string   `json:"name"`
+	Archived      bool     `json:"archived"`
 }
 
 func hashStickieYAML(y stickieYAML) string {
 	mat := stickieHashMaterial{}
-	if y.TopicName != nil {
-		mat.TopicName = *y.TopicName
-	}
-	if y.TopicRole != nil {
-		mat.TopicRoleName = *y.TopicRole
-	}
+	// topics removed
 	if y.Note != nil {
-		mat.Note = *y.Note
+		// Normalize to match exporter behavior (wrap at 80)
+		mat.Note = wrapAt(string(*y.Note), 80)
 	}
 	if y.Code != nil {
 		mat.Code = *y.Code
@@ -604,22 +657,18 @@ func hashStickieYAML(y stickieYAML) string {
 	if y.Score != nil {
 		mat.Score = y.Score
 	}
-	mat.ComplexName.Name = y.ComplexName.Name
-	mat.ComplexName.Variant = y.ComplexName.Variant
+	if y.Name != nil {
+		mat.Name = *y.Name
+	}
 	mat.Archived = y.Archived
 	return hashMaterial(mat)
 }
 
 func hashStickieDB(s pgdao.Stickie) string {
 	mat := stickieHashMaterial{}
-	if s.TopicName.Valid {
-		mat.TopicName = s.TopicName.String
-	}
-	if s.TopicRoleName.Valid {
-		mat.TopicRoleName = s.TopicRoleName.String
-	}
 	if s.Note.Valid {
-		mat.Note = s.Note.String
+		// Normalize like exporter which wraps notes at 80 columns
+		mat.Note = wrapAt(s.Note.String, 80)
 	}
 	if s.Code.Valid {
 		mat.Code = s.Code.String
@@ -639,8 +688,9 @@ func hashStickieDB(s pgdao.Stickie) string {
 		v := s.Score.Float64
 		mat.Score = &v
 	}
-	mat.ComplexName.Name = s.ComplexName.Name
-	mat.ComplexName.Variant = s.ComplexName.Variant
+	if s.Name.Valid {
+		mat.Name = s.Name.String
+	}
 	mat.Archived = s.Archived
 	return hashMaterial(mat)
 }
@@ -649,4 +699,76 @@ func hashMaterial(v any) string {
 	b, _ := json.Marshal(v)
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
+}
+
+// readBlackboardIDFromFolder reads blackboard.yaml in the given relative folder
+// and returns the blackboard id. Errors when the file cannot be read or id is empty.
+func readBlackboardIDFromFolder(relFolder string) (string, error) {
+	if strings.TrimSpace(relFolder) == "" {
+		return "", errors.New("folder path is empty for id:_ shortcut")
+	}
+	dir := filepath.Clean(relFolder)
+	if strings.HasPrefix(dir, "..") {
+		return "", errors.New("folder path must not escape current directory")
+	}
+	p := filepath.Join(dir, "blackboard.yaml")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", p, err)
+	}
+	var y blackboardYAML
+	if err := yaml.Unmarshal(data, &y); err != nil {
+		return "", fmt.Errorf("parse %s: %w", p, err)
+	}
+	id := strings.TrimSpace(y.ID)
+	if id == "" {
+		return "", fmt.Errorf("blackboard id not found in %s", p)
+	}
+	return id, nil
+}
+
+// stickieFileName returns the filename for a stickie when exporting.
+// If the stickie has a non-empty Name, it uses a sanitized version prefixed by
+// "about-" (e.g., about-my-feature.stickie.yaml). Otherwise, it falls back to
+// the UUID-based filename (<id>.stickie.yaml).
+func stickieFileName(s pgdao.Stickie) string {
+	if s.Name.Valid {
+		base := strings.TrimSpace(s.Name.String)
+		if base != "" {
+			safe := sanitizeForFile(base)
+			if safe != "" {
+				return fmt.Sprintf("about-%s.stickie.yaml", safe)
+			}
+		}
+	}
+	return fmt.Sprintf("%s.stickie.yaml", s.ID)
+}
+
+// sanitizeForFile replaces any rune that is not alphanumeric, '_' or '-' with '-'.
+// It also lowercases the result and collapses consecutive '-' and trims leading/trailing '-'.
+func sanitizeForFile(s string) string {
+	// lowercase
+	s = strings.ToLower(s)
+	// replace invalid runes with '-'
+	var b strings.Builder
+	b.Grow(len(s))
+	prevDash := false
+	for _, r := range s {
+		valid := unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
+		if !valid {
+			r = '-'
+		}
+		if r == '-' {
+			if prevDash {
+				continue
+			}
+			prevDash = true
+			b.WriteRune(r)
+			continue
+		}
+		prevDash = false
+		b.WriteRune(r)
+	}
+	out := strings.Trim(b.String(), "-")
+	return out
 }

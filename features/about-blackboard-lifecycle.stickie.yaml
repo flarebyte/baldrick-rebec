@@ -1,0 +1,14 @@
+id: 5abab2af-6db0-4851-869a-87d643f22edc
+note: |-
+    Optional lifecycle: permanent|yearly|quarterly|monthly|weekly|daily. Used for
+    filtering, navigation, and retention guidance; not an enforcement mechanism.
+    Omit when a board should not expire (e.g., Features). Keeping lifecycle on the
+    board itself avoids cross-entity indirection.
+labels:
+    - compliance
+    - documentation
+    - stable
+created: "2026-01-19T09:27:24.347639Z"
+updated: "2026-01-19T09:27:24.347639Z"
+priority_level: could
+archived: false

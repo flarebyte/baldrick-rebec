@@ -29,6 +29,12 @@ Then run the scaffold step again.
 
 See DATABASES.md for full workflow and a setup checklist. For ops-focused learning prompts, see LEARNING.md.
 
+## Blackboard CLI
+
+- Sync id ↔ folder: `rbc blackboard sync id:_ folder:features [--dry-run] [--delete] [--clear-ids] [--force-write] [--include-archived]`
+- Diff id vs folder: `rbc blackboard diff id:_ folder:features [--detailed] [--include-archived]`
+- Import from folder: `rbc blackboard import features [--detailed]` (preserves IDs; requires ids not to exist in DB)
+
 ## Snapshot Backups
 
 Use the schema-aware snapshot subsystem to capture and restore long‑lived entities into a dedicated Postgres schema (default: `backup`). It stores full JSONB row snapshots plus tracked entity schemas, and supports append/replace restores.
@@ -51,7 +57,7 @@ Use the schema-aware snapshot subsystem to capture and restore long‑lived enti
 - Delete backup
   - `rbc snapshot delete <backup-id> --force`
 
-By default, permanent-ish entities like `roles`, `workflows`, `tags`, `projects`, `stores`, `scripts`, `tasks`, `topics`, `workspaces`, `blackboards`, `stickies`, `stickie_relations`, `task_replaces`, `packages`, `task_variants`, and `scripts_content` are included. Ephemeral tables such as `conversations`, `experiments`, `messages`, `messages_content`, `queues`, and `testcases` are excluded unless explicitly included.
+By default, permanent-ish entities like `roles`, `workflows`, `tags`, `projects`, `scripts`, `tasks`, `topics`, `workspaces`, `blackboards`, `stickies`, `stickie_relations`, `task_replaces`, `packages`, `task_variants`, and `scripts_content` are included. Ephemeral tables such as `conversations`, `experiments`, `messages`, `messages_content`, `queues`, and `testcases` are excluded unless explicitly included.
 
 Snapshot connections require a dedicated backup role configured in `~/.baldrick-rebec/config.yaml` (no admin fallback):
 
@@ -88,8 +94,8 @@ Key exports:
 - Roles/Workflows: `runSetRole({name,title,description?,notes?})`, `runSetWorkflow({name,title,description?,role?,notes?})`
 - Scripts: `createScript(role,title,description,body,{name?,variant?,archived?})`, `scriptListJSON({role,...})`, `scriptFind({name,variant?,archived?,role?})`
 - Tasks: `runSetTask({...})`, `taskSetReplacement({...})`
-- Stores/Blackboards: `storeSet({...})`, `storeGet({name,role})`, `blackboardSet({...})`
-- Stickies: `stickieSet({...})`, `stickieListJSON({...})`, `stickieFind({...})`, `stickieList`, `stickieListByBlackboard`, `stickieListByTopic`, `stickieRelSet`, `stickieRelList`, `stickieRelGet`
+- Blackboards: `blackboardSet({...})`
+- Stickies: `stickieSet({...})`, `stickieListJSON({...})`, `stickieFind({...})`, `stickieList`, `stickieListByBlackboard`, `stickieRelSet`, `stickieRelList`, `stickieRelGet`
 - Conversations/Experiments: `conversationSet({title,role?})`, `experimentCreate({conversation})`
 - Queue: `queueAdd({...})`, `queuePeek`, `queueSize`, `queueTake`
 - Lists and counts: `listWithRole(cmd,role,limit)`, `experimentList(limit)`, `dbCountPerRole`, `dbCountJSON`

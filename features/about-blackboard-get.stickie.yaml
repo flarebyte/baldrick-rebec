@@ -1,0 +1,12 @@
+id: f9b472e0-e5d8-4c08-b89b-e31556f9cfc0
+note: |-
+    Fetch a single blackboard by id. We return background, guidelines, and lifecycle
+    so downstream tools (docs, UIs) can render context without additional queries.
+    Simplicity over breadth keeps lookup fast.
+labels:
+    - documentation
+    - stable
+created: "2026-01-19T09:27:24.337091Z"
+updated: "2026-01-19T09:27:24.337091Z"
+priority_level: could
+archived: false

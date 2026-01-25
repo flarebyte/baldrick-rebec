@@ -40,8 +40,8 @@ var getCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(os.Stderr, "blackboard id=%s role=%q store=%s\n", b.ID, b.RoleName, b.StoreID)
-		out := map[string]any{"id": b.ID, "role": b.RoleName, "store_id": b.StoreID}
+		fmt.Fprintf(os.Stderr, "blackboard id=%s role=%q\n", b.ID, b.RoleName)
+		out := map[string]any{"id": b.ID, "role": b.RoleName}
 		if b.ConversationID.Valid {
 			out["conversation_id"] = b.ConversationID.String
 		}
@@ -56,6 +56,9 @@ var getCmd = &cobra.Command{
 		}
 		if b.Guidelines.Valid {
 			out["guidelines"] = b.Guidelines.String
+		}
+		if b.Lifecycle.Valid {
+			out["lifecycle"] = b.Lifecycle.String
 		}
 		if b.Created.Valid {
 			out["created"] = b.Created.Time.Format(time.RFC3339Nano)

@@ -8,6 +8,7 @@
 .PHONY: lint format test gen clean help
 
 ZX := npx zx
+RBC := go run main.go
 
 # Generic lint (abstract across languages): delegate to project script
 lint:
@@ -24,6 +25,7 @@ format_unsafe:
 # Generic test: end-to-end script
 test: gen
 	$(ZX) script/test-all.mjs
+	$(RBC) blackboard import features
 
 lintb: 
 	$(ZX) script/generate-bespoke-rules.mjs

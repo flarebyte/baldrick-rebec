@@ -19,8 +19,6 @@ var (
 	flagStListOffset     int
 	flagStListOutput     string
 	flagStListBlackboard string
-	flagStListTopicName  string
-	flagStListTopicRole  string
 )
 
 var listCmd = &cobra.Command{
@@ -38,7 +36,7 @@ var listCmd = &cobra.Command{
 			return err
 		}
 		defer db.Close()
-		ss, err := pgdao.ListStickies(ctx, db, strings.TrimSpace(flagStListBlackboard), strings.TrimSpace(flagStListTopicName), strings.TrimSpace(flagStListTopicRole), flagStListLimit, flagStListOffset)
+		ss, err := pgdao.ListStickies(ctx, db, strings.TrimSpace(flagStListBlackboard), flagStListLimit, flagStListOffset)
 		if err != nil {
 			return err
 		}
@@ -48,12 +46,7 @@ var listCmd = &cobra.Command{
 			arr := make([]map[string]any, 0, len(ss))
 			for _, s := range ss {
 				item := map[string]any{"id": s.ID, "blackboard_id": s.BlackboardID, "edit_count": s.EditCount}
-				if s.TopicName.Valid {
-					item["topic_name"] = s.TopicName.String
-				}
-				if s.TopicRoleName.Valid {
-					item["topic_role_name"] = s.TopicRoleName.String
-				}
+				// topics removed; use labels instead
 				if s.Note.Valid && s.Note.String != "" {
 					item["note"] = s.Note.String
 				}
@@ -66,9 +59,8 @@ var listCmd = &cobra.Command{
 				if s.Updated.Valid {
 					item["updated"] = s.Updated.Time.Format(time.RFC3339Nano)
 				}
-				if s.ComplexName.Name != "" || s.ComplexName.Variant != "" {
-					item["name"] = s.ComplexName.Name
-					item["variant"] = s.ComplexName.Variant
+				if s.Name.Valid && s.Name.String != "" {
+					item["name"] = s.Name.String
 				}
 				if s.Archived {
 					item["archived"] = true
@@ -81,17 +73,17 @@ var listCmd = &cobra.Command{
 		}
 		// table default
 		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"ID", "BLACKBOARD", "TOPIC", "NAME", "VARIANT", "UPDATED", "EDIT#"})
+		table.SetHeader([]string{"ID", "BLACKBOARD", "NAME", "UPDATED", "EDIT#"})
 		for _, s := range ss {
 			updated := ""
 			if s.Updated.Valid {
 				updated = s.Updated.Time.Format(time.RFC3339)
 			}
-			topic := ""
-			if s.TopicName.Valid {
-				topic = s.TopicName.String
+			name := ""
+			if s.Name.Valid {
+				name = s.Name.String
 			}
-			table.Append([]string{s.ID, s.BlackboardID, topic, s.ComplexName.Name, s.ComplexName.Variant, updated, fmt.Sprintf("%d", s.EditCount)})
+			table.Append([]string{s.ID, s.BlackboardID, name, updated, fmt.Sprintf("%d", s.EditCount)})
 		}
 		table.Render()
 		return nil
@@ -104,6 +96,5 @@ func init() {
 	listCmd.Flags().IntVar(&flagStListOffset, "offset", 0, "Offset for pagination")
 	listCmd.Flags().StringVar(&flagStListOutput, "output", "table", "Output format: table or json")
 	listCmd.Flags().StringVar(&flagStListBlackboard, "blackboard", "", "Filter by blackboard UUID")
-	listCmd.Flags().StringVar(&flagStListTopicName, "topic-name", "", "Filter by topic name")
-	listCmd.Flags().StringVar(&flagStListTopicRole, "topic-role", "", "Filter by topic role name")
+	// topics removed
 }

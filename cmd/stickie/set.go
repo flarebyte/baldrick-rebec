@@ -18,17 +18,15 @@ import (
 var (
 	flagStID         string
 	flagStBlackboard string
-	flagStTopicName  string
-	flagStTopicRole  string
-	flagStNote       string
-	flagStCode       string
-	flagStLabels     []string
-	flagStCreatedBy  string
-	flagStPriority   string
-	flagStName       string
-	flagStVariant    string
-	flagStArchived   bool
-	flagStScore      float64
+	// topic flags removed; use labels instead
+	flagStNote      string
+	flagStCode      string
+	flagStLabels    []string
+	flagStCreatedBy string
+	flagStPriority  string
+	flagStName      string
+	flagStArchived  bool
+	flagStScore     float64
 )
 
 var setCmd = &cobra.Command{
@@ -54,12 +52,6 @@ var setCmd = &cobra.Command{
 		if strings.TrimSpace(flagStBlackboard) != "" {
 			st.BlackboardID = strings.TrimSpace(flagStBlackboard)
 		}
-		if strings.TrimSpace(flagStTopicName) != "" {
-			st.TopicName = sql.NullString{String: strings.TrimSpace(flagStTopicName), Valid: true}
-		}
-		if strings.TrimSpace(flagStTopicRole) != "" {
-			st.TopicRoleName = sql.NullString{String: strings.TrimSpace(flagStTopicRole), Valid: true}
-		}
 		if strings.TrimSpace(flagStNote) != "" {
 			st.Note = sql.NullString{String: flagStNote, Valid: true}
 		}
@@ -75,8 +67,8 @@ var setCmd = &cobra.Command{
 		if strings.TrimSpace(flagStPriority) != "" {
 			st.PriorityLevel = sql.NullString{String: strings.ToLower(flagStPriority), Valid: true}
 		}
-		if strings.TrimSpace(flagStName) != "" || strings.TrimSpace(flagStVariant) != "" {
-			st.ComplexName = pgdao.StickieComplexName{Name: strings.TrimSpace(flagStName), Variant: strings.TrimSpace(flagStVariant)}
+		if strings.TrimSpace(flagStName) != "" {
+			st.Name = sql.NullString{String: strings.TrimSpace(flagStName), Valid: true}
 		}
 		st.Archived = flagStArchived
 
@@ -107,15 +99,13 @@ func init() {
 	StickieCmd.AddCommand(setCmd)
 	setCmd.Flags().StringVar(&flagStID, "id", "", "Stickie UUID (optional; when omitted, a new id is generated)")
 	setCmd.Flags().StringVar(&flagStBlackboard, "blackboard", "", "Blackboard UUID (required on create)")
-	setCmd.Flags().StringVar(&flagStTopicName, "topic-name", "", "Topic name (optional)")
-	setCmd.Flags().StringVar(&flagStTopicRole, "topic-role", "", "Topic role name (optional)")
+	// topics removed from stickies interface
 	setCmd.Flags().StringVar(&flagStNote, "note", "", "Note text")
 	setCmd.Flags().StringVar(&flagStCode, "code", "", "Code snippet (programming language)")
 	setCmd.Flags().StringSliceVar(&flagStLabels, "labels", nil, "Labels (repeat or comma-separated)")
 	setCmd.Flags().StringVar(&flagStCreatedBy, "created-by-task", "", "Creator task UUID (optional)")
 	setCmd.Flags().StringVar(&flagStPriority, "priority", "", "Priority level: must, should, could, wont")
-	setCmd.Flags().StringVar(&flagStName, "name", "", "Complex name: name (exact lookup key)")
-	setCmd.Flags().StringVar(&flagStVariant, "variant", "", "Complex name: variant (exact lookup key; may be empty)")
+	setCmd.Flags().StringVar(&flagStName, "name", "", "Human-readable name (exact lookup key)")
 	setCmd.Flags().BoolVar(&flagStArchived, "archived", false, "Mark stickie as archived (excluded from active lookups)")
 	setCmd.Flags().Float64Var(&flagStScore, "score", 0, "Optimisation score (optional; double precision)")
 }

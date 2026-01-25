@@ -1,0 +1,13 @@
+id: 2c273e84-ac07-44f6-aba3-b24d824dd643
+note: |-
+    Stores removed: blackboards no longer require store_id and are scoped solely by
+    role. DAO, schema, CLI, and docs updated accordingly. Benefits: fewer moving
+    parts, faster iteration, simpler mental model for boards.
+labels:
+    - documentation
+    - operations
+    - stable
+created: "2026-01-19T09:27:24.327065Z"
+updated: "2026-01-19T09:27:24.327065Z"
+priority_level: should
+archived: false

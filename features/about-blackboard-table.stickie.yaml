@@ -1,0 +1,16 @@
+id: 701fbd42-b613-4707-ab99-650054575541
+note: |-
+    Table schema: blackboards(id UUID PK, role_name TEXT, conversation_id UUID?,
+    project_name TEXT?, task_id UUID?, background TEXT?, guidelines TEXT?, lifecycle
+    TEXT?, created TIMESTAMPTZ, updated TIMESTAMPTZ). FKs: conversation_id →
+    conversations.id, (project_name,role_name) → projects, task_id → tasks. A
+    trigger maintains updated on any update. No dependency on stores; boards are
+    scoped by role. Rationale: fewer joins, faster lookups, simpler mental model.
+labels:
+    - documentation
+    - operations
+    - stable
+created: "2026-01-19T09:27:24.34057Z"
+updated: "2026-01-19T09:27:24.34057Z"
+priority_level: should
+archived: false

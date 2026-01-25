@@ -1,0 +1,14 @@
+id: 644ff9dd-45e5-4ee9-bd94-542766737951
+note: |-
+    DAO functions: UpsertBlackboard (insert/update with NULL handling),
+    GetBlackboardByID, ListBlackboards (role-scoped, updated DESC),
+    ListBlackboardsWithRefs (joins tasks/projects/conversations for display),
+    DeleteBlackboard. Types use sql.Null* for optional fields. Queries favor
+    predictable ordering and minimal columns to reduce allocation and I/O.
+labels:
+    - documentation
+    - stable
+created: "2026-01-19T09:27:24.332203Z"
+updated: "2026-01-19T09:27:24.332203Z"
+priority_level: should
+archived: false
