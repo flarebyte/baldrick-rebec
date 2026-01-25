@@ -111,6 +111,9 @@ type bbActiveModel struct {
 	selected map[string]bool // stickieID -> selected
 }
 
+// Max number of stickies shown to keep the view readable
+const maxVisibleStickies = 10
+
 func newBBActiveModel(roles []string, currentRole string, boards []pgdao.BlackboardWithRefs, search string) bbActiveModel {
 	idx := -1
 	for i, r := range roles {
@@ -171,7 +174,7 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "down", "j":
-				if m.stickCursor < len(m.filteredStickyIndices())-1 {
+				if m.stickCursor < len(m.visibleStickyIndices())-1 {
 					m.stickCursor++
 				}
 				return m, nil
@@ -185,7 +188,7 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if len(m.topicOptions) > 0 {
 					m.topicIdx = (m.topicIdx + 1) % len(m.topicOptions)
-					if m.stickCursor >= len(m.filteredStickyIndices()) {
+					if m.stickCursor >= len(m.visibleStickyIndices()) {
 						m.stickCursor = 0
 					}
 				}
@@ -202,7 +205,7 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case " ":
 				// Toggle selection for current stickie when in select mode
 				if m.inSelect {
-					idxs := m.filteredStickyIndices()
+					idxs := m.visibleStickyIndices()
 					if m.stickCursor >= 0 && m.stickCursor < len(idxs) {
 						s := m.stickies[idxs[m.stickCursor]]
 						if m.selected == nil {
@@ -218,7 +221,7 @@ func (m bbActiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.selected == nil {
 						m.selected = map[string]bool{}
 					}
-					for _, i := range m.filteredStickyIndices() {
+					for _, i := range m.visibleStickyIndices() {
 						m.selected[m.stickies[i].ID] = true
 					}
 					return m, nil
@@ -352,11 +355,24 @@ func (m bbActiveModel) View() string {
 		b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 		b.WriteString(bStyleHelp.Render("Keys: ↑/k, ↓/j, /=search, t=topic, m=multi-select, space=toggle, a=all, n=none, b/esc=back, r=refresh, q") + "\n")
 		filtered := m.filteredStickyIndices()
+		// Compute visible window
+		visible := filtered
+		if len(visible) > maxVisibleStickies {
+			visible = visible[:maxVisibleStickies]
+		}
+		// Clamp cursor into visible range
+		if m.stickCursor >= len(visible) {
+			if len(visible) > 0 {
+				m.stickCursor = len(visible) - 1
+			} else {
+				m.stickCursor = 0
+			}
+		}
 		if len(m.stickies) == 0 || len(filtered) == 0 {
 			b.WriteString("No stickies.\n")
 			return b.String()
 		}
-		for i, idx := range filtered {
+		for i, idx := range visible {
 			s := m.stickies[idx]
 			cursor := "  "
 			if i == m.stickCursor {
@@ -375,8 +391,8 @@ func (m bbActiveModel) View() string {
 			}
 		}
 		// Details for selected stickie
-		if m.stickCursor >= 0 && m.stickCursor < len(filtered) {
-			st := m.stickies[filtered[m.stickCursor]]
+		if m.stickCursor >= 0 && m.stickCursor < len(visible) {
+			st := m.stickies[visible[m.stickCursor]]
 			b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 			b.WriteString(bStyleHeader.Render("Stickie Details") + "\n")
 			b.WriteString(bStyleLabel.Render("ID: ") + bStyleValue.Render(st.ID) + "\n")
@@ -422,7 +438,12 @@ func (m bbActiveModel) View() string {
 		if m.inSelect {
 			b.WriteString(bStyleDivider.Render(strings.Repeat("─", 60)) + "\n")
 			b.WriteString(bStyleHeader.Render("Selected UUIDs") + "\n")
-			b.WriteString(bStyleValue.Render(strings.Join(m.selectedIDsInOrder(filtered), " ")) + "\n")
+			b.WriteString(bStyleValue.Render(strings.Join(m.selectedIDsInOrder(visible), " ")) + "\n")
+		}
+		// If more stickies exist than we display, add a hint
+		if len(filtered) > len(visible) {
+			more := len(filtered) - len(visible)
+			b.WriteString(bStyleHelp.Render(fmt.Sprintf("Showing first %d of %d; %d more not shown. Use '/' to search.", len(visible), len(filtered), more)) + "\n")
 		}
 		return b.String()
 	}
@@ -699,4 +720,13 @@ func (m bbActiveModel) selectedIDsInOrder(filtered []int) []string {
 		}
 	}
 	return out
+}
+
+// visibleStickyIndices returns the first maxVisibleStickies indices of the filtered list
+func (m bbActiveModel) visibleStickyIndices() []int {
+	idxs := m.filteredStickyIndices()
+	if len(idxs) > maxVisibleStickies {
+		return idxs[:maxVisibleStickies]
+	}
+	return idxs
 }

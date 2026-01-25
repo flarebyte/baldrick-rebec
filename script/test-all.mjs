@@ -1298,9 +1298,15 @@ try {
   // Remove any stickie YAML without an id (e.g., created earlier without id)
   await $`bash -lc 'for f in temp/blackboard-import/*.stickie.yaml; do grep -q "^id:" "$f" || rm -f "$f"; done'`;
   // Assign fresh UUIDs (generate to avoid clashes on repeated runs)
-  const BB_IMPORT = String((await $`bash -lc 'uuidgen | tr "[:upper:]" "[:lower:]"'`).stdout || '').trim();
-  const ST_IMPORT_1 = String((await $`bash -lc 'uuidgen | tr "[:upper:]" "[:lower:]"'`).stdout || '').trim();
-  const ST_IMPORT_2 = String((await $`bash -lc 'uuidgen | tr "[:upper:]" "[:lower:]"'`).stdout || '').trim();
+  const BB_IMPORT = String(
+    (await $`bash -lc 'uuidgen | tr "[:upper:]" "[:lower:]"'`).stdout || '',
+  ).trim();
+  const ST_IMPORT_1 = String(
+    (await $`bash -lc 'uuidgen | tr "[:upper:]" "[:lower:]"'`).stdout || '',
+  ).trim();
+  const ST_IMPORT_2 = String(
+    (await $`bash -lc 'uuidgen | tr "[:upper:]" "[:lower:]"'`).stdout || '',
+  ).trim();
   // Update blackboard.yaml id
   await $`bash -lc ${`sed -i'' -e 's/^id:.*/id: ${BB_IMPORT}/' temp/blackboard-import/blackboard.yaml`}`;
   // Update stickie ids (assume two files exist: about-onboarding-refresh and about-devops-caching)

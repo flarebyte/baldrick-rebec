@@ -27,11 +27,11 @@ var (
 // - No blackboard with that id exists in DB
 // - Any stickie YAML with id: must not exist in DB
 var importCmd = &cobra.Command{
-    Use:   "import <folder>",
-    Short: "Import a blackboard and stickies from a folder (IDs preserved)",
-    Args:  cobra.ExactArgs(1),
-    SilenceUsage: true,
-    RunE: func(cmd *cobra.Command, args []string) error {
+	Use:          "import <folder>",
+	Short:        "Import a blackboard and stickies from a folder (IDs preserved)",
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		folder := strings.TrimSpace(args[0])
 		if folder == "" {
 			return errors.New("folder is required")
@@ -66,11 +66,11 @@ var importCmd = &cobra.Command{
 		_ = runBlackboardDiff(bbY.ID, folder, flagImportDetailed, true)
 
 		// Existence checks: blackboard and stickies must NOT exist
-        if _, err := pgdao.GetBlackboardByID(ctx, db, bbY.ID); err == nil {
-            fmt.Fprintf(os.Stderr, "blackboard already exists: id=%s\n", bbY.ID)
-            fmt.Fprintf(os.Stderr, "Hint: use 'rbc blackboard sync folder:%s id:%s' to update it, or change id in %s/blackboard.yaml and stickie YAMLs.\n", folder, bbY.ID, folder)
-            return fmt.Errorf("blackboard already exists: id=%s", bbY.ID)
-        }
+		if _, err := pgdao.GetBlackboardByID(ctx, db, bbY.ID); err == nil {
+			fmt.Fprintf(os.Stderr, "blackboard already exists: id=%s\n", bbY.ID)
+			fmt.Fprintf(os.Stderr, "Hint: use 'rbc blackboard sync folder:%s id:%s' to update it, or change id in %s/blackboard.yaml and stickie YAMLs.\n", folder, bbY.ID, folder)
+			return fmt.Errorf("blackboard already exists: id=%s", bbY.ID)
+		}
 
 		// Load local stickies
 		byID, anon, err := loadLocalStickies(folder, true)
@@ -81,12 +81,12 @@ var importCmd = &cobra.Command{
 			return fmt.Errorf("found %d stickie yaml without id; import requires explicit ids", len(anon))
 		}
 		// Check none of the stickie ids exist
-        for id, rec := range byID {
-            if s, err := pgdao.GetStickieByID(ctx, db, id); err == nil && s != nil {
-                fmt.Fprintf(os.Stderr, "stickie already exists: id=%s (file=%s)\n", id, rec.filename)
-                return fmt.Errorf("stickie already exists: id=%s", id)
-            }
-        }
+		for id, rec := range byID {
+			if s, err := pgdao.GetStickieByID(ctx, db, id); err == nil && s != nil {
+				fmt.Fprintf(os.Stderr, "stickie already exists: id=%s (file=%s)\n", id, rec.filename)
+				return fmt.Errorf("stickie already exists: id=%s", id)
+			}
+		}
 
 		// Insert blackboard with provided ID
 		if err := insertBlackboardWithID(ctx, db, bbY); err != nil {
