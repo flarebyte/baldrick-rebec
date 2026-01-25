@@ -33,6 +33,7 @@ See DATABASES.md for full workflow and a setup checklist. For ops-focused learni
 
 - Sync id ↔ folder: `rbc blackboard sync id:_ folder:features [--dry-run] [--delete] [--clear-ids] [--force-write] [--include-archived]`
 - Diff id vs folder: `rbc blackboard diff id:_ folder:features [--detailed] [--include-archived]`
+- Import from folder: `rbc blackboard import features [--detailed]` (preserves IDs; requires ids not to exist in DB)
 
 ## Snapshot Backups
 

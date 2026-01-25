@@ -1281,6 +1281,56 @@ try {
   await dbCountPerRole();
   await dbCountJSON();
 
+  // Import: create a new board by copying exported YAML and changing IDs
+  step++;
+  logStep(
+    step,
+    TOTAL,
+    'Import: creating new blackboard from folder with preserved IDs',
+  );
+  try {
+    await $`rm -rf temp/blackboard-import`;
+  } catch {}
+  await $`mkdir -p temp/blackboard-import`;
+  // Copy exported YAMLs
+  await $`cp temp/blackboard-test/blackboard.yaml temp/blackboard-import/blackboard.yaml`;
+  await $`bash -lc 'cp temp/blackboard-test/*.stickie.yaml temp/blackboard-import/'`;
+  // Assign fresh UUIDs (deterministic hex sequences)
+  const BB_IMPORT = '11111111-1111-4111-8111-111111111111';
+  const ST_IMPORT_1 = '22222222-2222-4222-8222-222222222222';
+  const ST_IMPORT_2 = '33333333-3333-4333-8333-333333333333';
+  // Update blackboard.yaml id
+  await $`bash -lc ${`sed -i'' -e 's/^id:.*/id: ${BB_IMPORT}/' temp/blackboard-import/blackboard.yaml`}`;
+  // Update stickie ids (assume two files exist: about-onboarding-refresh and about-devops-caching)
+  await $`bash -lc ${`sed -i'' -e 's/^id:.*/id: ${ST_IMPORT_1}/' temp/blackboard-import/about-onboarding-refresh.stickie.yaml`}`;
+  await $`bash -lc ${`sed -i'' -e 's/^id:.*/id: ${ST_IMPORT_2}/' temp/blackboard-import/about-devops-caching.stickie.yaml`}`;
+  // Run import (shows preview, then inserts)
+  await $`go run main.go blackboard import temp/blackboard-import --detailed`;
+  // Validate imported board and stickies
+  {
+    const bbl = await blackboardListJSON({ role: TEST_ROLE_USER, limit: 200 });
+    const got = (bbl || []).find(
+      (b) => b && (b.id === BB_IMPORT || b.ID === BB_IMPORT),
+    );
+    await assertStep(
+      'import: blackboard inserted',
+      !!got,
+      'expected imported blackboard in list',
+    );
+    const lst = await stickieListJSON({ blackboard: BB_IMPORT });
+    const has1 = (lst || []).find(
+      (x) => x && (x.id === ST_IMPORT_1 || x.ID === ST_IMPORT_1),
+    );
+    const has2 = (lst || []).find(
+      (x) => x && (x.id === ST_IMPORT_2 || x.ID === ST_IMPORT_2),
+    );
+    await assertStep(
+      'import: stickies inserted',
+      !!has1 && !!has2,
+      'expected both imported stickies',
+    );
+  }
+
   // 13) Snapshot (backup/list/show/restore-dry/delete)
   step++;
   if (!SKIP_SNAPSHOT) {

@@ -103,16 +103,34 @@ Examples:
 
 Options:
 
-- `--include-archived`: include archived stickies (default: excluded)
-- `--detailed`: show per-field values/hashes
+  - `--include-archived`: include archived stickies (default: excluded)
+  - `--detailed`: show per-field values/hashes
 
 Output legend:
 - `=` unchanged
 - `~` changed
 - `+` remote-only (exists in DB, not in folder)
-- `-` local-only (exists in folder, not in DB). If YAML has no `id`, it’s reported as “local-only, no id”.
+  - `-` local-only (exists in folder, not in DB). If YAML has no `id`, it’s reported as “local-only, no id”.
 
-4. Handy Checks
+4. Import from folder (IDs preserved)
+
+Create a brand-new blackboard and stickies using the IDs in YAML files.
+
+- Command: `rbc blackboard import <RELATIVE_PATH>`
+- Requirements:
+  - `<RELATIVE_PATH>/blackboard.yaml` must exist and contain an `id:` and `role:`.
+  - No blackboard with that id must exist in the DB.
+  - All `*.stickie.yaml` must include an `id:` and none must exist in the DB.
+- Behavior:
+  - Runs a diff preview first (concise by default; `--detailed` optional).
+  - Inserts blackboard and all stickies preserving the IDs from the YAML.
+  - Fails fast if any existence check fails.
+
+Examples:
+- `rbc blackboard import features` (shows preview then imports)
+- `rbc blackboard import features --detailed` (more verbose preview)
+
+ 5. Handy Checks
 
 - Show a blackboard: `rbc blackboard get --id <BOARD_ID>`
 - Show a stickie: `rbc stickie get --id <STICKIE_ID>`
