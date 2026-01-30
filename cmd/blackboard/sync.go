@@ -570,15 +570,23 @@ func syncFolderToID(relFolder, blackboardID string, dryRun bool) error {
 }
 
 func readStickieYAML(path string) (stickieYAML, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return stickieYAML{}, err
-	}
-	var y stickieYAML
-	if err := yaml.Unmarshal(b, &y); err != nil {
-		return stickieYAML{}, err
-	}
-	return y, nil
+    b, err := os.ReadFile(path)
+    if err != nil {
+        return stickieYAML{}, err
+    }
+    var y stickieYAML
+    if err := yaml.Unmarshal(b, &y); err != nil {
+        return stickieYAML{}, err
+    }
+    // If no explicit name is provided in YAML, try to infer it from the filename
+    // Pattern: about-<name>.stickie.yaml -> name
+    if y.Name == nil || strings.TrimSpace(getStrPtr(y.Name)) == "" {
+        if n := inferNameFromFilename(filepath.Base(path)); n != "" {
+            nn := n
+            y.Name = &nn
+        }
+    }
+    return y, nil
 }
 
 // stickieFromYAMLForUpsert maps YAML into pgdao.Stickie for UpsertStickie.
@@ -696,9 +704,9 @@ func hashStickieDB(s pgdao.Stickie) string {
 }
 
 func hashMaterial(v any) string {
-	b, _ := json.Marshal(v)
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
+    b, _ := json.Marshal(v)
+    sum := sha256.Sum256(b)
+    return hex.EncodeToString(sum[:])
 }
 
 // readBlackboardIDFromFolder reads blackboard.yaml in the given relative folder
@@ -732,16 +740,16 @@ func readBlackboardIDFromFolder(relFolder string) (string, error) {
 // "about-" (e.g., about-my-feature.stickie.yaml). Otherwise, it falls back to
 // the UUID-based filename (<id>.stickie.yaml).
 func stickieFileName(s pgdao.Stickie) string {
-	if s.Name.Valid {
-		base := strings.TrimSpace(s.Name.String)
-		if base != "" {
-			safe := sanitizeForFile(base)
-			if safe != "" {
-				return fmt.Sprintf("about-%s.stickie.yaml", safe)
-			}
-		}
-	}
-	return fmt.Sprintf("%s.stickie.yaml", s.ID)
+    if s.Name.Valid {
+        base := strings.TrimSpace(s.Name.String)
+        if base != "" {
+            safe := sanitizeForFile(base)
+            if safe != "" {
+                return fmt.Sprintf("about-%s.stickie.yaml", safe)
+            }
+        }
+    }
+    return fmt.Sprintf("%s.stickie.yaml", s.ID)
 }
 
 // sanitizeForFile replaces any rune that is not alphanumeric, '_' or '-' with '-'.
@@ -769,6 +777,22 @@ func sanitizeForFile(s string) string {
 		prevDash = false
 		b.WriteRune(r)
 	}
-	out := strings.Trim(b.String(), "-")
-	return out
+    out := strings.Trim(b.String(), "-")
+    return out
+}
+
+// inferNameFromFilename extracts a stickie name from a conventional filename.
+// Accepts patterns like "about-<name>.stickie.yaml" and returns "<name>".
+// Returns empty string when no name can be inferred.
+func inferNameFromFilename(filename string) string {
+    const suffix = ".stickie.yaml"
+    const prefix = "about-"
+    if !strings.HasSuffix(filename, suffix) {
+        return ""
+    }
+    base := strings.TrimSuffix(filename, suffix)
+    if strings.HasPrefix(base, prefix) {
+        return strings.TrimSpace(strings.TrimPrefix(base, prefix))
+    }
+    return ""
 }
