@@ -25,13 +25,16 @@ import (
 	vaultcmd "github.com/flarebyte/baldrick-rebec/cmd/vault"
 	"github.com/flarebyte/baldrick-rebec/cmd/workflow"
 	wscmd "github.com/flarebyte/baldrick-rebec/cmd/workspace"
+	vercmd "github.com/flarebyte/baldrick-rebec/cmd/version"
+	"github.com/flarebyte/baldrick-rebec/internal/buildinfo"
+	"github.com/flarebyte/baldrick-rebec/cli"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "rbc",
-	Short: "TODO: Short description of your CLI",
-	Long:  "TODO: Long description of your CLI tool.",
+    Use:   "rbc",
+    Short: "Autonomous build automation and blackboard CLI",
+    Long:  helpIntro,
 }
 
 func Execute() error {
@@ -39,9 +42,18 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.AddCommand(test.TestCmd)
-	// Expose former `admin` subcommands at the root level
-	rootCmd.AddCommand(conversation.ConversationCmd)
+    // Expose --version and the version subcommand
+    // Cobra adds --version when this is non-empty
+    v := buildinfo.Summary()
+    if v == "dev" && cli.Version != "" {
+        v = cli.Version
+    }
+    rootCmd.Version = v
+    rootCmd.AddCommand(vercmd.VersionCmd)
+
+    rootCmd.AddCommand(test.TestCmd)
+    // Expose former `admin` subcommands at the root level
+    rootCmd.AddCommand(conversation.ConversationCmd)
 	rootCmd.AddCommand(configcmd.ConfigCmd)
 	rootCmd.AddCommand(dbcmd.DBCmd)
 	rootCmd.AddCommand(qcmd.QueueCmd)
@@ -63,5 +75,9 @@ func init() {
 	rootCmd.AddCommand(snapcmd.SnapshotCmd)
 	rootCmd.AddCommand(vaultcmd.VaultCmd)
 	rootCmd.AddCommand(toolcmd.ToolCmd)
-	rootCmd.AddCommand(promptcmd.PromptCmd)
+    rootCmd.AddCommand(promptcmd.PromptCmd)
 }
+
+const helpIntro = `rbc - autonomous build automation and blackboard CLI
+Also known as baldrick-rebec, a command-line tool for task/workflow automation on Postgres; managing blackboards & stickies with folder sync, diff, and import; scripts/messages and queues; and schema-aware snapshot backups.
+Copyright (c) 2026 Flarebyte.com - MIT License`
