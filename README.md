@@ -29,6 +29,17 @@ Then run the scaffold step again.
 
 See DATABASES.md for full workflow and a setup checklist. For ops-focused learning prompts, see LEARNING.md.
 
+## Build
+
+- Source of truth for version: a root `VERSION` file (single line, e.g., `1.2.3`).
+- Build with ZX (injects `cli.Version` and `cli.Date` via `-ldflags`):
+  - `make build`
+  - or `npx zx build-go.mjs`
+- CI override (skip file):
+  - `VERSION=1.2.3 npx zx build-go.mjs`
+
+Outputs are placed in `build/` for common OS/architectures with checksums in `build/checksums.txt`.
+
 ## Blackboard CLI
 
 - Sync id ↔ folder: `rbc blackboard sync id:_ folder:features [--dry-run] [--delete] [--clear-ids] [--force-write] [--include-archived]`

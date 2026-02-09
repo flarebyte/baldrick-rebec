@@ -1,3 +1,6 @@
+#!/usr/bin/env zx
+import 'zx/globals';
+
 function getBritishDate() {
   const now = new Date();
 
@@ -12,7 +15,8 @@ function getBritishDate() {
   return britishDate;
 }
 
-const version = '0.0.0'
+// Resolve version from env or VERSION file (fallback to 0.0.0)
+const version = (process.env.VERSION ?? (await fs.readFile('VERSION', 'utf8').catch(() => '0.0.0'))).trim() || '0.0.0';
 
 const currentDirectory = process.cwd();
 const folderName = path.basename(currentDirectory);
@@ -21,7 +25,8 @@ const projectName = `github.com/flarebyte/${folderName}`;
 
 const currentDate = getBritishDate().replaceAll(" ", "-");
 
-const ldflags = `-X ${projectName}/internal/cli.Version=${version} -X ${projectName}/internal/cli.Date=${currentDate}`;
+// Inject into cli.Version and cli.Date (root-level package)
+const ldflags = `-X ${projectName}/cli.Version=${version} -X ${projectName}/cli.Date=${currentDate}`;
 const platforms = [
   { label: "Linux (amd64)", os: "linux", arch: "amd64" },
   { label: "Linux (arm64)", os: "linux", arch: "arm64" },
@@ -33,6 +38,7 @@ const platforms = [
   { label: "Windows (arm64)", os: "windows", arch: "arm64" },
 ];
 
+await $`mkdir -p build`;
 for (const p of platforms) {
   echo(p.label);
   await $`GOOS=${p.os} GOARCH=${p.arch} go build -o build/${folderName}-${p.os}-${p.arch} -ldflags ${ldflags}`;

@@ -5,7 +5,7 @@
 # - Avoid variables that compute values; keep only stable constants.
 # - Do not add pattern rules, arguments, or conditionals.
 
-.PHONY: lint format test gen clean help
+.PHONY: lint format test gen build clean help
 
 ZX := npx zx
 RBC := go run main.go
@@ -53,6 +53,7 @@ help:
 	@printf "  lint    Run project linters (fast, generic).\n"
 	@printf "  format  Apply basic formatting.\n"
 	@printf "  test    Run end-to-end tests.\n"
+	@printf "  build   Build rbc binaries with version/date (ZX).\n"
 	@printf "  gen     Generate artifacts (e.g., client stubs).\n"
 	@printf "  clean   Clean generated artifacts.\n"
 
@@ -72,4 +73,7 @@ help:
 #
 # Why so simple:
 # - Biome config (biome.json) defines the scope (script/*.mjs). Calling the tool directly is sufficient.
+# Build rbc binaries with version/date injected via ldflags (see build-go.mjs)
+build:
+	npx zx build-go.mjs
 # - No shell logic in Makefile, no arguments or conditionals, no pattern rules.
