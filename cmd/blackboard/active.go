@@ -414,10 +414,10 @@ func (m bbActiveModel) View() string {
 			if len(st.Labels) > 0 {
 				b.WriteString(bStyleLabel.Render("Labels: ") + bStyleValue.Render(strings.Join(st.Labels, ", ")) + "\n")
 			}
-            // Score
-            if st.Score.Valid {
-                b.WriteString(bStyleLabel.Render("Score: ") + bStyleValue.Render(fmt.Sprintf("%.3f", st.Score.Float64)) + "\n")
-            }
+			// Score
+			if st.Score.Valid {
+				b.WriteString(bStyleLabel.Render("Score: ") + bStyleValue.Render(fmt.Sprintf("%.3f", st.Score.Float64)) + "\n")
+			}
 			// Created by task
 			if st.CreatedByTaskID.Valid {
 				b.WriteString(bStyleLabel.Render("Created.by.task: ") + bStyleValue.Render(st.CreatedByTaskID.String) + "\n")

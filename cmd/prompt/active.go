@@ -655,11 +655,11 @@ func (m promptModel) renderPreview() string {
 						out.WriteString("\n")
 					}
 				}
-                // Code block section if code exists
-                if st.Code.Valid {
-                    code := strings.TrimSpace(st.Code.String)
-                    if code != "" {
-                        out.WriteString("\n```\n")
+				// Code block section if code exists
+				if st.Code.Valid {
+					code := strings.TrimSpace(st.Code.String)
+					if code != "" {
+						out.WriteString("\n```\n")
 						out.WriteString(code)
 						out.WriteString("\n```\n")
 					}
@@ -757,11 +757,11 @@ func previewStickieText(st pgdao.Stickie) string {
 			out.WriteString("\n")
 		}
 	}
-    if st.Code.Valid {
-        code := strings.TrimSpace(st.Code.String)
-        if code != "" {
-            out.WriteString("\n```\n")
-            out.WriteString(code)
+	if st.Code.Valid {
+		code := strings.TrimSpace(st.Code.String)
+		if code != "" {
+			out.WriteString("\n```\n")
+			out.WriteString(code)
 			out.WriteString("\n```\n")
 		}
 	}

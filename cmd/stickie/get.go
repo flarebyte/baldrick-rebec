@@ -49,12 +49,12 @@ var getCmd = &cobra.Command{
 		if len(s.Labels) > 0 {
 			out["labels"] = s.Labels
 		}
-        if s.CreatedByTaskID.Valid {
-            out["created_by_task_id"] = s.CreatedByTaskID.String
-        }
-        if s.Score.Valid {
-            out["score"] = s.Score.Float64
-        }
+		if s.CreatedByTaskID.Valid {
+			out["created_by_task_id"] = s.CreatedByTaskID.String
+		}
+		if s.Score.Valid {
+			out["score"] = s.Score.Float64
+		}
 		if s.Name.Valid {
 			out["name"] = s.Name.String
 		}

@@ -22,10 +22,10 @@ var (
 	flagStNote      string
 	flagStCode      string
 	flagStLabels    []string
-    flagStCreatedBy string
-    flagStName      string
-    flagStArchived  bool
-    flagStScore     float64
+	flagStCreatedBy string
+	flagStName      string
+	flagStArchived  bool
+	flagStScore     float64
 )
 
 var setCmd = &cobra.Command{
@@ -60,12 +60,12 @@ var setCmd = &cobra.Command{
 		if len(flagStLabels) > 0 {
 			st.Labels = flagStLabels
 		}
-        if strings.TrimSpace(flagStCreatedBy) != "" {
-            st.CreatedByTaskID = sql.NullString{String: strings.TrimSpace(flagStCreatedBy), Valid: true}
-        }
-        if strings.TrimSpace(flagStName) != "" {
-            st.Name = sql.NullString{String: strings.TrimSpace(flagStName), Valid: true}
-        }
+		if strings.TrimSpace(flagStCreatedBy) != "" {
+			st.CreatedByTaskID = sql.NullString{String: strings.TrimSpace(flagStCreatedBy), Valid: true}
+		}
+		if strings.TrimSpace(flagStName) != "" {
+			st.Name = sql.NullString{String: strings.TrimSpace(flagStName), Valid: true}
+		}
 		st.Archived = flagStArchived
 
 		// Optional score; only set if flag provided
@@ -99,8 +99,8 @@ func init() {
 	setCmd.Flags().StringVar(&flagStNote, "note", "", "Note text")
 	setCmd.Flags().StringVar(&flagStCode, "code", "", "Code snippet (programming language)")
 	setCmd.Flags().StringSliceVar(&flagStLabels, "labels", nil, "Labels (repeat or comma-separated)")
-    setCmd.Flags().StringVar(&flagStCreatedBy, "created-by-task", "", "Creator task UUID (optional)")
-    setCmd.Flags().StringVar(&flagStName, "name", "", "Human-readable name (exact lookup key)")
+	setCmd.Flags().StringVar(&flagStCreatedBy, "created-by-task", "", "Creator task UUID (optional)")
+	setCmd.Flags().StringVar(&flagStName, "name", "", "Human-readable name (exact lookup key)")
 	setCmd.Flags().BoolVar(&flagStArchived, "archived", false, "Mark stickie as archived (excluded from active lookups)")
 	setCmd.Flags().Float64Var(&flagStScore, "score", 0, "Optimisation score (optional; double precision)")
 }

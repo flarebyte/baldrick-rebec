@@ -150,10 +150,10 @@ func insertStickieWithID(ctx context.Context, db *pgxpool.Pool, blackboardID str
 	labels := y.Labels
 	sort.Strings(labels)
 	ctask := strings.TrimSpace(getStrPtr(y.CreatedByTask))
-    var score *float64 = y.Score
-    name := strings.TrimSpace(getStrPtr(y.Name))
-    archived := y.Archived
-    q := `INSERT INTO stickies (id, blackboard_id, note, code, labels, created_by_task_id, score, name, archived)
+	var score *float64 = y.Score
+	name := strings.TrimSpace(getStrPtr(y.Name))
+	archived := y.Archived
+	q := `INSERT INTO stickies (id, blackboard_id, note, code, labels, created_by_task_id, score, name, archived)
           VALUES ($1::uuid, $2::uuid, NULLIF($3,''), NULLIF($4,''), COALESCE($5, ARRAY[]::text[]), CASE WHEN $6='' THEN NULL ELSE $6::uuid END, $7::double precision, NULLIF($8,''), COALESCE($9,false))`
 	var lblParam any
 	if len(labels) > 0 {
@@ -161,6 +161,6 @@ func insertStickieWithID(ctx context.Context, db *pgxpool.Pool, blackboardID str
 	} else {
 		lblParam = nil
 	}
-    _, err := db.Exec(ctx, q, y.ID, blackboardID, note, code, lblParam, ctask, score, name, archived)
-    return err
+	_, err := db.Exec(ctx, q, y.ID, blackboardID, note, code, lblParam, ctask, score, name, archived)
+	return err
 }
