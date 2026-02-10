@@ -23,7 +23,6 @@ var (
 	flagStCode      string
 	flagStLabels    []string
 	flagStCreatedBy string
-	flagStPriority  string
 	flagStName      string
 	flagStArchived  bool
 	flagStScore     float64
@@ -64,9 +63,6 @@ var setCmd = &cobra.Command{
 		if strings.TrimSpace(flagStCreatedBy) != "" {
 			st.CreatedByTaskID = sql.NullString{String: strings.TrimSpace(flagStCreatedBy), Valid: true}
 		}
-		if strings.TrimSpace(flagStPriority) != "" {
-			st.PriorityLevel = sql.NullString{String: strings.ToLower(flagStPriority), Valid: true}
-		}
 		if strings.TrimSpace(flagStName) != "" {
 			st.Name = sql.NullString{String: strings.TrimSpace(flagStName), Valid: true}
 		}
@@ -104,7 +100,6 @@ func init() {
 	setCmd.Flags().StringVar(&flagStCode, "code", "", "Code snippet (programming language)")
 	setCmd.Flags().StringSliceVar(&flagStLabels, "labels", nil, "Labels (repeat or comma-separated)")
 	setCmd.Flags().StringVar(&flagStCreatedBy, "created-by-task", "", "Creator task UUID (optional)")
-	setCmd.Flags().StringVar(&flagStPriority, "priority", "", "Priority level: must, should, could, wont")
 	setCmd.Flags().StringVar(&flagStName, "name", "", "Human-readable name (exact lookup key)")
 	setCmd.Flags().BoolVar(&flagStArchived, "archived", false, "Mark stickie as archived (excluded from active lookups)")
 	setCmd.Flags().Float64Var(&flagStScore, "score", 0, "Optimisation score (optional; double precision)")

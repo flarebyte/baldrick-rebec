@@ -442,7 +442,6 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             created_by_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
             edit_count INT NOT NULL DEFAULT 0,
-            priority_level TEXT CHECK (priority_level IN ('must','should','could','wont') OR priority_level IS NULL),
             score DOUBLE PRECISION,
             name TEXT,
             archived BOOLEAN NOT NULL DEFAULT FALSE

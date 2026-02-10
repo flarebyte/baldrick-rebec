@@ -34,6 +34,9 @@ go.work.sum
 temp/
 
 .gocache/
+# Local build caches (created during sandboxed builds)
+.cache/
+_gopath/
 script/node_modules/
 
 scratch/

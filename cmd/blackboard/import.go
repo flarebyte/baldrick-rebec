@@ -150,18 +150,17 @@ func insertStickieWithID(ctx context.Context, db *pgxpool.Pool, blackboardID str
 	labels := y.Labels
 	sort.Strings(labels)
 	ctask := strings.TrimSpace(getStrPtr(y.CreatedByTask))
-	prio := strings.TrimSpace(getStrPtr(y.Priority))
 	var score *float64 = y.Score
 	name := strings.TrimSpace(getStrPtr(y.Name))
 	archived := y.Archived
-	q := `INSERT INTO stickies (id, blackboard_id, note, code, labels, created_by_task_id, priority_level, score, name, archived)
-          VALUES ($1::uuid, $2::uuid, NULLIF($3,''), NULLIF($4,''), COALESCE($5, ARRAY[]::text[]), CASE WHEN $6='' THEN NULL ELSE $6::uuid END, NULLIF($7,''), $8::double precision, NULLIF($9,''), COALESCE($10,false))`
+	q := `INSERT INTO stickies (id, blackboard_id, note, code, labels, created_by_task_id, score, name, archived)
+          VALUES ($1::uuid, $2::uuid, NULLIF($3,''), NULLIF($4,''), COALESCE($5, ARRAY[]::text[]), CASE WHEN $6='' THEN NULL ELSE $6::uuid END, $7::double precision, NULLIF($8,''), COALESCE($9,false))`
 	var lblParam any
 	if len(labels) > 0 {
 		lblParam = labels
 	} else {
 		lblParam = nil
 	}
-	_, err := db.Exec(ctx, q, y.ID, blackboardID, note, code, lblParam, ctask, prio, score, name, archived)
+	_, err := db.Exec(ctx, q, y.ID, blackboardID, note, code, lblParam, ctask, score, name, archived)
 	return err
 }

@@ -414,10 +414,7 @@ func (m bbActiveModel) View() string {
 			if len(st.Labels) > 0 {
 				b.WriteString(bStyleLabel.Render("Labels: ") + bStyleValue.Render(strings.Join(st.Labels, ", ")) + "\n")
 			}
-			// Priority / Score
-			if st.PriorityLevel.Valid {
-				b.WriteString(bStyleLabel.Render("Priority: ") + bStyleValue.Render(st.PriorityLevel.String) + "\n")
-			}
+			// Score
 			if st.Score.Valid {
 				b.WriteString(bStyleLabel.Render("Score: ") + bStyleValue.Render(fmt.Sprintf("%.3f", st.Score.Float64)) + "\n")
 			}

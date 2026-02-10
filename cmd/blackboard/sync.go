@@ -178,7 +178,6 @@ type stickieYAML struct {
 	Updated       *string        `yaml:"updated,omitempty"`
 	CreatedByTask *string        `yaml:"created_by_task_id,omitempty"`
 	EditCount     int            `yaml:"edit_count,omitempty"`
-	Priority      *string        `yaml:"priority_level,omitempty"`
 	Score         *float64       `yaml:"score,omitempty"`
 	Name          *string        `yaml:"name,omitempty"`
 	Archived      bool           `yaml:"archived"`
@@ -333,10 +332,6 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 		if s.CreatedByTaskID.Valid && s.CreatedByTaskID.String != "" {
 			v := s.CreatedByTaskID.String
 			sy.CreatedByTask = &v
-		}
-		if s.PriorityLevel.Valid && s.PriorityLevel.String != "" {
-			v := s.PriorityLevel.String
-			sy.Priority = &v
 		}
 		if s.Score.Valid {
 			v := s.Score.Float64
@@ -613,10 +608,6 @@ func stickieFromYAMLForUpsert(y stickieYAML, blackboardID string) pgdao.Stickie 
 		s.CreatedByTaskID.Valid = true
 		s.CreatedByTaskID.String = *y.CreatedByTask
 	}
-	if y.Priority != nil {
-		s.PriorityLevel.Valid = true
-		s.PriorityLevel.String = *y.Priority
-	}
 	if y.Score != nil {
 		s.Score.Valid = true
 		s.Score.Float64 = *y.Score
@@ -635,7 +626,6 @@ type stickieHashMaterial struct {
 	Code          string   `json:"code"`
 	Labels        []string `json:"labels"`
 	CreatedByTask string   `json:"created_by_task_id"`
-	PriorityLevel string   `json:"priority_level"`
 	Score         *float64 `json:"score,omitempty"`
 	Name          string   `json:"name"`
 	Archived      bool     `json:"archived"`
@@ -658,9 +648,6 @@ func hashStickieYAML(y stickieYAML) string {
 	}
 	if y.CreatedByTask != nil {
 		mat.CreatedByTask = *y.CreatedByTask
-	}
-	if y.Priority != nil {
-		mat.PriorityLevel = *y.Priority
 	}
 	if y.Score != nil {
 		mat.Score = y.Score
@@ -688,9 +675,6 @@ func hashStickieDB(s pgdao.Stickie) string {
 	}
 	if s.CreatedByTaskID.Valid {
 		mat.CreatedByTask = s.CreatedByTaskID.String
-	}
-	if s.PriorityLevel.Valid {
-		mat.PriorityLevel = s.PriorityLevel.String
 	}
 	if s.Score.Valid {
 		v := s.Score.Float64

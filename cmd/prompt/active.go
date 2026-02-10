@@ -655,11 +655,6 @@ func (m promptModel) renderPreview() string {
 						out.WriteString("\n")
 					}
 				}
-				if st.PriorityLevel.Valid && strings.TrimSpace(st.PriorityLevel.String) != "" {
-					out.WriteString("- Priority: ")
-					out.WriteString(strings.TrimSpace(st.PriorityLevel.String))
-					out.WriteString("\n")
-				}
 				// Code block section if code exists
 				if st.Code.Valid {
 					code := strings.TrimSpace(st.Code.String)
@@ -761,11 +756,6 @@ func previewStickieText(st pgdao.Stickie) string {
 			out.WriteString(note)
 			out.WriteString("\n")
 		}
-	}
-	if st.PriorityLevel.Valid && strings.TrimSpace(st.PriorityLevel.String) != "" {
-		out.WriteString("- Priority: ")
-		out.WriteString(strings.TrimSpace(st.PriorityLevel.String))
-		out.WriteString("\n")
 	}
 	if st.Code.Valid {
 		code := strings.TrimSpace(st.Code.String)

@@ -83,7 +83,7 @@ High-level view of common fields (not exhaustive).
   - `topics(name, role_name) PK, title, description, created, updated, notes, tags`
 - Blackboards & Stickies
   - `blackboards(id UUID PK, role_name, conversation_id, project_name, task_id, created, updated, background, guidelines, lifecycle)`
-  - `stickies(id UUID PK, blackboard_id, name, note, labels TEXT[], created, updated, created_by_task_id, edit_count, priority_level, structured JSONB)`
+  - `stickies(id UUID PK, blackboard_id, name, note, labels TEXT[], created, updated, created_by_task_id, edit_count, structured JSONB)`
   - SQL mirror for graph edges: `stickie_relations(from_id, to_id, rel_type, labels TEXT[], created)`
 
 ## Relationships (FK vs. Graph)

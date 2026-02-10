@@ -16,7 +16,7 @@ lint:
 
 # Generic format: keep it simple and fast
 format:
-	gofmt -w .
+	go fmt ./...
 	npx @biomejs/biome format script --write
 	npx @biomejs/biome check script --write
 
@@ -25,7 +25,7 @@ format_unsafe:
 # Generic test: end-to-end script
 test: gen
 	$(ZX) script/test-all.mjs
-	$(RBC) blackboard import features
+	$(RBC) blackboard import notes
 	$(RBC) conversation set --role dev --title "rebec dev" --project "github/flarebyte/baldrick-rebec"
 
 lintb: 

@@ -34,7 +34,7 @@ Create via YAML (optional)
 2. Create / Update / Delete Stickies (CLI)
 
 - Create a stickie on a blackboard (by id):
-  `rbc stickie set --blackboard <BOARD_ID> --note "Evaluate CI caching for go build" --labels idea,devops --priority could --name "DevOps Caching"`
+  `rbc stickie set --blackboard <BOARD_ID> --note "Evaluate CI caching for go build" --labels idea,devops --name "DevOps Caching"`
 - Update a stickie by id (change any field):
   `rbc stickie set --id <STICKIE_ID> --note "Refine plan; prototype in a branch"`
 - Delete a stickie by id:
@@ -78,7 +78,7 @@ B) Import: folder → id
 - Reads `*.stickie.yaml` in the folder. One folder = one blackboard.
 - Rules and safety:
   - To update: include `id:` inside the YAML that already exists on that blackboard.
-  - The tool compares content hashes (topic/name/note/code/labels/priority/score/archived). If changed, it updates and DB sets `updated=now()` automatically.
+  - The tool compares content hashes (topic/name/note/code/labels/score/archived). If changed, it updates and DB sets `updated=now()` automatically.
   - To create: omit `id:` in YAML; a new UUID is assigned on insert.
   - Security guard: if a YAML has an `id` that does not exist for that blackboard, sync fails.
   - `updated` values in YAML are ignored on import.
@@ -127,8 +127,8 @@ Create a brand-new blackboard and stickies using the IDs in YAML files.
   - Fails fast if any existence check fails.
 
 Examples:
-- `rbc blackboard import features` (shows preview then imports)
-- `rbc blackboard import features --detailed` (more verbose preview)
+- `rbc blackboard import notes` (shows preview then imports)
+- `rbc blackboard import notes --detailed` (more verbose preview)
 
  5. Handy Checks
 
