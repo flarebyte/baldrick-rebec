@@ -8,7 +8,9 @@ labels:
     - compliance
     - documentation
     - stable
-created: "2026-01-19T09:27:24.347639Z"
-updated: "2026-01-19T09:27:24.347639Z"
+created: "2026-01-25T12:42:01.195872Z"
+updated: "2026-01-30T09:27:45.709383Z"
+edit_count: 1
 priority_level: could
+name: blackboard-lifecycle
 archived: false

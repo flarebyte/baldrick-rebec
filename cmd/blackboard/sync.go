@@ -578,6 +578,14 @@ func readStickieYAML(path string) (stickieYAML, error) {
 	if err := yaml.Unmarshal(b, &y); err != nil {
 		return stickieYAML{}, err
 	}
+	// If no explicit name is provided in YAML, try to infer it from the filename
+	// Pattern: about-<name>.stickie.yaml -> name
+	if y.Name == nil || strings.TrimSpace(getStrPtr(y.Name)) == "" {
+		if n := inferNameFromFilename(filepath.Base(path)); n != "" {
+			nn := n
+			y.Name = &nn
+		}
+	}
 	return y, nil
 }
 
@@ -771,4 +779,20 @@ func sanitizeForFile(s string) string {
 	}
 	out := strings.Trim(b.String(), "-")
 	return out
+}
+
+// inferNameFromFilename extracts a stickie name from a conventional filename.
+// Accepts patterns like "about-<name>.stickie.yaml" and returns "<name>".
+// Returns empty string when no name can be inferred.
+func inferNameFromFilename(filename string) string {
+	const suffix = ".stickie.yaml"
+	const prefix = "about-"
+	if !strings.HasSuffix(filename, suffix) {
+		return ""
+	}
+	base := strings.TrimSuffix(filename, suffix)
+	if strings.HasPrefix(base, prefix) {
+		return strings.TrimSpace(strings.TrimPrefix(base, prefix))
+	}
+	return ""
 }
