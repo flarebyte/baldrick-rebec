@@ -46,6 +46,11 @@ terms:
 termsc:
 	CONVERSATION_ID=$(CONV) osascript -l JavaScript script/terminals-conversation.js
 
+release:
+    # todo ensure we are on main ?
+	$(ZX) build-go.mjs
+	gh release create v$(VERSION) ./build/* --generate-notes
+
 # HUMAN: Print a clear list of available Make targets and what they do.
 # AI: Keep this static and explicit; do not auto-parse or add shell logic.
 help:
