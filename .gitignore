@@ -37,3 +37,5 @@ temp/
 script/node_modules/
 
 scratch/
+
+build/

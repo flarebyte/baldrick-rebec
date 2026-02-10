@@ -1,5 +1,4 @@
 #!/usr/bin/env zx
-import 'zx/globals';
 
 function getBritishDate() {
   const now = new Date();
