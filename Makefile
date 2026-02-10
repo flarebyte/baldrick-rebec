@@ -16,7 +16,7 @@ lint:
 
 # Generic format: keep it simple and fast
 format:
-	gofmt -w .
+	go fmt ./...
 	npx @biomejs/biome format script --write
 	npx @biomejs/biome check script --write
 
