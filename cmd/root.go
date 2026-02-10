@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/flarebyte/baldrick-rebec/cli"
 	bbcmd "github.com/flarebyte/baldrick-rebec/cmd/blackboard"
 	configcmd "github.com/flarebyte/baldrick-rebec/cmd/config"
 	"github.com/flarebyte/baldrick-rebec/cmd/conversation"
@@ -23,18 +24,17 @@ import (
 	tccmd "github.com/flarebyte/baldrick-rebec/cmd/testcase"
 	toolcmd "github.com/flarebyte/baldrick-rebec/cmd/tool"
 	vaultcmd "github.com/flarebyte/baldrick-rebec/cmd/vault"
+	vercmd "github.com/flarebyte/baldrick-rebec/cmd/version"
 	"github.com/flarebyte/baldrick-rebec/cmd/workflow"
 	wscmd "github.com/flarebyte/baldrick-rebec/cmd/workspace"
-	vercmd "github.com/flarebyte/baldrick-rebec/cmd/version"
 	"github.com/flarebyte/baldrick-rebec/internal/buildinfo"
-	"github.com/flarebyte/baldrick-rebec/cli"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-    Use:   "rbc",
-    Short: "Autonomous build automation and blackboard CLI",
-    Long:  helpIntro,
+	Use:   "rbc",
+	Short: "Autonomous build automation and blackboard CLI",
+	Long:  helpIntro,
 }
 
 func Execute() error {
@@ -42,18 +42,18 @@ func Execute() error {
 }
 
 func init() {
-    // Expose --version and the version subcommand
-    // Cobra adds --version when this is non-empty
-    v := buildinfo.Summary()
-    if v == "dev" && cli.Version != "" {
-        v = cli.Version
-    }
-    rootCmd.Version = v
-    rootCmd.AddCommand(vercmd.VersionCmd)
+	// Expose --version and the version subcommand
+	// Cobra adds --version when this is non-empty
+	v := buildinfo.Summary()
+	if v == "dev" && cli.Version != "" {
+		v = cli.Version
+	}
+	rootCmd.Version = v
+	rootCmd.AddCommand(vercmd.VersionCmd)
 
-    rootCmd.AddCommand(test.TestCmd)
-    // Expose former `admin` subcommands at the root level
-    rootCmd.AddCommand(conversation.ConversationCmd)
+	rootCmd.AddCommand(test.TestCmd)
+	// Expose former `admin` subcommands at the root level
+	rootCmd.AddCommand(conversation.ConversationCmd)
 	rootCmd.AddCommand(configcmd.ConfigCmd)
 	rootCmd.AddCommand(dbcmd.DBCmd)
 	rootCmd.AddCommand(qcmd.QueueCmd)
@@ -75,7 +75,7 @@ func init() {
 	rootCmd.AddCommand(snapcmd.SnapshotCmd)
 	rootCmd.AddCommand(vaultcmd.VaultCmd)
 	rootCmd.AddCommand(toolcmd.ToolCmd)
-    rootCmd.AddCommand(promptcmd.PromptCmd)
+	rootCmd.AddCommand(promptcmd.PromptCmd)
 }
 
 const helpIntro = `rbc - autonomous build automation and blackboard CLI
