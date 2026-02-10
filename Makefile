@@ -5,7 +5,7 @@
 # - Avoid variables that compute values; keep only stable constants.
 # - Do not add pattern rules, arguments, or conditionals.
 
-.PHONY: lint format test gen build clean help
+.PHONY: lint format test gen build release clean help
 
 ZX := npx zx
 RBC := go run main.go
@@ -47,9 +47,13 @@ termsc:
 	CONVERSATION_ID=$(CONV) osascript -l JavaScript script/terminals-conversation.js
 
 release:
-    # todo ensure we are on main ?
+    # Ensure version and GitHub CLI are available (no heavy logic)
+	@test -s VERSION || (echo "VERSION file missing (e.g., 1.2.3)" && exit 1)
+	@command -v gh >/dev/null || (echo "gh (GitHub CLI) is required" && exit 1)
+	rm -rf build
 	$(ZX) build-go.mjs
-	gh release create v$(VERSION) ./build/* --generate-notes
+	@echo "Creating GitHub release v$$(cat VERSION)"
+	gh release create v$$(cat VERSION) ./build/* --generate-notes
 
 # HUMAN: Print a clear list of available Make targets and what they do.
 # AI: Keep this static and explicit; do not auto-parse or add shell logic.
@@ -78,7 +82,4 @@ help:
 #
 # Why so simple:
 # - Biome config (biome.json) defines the scope (script/*.mjs). Calling the tool directly is sufficient.
-# Build rbc binaries with version/date injected via ldflags (see build-go.mjs)
-build:
-	npx zx build-go.mjs
 # - No shell logic in Makefile, no arguments or conditionals, no pattern rules.
