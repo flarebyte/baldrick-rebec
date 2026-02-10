@@ -85,5 +85,5 @@ help:
 # - Biome config (biome.json) defines the scope (script/*.mjs). Calling the tool directly is sufficient.
 # Build rbc binaries with version/date injected via ldflags (see build-go.mjs)
 build:
-	$(ZX) build-go.mjs
+		$(ZX) build-go.mjs
 # - No shell logic in Makefile, no arguments or conditionals, no pattern rules.
