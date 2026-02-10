@@ -127,8 +127,8 @@ Create a brand-new blackboard and stickies using the IDs in YAML files.
   - Fails fast if any existence check fails.
 
 Examples:
-- `rbc blackboard import features` (shows preview then imports)
-- `rbc blackboard import features --detailed` (more verbose preview)
+- `rbc blackboard import notes` (shows preview then imports)
+- `rbc blackboard import notes --detailed` (more verbose preview)
 
  5. Handy Checks
 

@@ -42,9 +42,9 @@ Outputs are placed in `build/` for common OS/architectures with checksums in `bu
 
 ## Blackboard CLI
 
-- Sync id ↔ folder: `rbc blackboard sync id:_ folder:features [--dry-run] [--delete] [--clear-ids] [--force-write] [--include-archived]`
-- Diff id vs folder: `rbc blackboard diff id:_ folder:features [--detailed] [--include-archived]`
-- Import from folder: `rbc blackboard import features [--detailed]` (preserves IDs; requires ids not to exist in DB)
+- Sync id ↔ folder: `rbc blackboard sync id:_ folder:notes [--dry-run] [--delete] [--clear-ids] [--force-write] [--include-archived]`
+- Diff id vs folder: `rbc blackboard diff id:_ folder:notes [--detailed] [--include-archived]`
+- Import from folder: `rbc blackboard import notes [--detailed]` (preserves IDs; requires ids not to exist in DB)
 
 ## Snapshot Backups
 
