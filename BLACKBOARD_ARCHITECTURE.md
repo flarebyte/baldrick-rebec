@@ -35,7 +35,7 @@ erDiagram
 
 - Stickies (`internal/dao/postgres/stickies.go` → table `stickies`)
 
-  - Fields: `id`, `blackboard_id`, `name?`, `note?`, `labels[]`, `created`, `updated`, `created_by_task_id?`, `edit_count`, `priority_level?`, `score?`, `archived`.
+  - Fields: `id`, `blackboard_id`, `name?`, `note?`, `labels[]`, `created`, `updated`, `created_by_task_id?`, `edit_count`, `score?`, `archived`.
   - FKs/refs:
     - `blackboard_id → blackboards.id`
     - topics linkage removed; use labels for categorization
