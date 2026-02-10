@@ -342,7 +342,6 @@ export async function stickieSet({
   code = '',
   labels = [],
   createdByTask = '',
-  priority = '',
   name = '',
   archived = false,
   score = null,
@@ -356,7 +355,6 @@ export async function stickieSet({
   if (code) args.push('--code', code);
   if (labels?.length) args.push('--labels', labels.join(','));
   if (createdByTask) args.push('--created-by-task', createdByTask);
-  if (priority) args.push('--priority', priority);
   if (name !== undefined) args.push('--name', name);
   if (archived) args.push('--archived');
   if (score !== null && score !== undefined)

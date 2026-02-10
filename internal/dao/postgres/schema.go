@@ -432,7 +432,7 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_blackboards_role_name ON blackboards(role_name)`,
 		// Topics removed; use tags/labels instead
 		// Stickies: notes attached to blackboards, optionally associated to topics
-		`CREATE TABLE IF NOT EXISTS stickies (
+        `CREATE TABLE IF NOT EXISTS stickies (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             blackboard_id UUID NOT NULL REFERENCES blackboards(id) ON DELETE CASCADE,
             -- removed topic_name/topic_role_name; use labels instead
@@ -442,7 +442,6 @@ func EnsureSchema(ctx context.Context, db *pgxpool.Pool) error {
             updated TIMESTAMPTZ NOT NULL DEFAULT now(),
             created_by_task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
             edit_count INT NOT NULL DEFAULT 0,
-            priority_level TEXT CHECK (priority_level IN ('must','should','could','wont') OR priority_level IS NULL),
             score DOUBLE PRECISION,
             name TEXT,
             archived BOOLEAN NOT NULL DEFAULT FALSE

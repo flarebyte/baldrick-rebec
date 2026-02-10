@@ -132,8 +132,8 @@ func upsertRow(ctx context.Context, db *pgxpool.Pool, tbl string, obj rowObj, up
 		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"name", ""}, {"package", ""}, {"classname", ""}, {"title", ""}, {"experiment_id", ":uuid"}, {"role_name", ""}, {"status", ""}, {"error_message", ""}, {"tags", ":jsonb"}, {"level", ""}, {"created", ":timestamptz"}, {"file", ""}, {"line", ""}, {"execution_time", ""}}, "id", upsert, obj)
 	case "tools":
 		return insertGeneric(ctx, db, tbl, []col{{"name", ""}, {"title", ""}, {"description", ""}, {"role_name", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"notes", ""}, {"tags", ":jsonb"}, {"settings", ":jsonb"}, {"tool_type", ""}}, "name", upsert, obj)
-	case "stickies":
-		return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"blackboard_id", ":uuid"}, {"note", ""}, {"labels", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"created_by_task_id", ":uuid"}, {"edit_count", ""}, {"priority_level", ""}, {"structured", ":jsonb"}}, "id", upsert, obj)
+    case "stickies":
+        return insertGeneric(ctx, db, tbl, []col{{"id", ":uuid"}, {"blackboard_id", ":uuid"}, {"note", ""}, {"labels", ""}, {"created", ":timestamptz"}, {"updated", ":timestamptz"}, {"created_by_task_id", ":uuid"}, {"edit_count", ""}, {"structured", ":jsonb"}}, "id", upsert, obj)
 	default:
 		return errors.New("unknown table: " + tbl)
 	}

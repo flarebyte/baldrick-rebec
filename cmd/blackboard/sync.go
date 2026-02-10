@@ -170,18 +170,17 @@ type blackboardYAML struct {
 }
 
 type stickieYAML struct {
-	ID            string         `yaml:"id,omitempty"`
-	Note          *LiteralString `yaml:"note,omitempty"`
-	Code          *string        `yaml:"code,omitempty"`
-	Labels        []string       `yaml:"labels,omitempty"`
-	Created       *string        `yaml:"created,omitempty"`
-	Updated       *string        `yaml:"updated,omitempty"`
-	CreatedByTask *string        `yaml:"created_by_task_id,omitempty"`
-	EditCount     int            `yaml:"edit_count,omitempty"`
-	Priority      *string        `yaml:"priority_level,omitempty"`
-	Score         *float64       `yaml:"score,omitempty"`
-	Name          *string        `yaml:"name,omitempty"`
-	Archived      bool           `yaml:"archived"`
+    ID            string         `yaml:"id,omitempty"`
+    Note          *LiteralString `yaml:"note,omitempty"`
+    Code          *string        `yaml:"code,omitempty"`
+    Labels        []string       `yaml:"labels,omitempty"`
+    Created       *string        `yaml:"created,omitempty"`
+    Updated       *string        `yaml:"updated,omitempty"`
+    CreatedByTask *string        `yaml:"created_by_task_id,omitempty"`
+    EditCount     int            `yaml:"edit_count,omitempty"`
+    Score         *float64       `yaml:"score,omitempty"`
+    Name          *string        `yaml:"name,omitempty"`
+    Archived      bool           `yaml:"archived"`
 }
 
 type minimalUpdatedYAML struct {
@@ -330,22 +329,18 @@ func syncIDToFolder(blackboardID, relFolder string, allowDelete, dryRun bool) er
 			v := s.Updated.Time.Format(time.RFC3339Nano)
 			sy.Updated = &v
 		}
-		if s.CreatedByTaskID.Valid && s.CreatedByTaskID.String != "" {
-			v := s.CreatedByTaskID.String
-			sy.CreatedByTask = &v
-		}
-		if s.PriorityLevel.Valid && s.PriorityLevel.String != "" {
-			v := s.PriorityLevel.String
-			sy.Priority = &v
-		}
-		if s.Score.Valid {
-			v := s.Score.Float64
-			sy.Score = &v
-		}
-		if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
-			v := s.Name.String
-			sy.Name = &v
-		}
+        if s.CreatedByTaskID.Valid && s.CreatedByTaskID.String != "" {
+            v := s.CreatedByTaskID.String
+            sy.CreatedByTask = &v
+        }
+        if s.Score.Valid {
+            v := s.Score.Float64
+            sy.Score = &v
+        }
+        if s.Name.Valid && strings.TrimSpace(s.Name.String) != "" {
+            v := s.Name.String
+            sy.Name = &v
+        }
 
 		fn := filepath.Join(destDir, stickieFileName(s))
 		seen[filepath.Base(fn)] = struct{}{}
@@ -609,36 +604,31 @@ func stickieFromYAMLForUpsert(y stickieYAML, blackboardID string) pgdao.Stickie 
 		sort.Strings(cp)
 		s.Labels = cp
 	}
-	if y.CreatedByTask != nil {
-		s.CreatedByTaskID.Valid = true
-		s.CreatedByTaskID.String = *y.CreatedByTask
-	}
-	if y.Priority != nil {
-		s.PriorityLevel.Valid = true
-		s.PriorityLevel.String = *y.Priority
-	}
-	if y.Score != nil {
-		s.Score.Valid = true
-		s.Score.Float64 = *y.Score
-	}
-	if y.Name != nil {
-		s.Name.Valid = true
-		s.Name.String = *y.Name
-	}
+    if y.CreatedByTask != nil {
+        s.CreatedByTaskID.Valid = true
+        s.CreatedByTaskID.String = *y.CreatedByTask
+    }
+    if y.Score != nil {
+        s.Score.Valid = true
+        s.Score.Float64 = *y.Score
+    }
+    if y.Name != nil {
+        s.Name.Valid = true
+        s.Name.String = *y.Name
+    }
 	s.Archived = y.Archived
 	return s
 }
 
 // Hash utilities (SHA-256) for stickie content comparison
 type stickieHashMaterial struct {
-	Note          string   `json:"note"`
-	Code          string   `json:"code"`
-	Labels        []string `json:"labels"`
-	CreatedByTask string   `json:"created_by_task_id"`
-	PriorityLevel string   `json:"priority_level"`
-	Score         *float64 `json:"score,omitempty"`
-	Name          string   `json:"name"`
-	Archived      bool     `json:"archived"`
+    Note          string   `json:"note"`
+    Code          string   `json:"code"`
+    Labels        []string `json:"labels"`
+    CreatedByTask string   `json:"created_by_task_id"`
+    Score         *float64 `json:"score,omitempty"`
+    Name          string   `json:"name"`
+    Archived      bool     `json:"archived"`
 }
 
 func hashStickieYAML(y stickieYAML) string {
@@ -656,12 +646,9 @@ func hashStickieYAML(y stickieYAML) string {
 		sort.Strings(cp)
 		mat.Labels = cp
 	}
-	if y.CreatedByTask != nil {
-		mat.CreatedByTask = *y.CreatedByTask
-	}
-	if y.Priority != nil {
-		mat.PriorityLevel = *y.Priority
-	}
+    if y.CreatedByTask != nil {
+        mat.CreatedByTask = *y.CreatedByTask
+    }
 	if y.Score != nil {
 		mat.Score = y.Score
 	}
@@ -686,12 +673,9 @@ func hashStickieDB(s pgdao.Stickie) string {
 		sort.Strings(cp)
 		mat.Labels = cp
 	}
-	if s.CreatedByTaskID.Valid {
-		mat.CreatedByTask = s.CreatedByTaskID.String
-	}
-	if s.PriorityLevel.Valid {
-		mat.PriorityLevel = s.PriorityLevel.String
-	}
+    if s.CreatedByTaskID.Valid {
+        mat.CreatedByTask = s.CreatedByTaskID.String
+    }
 	if s.Score.Valid {
 		v := s.Score.Float64
 		mat.Score = &v

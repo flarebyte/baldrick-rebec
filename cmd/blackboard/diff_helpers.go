@@ -61,9 +61,8 @@ func listChangedStickieFields(r pgdao.Stickie, l stickieYAML) []string {
 	// exporter wraps notes at 80; normalize remote with wrapAt to avoid false diffs
 	add("note", norm(wrapIfValid(r.Note)) != norm(getLitPtr(l.Note)))
 	add("code", norm(getNS(r.Code)) != norm(getStrPtr(l.Code)))
-	add("labels", !equalStringSets(r.Labels, l.Labels))
-	add("priority_level", strings.TrimSpace(getNS(r.PriorityLevel)) != strings.TrimSpace(getStrPtr(l.Priority)))
-	add("created_by_task_id", strings.TrimSpace(getNS(r.CreatedByTaskID)) != strings.TrimSpace(getStrPtr(l.CreatedByTask)))
+    add("labels", !equalStringSets(r.Labels, l.Labels))
+    add("created_by_task_id", strings.TrimSpace(getNS(r.CreatedByTaskID)) != strings.TrimSpace(getStrPtr(l.CreatedByTask)))
 	if floatChanged(r.Score, l.Score) {
 		out = append(out, "score")
 	}
@@ -93,11 +92,10 @@ func computeStickieFieldDiff(r pgdao.Stickie, l stickieYAML) []fieldDetail {
 	if norm(getNS(r.Code)) != norm(getStrPtr(l.Code)) {
 		add("code", shortHash(getNS(r.Code)), shortHash(getStrPtr(l.Code)), true)
 	}
-	if !equalStringSets(r.Labels, l.Labels) {
-		add("labels", fmt.Sprintf("%v", sortedCopy(r.Labels)), fmt.Sprintf("%v", sortedCopy(l.Labels)), true)
-	}
-	add("priority_level", getNS(r.PriorityLevel), getStrPtr(l.Priority), strings.TrimSpace(getNS(r.PriorityLevel)) != strings.TrimSpace(getStrPtr(l.Priority)))
-	add("created_by_task_id", getNS(r.CreatedByTaskID), getStrPtr(l.CreatedByTask), strings.TrimSpace(getNS(r.CreatedByTaskID)) != strings.TrimSpace(getStrPtr(l.CreatedByTask)))
+    if !equalStringSets(r.Labels, l.Labels) {
+        add("labels", fmt.Sprintf("%v", sortedCopy(r.Labels)), fmt.Sprintf("%v", sortedCopy(l.Labels)), true)
+    }
+    add("created_by_task_id", getNS(r.CreatedByTaskID), getStrPtr(l.CreatedByTask), strings.TrimSpace(getNS(r.CreatedByTaskID)) != strings.TrimSpace(getStrPtr(l.CreatedByTask)))
 	if floatChanged(r.Score, l.Score) {
 		rv := ""
 		lv := ""

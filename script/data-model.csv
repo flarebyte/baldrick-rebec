@@ -9,7 +9,6 @@ stickie,created,Time,true,sql.NullTime,true
 stickie,updated,Time,true,sql.NullTime,true
 stickie,created_by_task_id,String,false,sql.NullString,true
 stickie,edit_count,Number,true,int,true
-stickie,priority_level,String,false,sql.NullString,true
 stickie,score,Number,false,sql.NullFloat64,true
 stickie,archived,Boolean,true,bool,true
 stickie,structured,Object,false,JSONB,true
