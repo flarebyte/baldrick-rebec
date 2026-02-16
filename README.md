@@ -31,14 +31,23 @@ See DATABASES.md for full workflow and a setup checklist. For ops-focused learni
 
 ## Build
 
-- Source of truth for version: a root `VERSION` file (single line, e.g., `1.2.3`).
-- Build with ZX (injects `cli.Version` and `cli.Date` via `-ldflags`):
+- Version source of truth: `main.project.yaml` → `tags.version`.
+- Build with Bun (injects `cli.Version` and `cli.Date` via `-ldflags`):
   - `make build`
-  - or `npx zx build-go.mjs`
-- CI override (skip file):
-  - `VERSION=1.2.3 npx zx build-go.mjs`
+  - or `bun run build-go.ts`
+- Fallbacks: If `tags.version` is missing, `build-go.ts` falls back to `VERSION` env or `VERSION` file, then `0.0.0`.
 
 Outputs are placed in `build/` for common OS/architectures with checksums in `build/checksums.txt`.
+
+## Release
+
+- Prerequisites:
+  - `gh` (GitHub CLI) installed and authenticated.
+  - `main.project.yaml` contains `tags.version` (e.g., `0.6.0`).
+- Commands:
+  - Preview: `make release-dry` (prints actions; no changes).
+  - Publish: `make release` (builds binaries and creates GitHub release `v<version>`).
+- No parameters needed for `make release`. Set the version in `main.project.yaml` beforehand.
 
 ## Blackboard CLI
 

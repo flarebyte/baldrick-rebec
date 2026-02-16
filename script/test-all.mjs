@@ -109,7 +109,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 25;
+const TOTAL = 28;
 let step = 0;
 
 try {
@@ -401,10 +401,26 @@ try {
   await projectSet({
     name: 'github/flarebyte/baldrick-rebec',
     role: 'dev',
-    description: 'Main repository',
+    description: 'Autonomous build automation tool and task runner',
     notes: 'Project for dev role',
-    tags: 'source=github,org=flarebyte',
+    tags: 'source=github,org=flarebyte,version=0.6.0',
   });
+  // 7.1) Keep repo project YAML in sync at repo root
+  step++;
+  logStep(step, TOTAL, 'Syncing baldrick-rebec project YAML to repo root');
+  try {
+    await $`rm -f ./main.project.yaml ./github-flarebyte-baldrick-rebec.project.yaml`;
+  } catch {}
+  await $`go run main.go project sync name:github/flarebyte/baldrick-rebec folder:. --role dev`;
+  // Rename default exported filename to canonical main.project.yaml
+  await $`bash -lc 'if [ -f ./github-flarebyte-baldrick-rebec.project.yaml ]; then mv ./github-flarebyte-baldrick-rebec.project.yaml ./main.project.yaml; fi'`;
+  const repoPrj =
+    await $`test -f ./main.project.yaml && echo OK || echo MISSING`;
+  await assertStep(
+    'repo project yaml exists',
+    String(repoPrj.stdout || '').includes('OK'),
+    'expected main.project.yaml at repo root',
+  );
   {
     const pj = await projectGetJSON({
       name: 'acme/complete',
@@ -424,6 +440,68 @@ try {
   {
     const prj = await projectListJSON({ role: TEST_ROLE_USER, limit: 50 });
     validateProjectListContract(prj);
+  }
+
+  // 7.4) Project sync to folder
+  step++;
+  logStep(step, TOTAL, 'Exporting project to temp/project-test');
+  try {
+    await $`rm -rf temp/project-test`;
+  } catch {}
+  await $`go run main.go project sync name:acme/complete folder:temp/project-test --role ${TEST_ROLE_USER}`;
+  const prjYaml =
+    await $`test -f temp/project-test/acme-complete.project.yaml && echo OK || echo MISSING`;
+  // Validate basic content: must include name and role
+  const content =
+    await $`bash -lc 'cat temp/project-test/acme-complete.project.yaml || true'`;
+  const hasName = String(content.stdout || '').includes('name: acme/complete');
+  const hasRole = String(content.stdout || '').includes(
+    `role: ${TEST_ROLE_USER}`,
+  );
+  await assertStep(
+    'project synced to folder',
+    String(prjYaml.stdout || '').includes('OK') && hasName && hasRole,
+    'expected exported project YAML missing or missing required fields (name, role)',
+  );
+  // Dry-run should not error
+  try {
+    await $`go run main.go project sync name:acme/complete folder:temp/project-test --role ${TEST_ROLE_USER} --dry-run`;
+    await assertStep('project sync dry-run ok', true);
+  } catch (_e) {
+    await assertStep(
+      'project sync dry-run ok',
+      false,
+      'expected project sync dry-run to succeed',
+    );
+  }
+
+  // 7.4b) Project import from folder (folder -> name)
+  step++;
+  logStep(
+    step,
+    TOTAL,
+    'Importing project from temp/project-import (folder->name)',
+  );
+  try {
+    await $`rm -rf temp/project-import`;
+  } catch {}
+  await $`mkdir -p temp/project-import`;
+  await $`bash -lc 'cat > temp/project-import/acme-complete.project.yaml <<EOF\nname: acme/complete\nrole: ${TEST_ROLE_USER}\ndescription: Updated via import\nnotes: Updated via import\ntags:\n  imported: true\nEOF'`;
+  await $`go run main.go project sync folder:temp/project-import name:acme/complete`;
+  {
+    const pj2 = await projectGetJSON({
+      name: 'acme/complete',
+      role: TEST_ROLE_USER,
+    });
+    const ok2 =
+      !!pj2 &&
+      pj2.description === 'Updated via import' &&
+      pj2.notes === 'Updated via import';
+    await assertStep(
+      'project imported and updated',
+      ok2,
+      'project import did not update fields as expected',
+    );
   }
 
   // 7.5) Tools

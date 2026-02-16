@@ -2,22 +2,34 @@
 // @generated from file prompt/v1/prompt.proto (package prompt.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import type { Value } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
-import type { JsonObject, Message } from "@bufbuild/protobuf";
+import type { JsonObject, Message } from '@bufbuild/protobuf';
+import type {
+  GenFile,
+  GenMessage,
+  GenService,
+} from '@bufbuild/protobuf/codegenv2';
+import {
+  fileDesc,
+  messageDesc,
+  serviceDesc,
+} from '@bufbuild/protobuf/codegenv2';
+import type { Value } from '@bufbuild/protobuf/wkt';
+import { file_google_protobuf_struct } from '@bufbuild/protobuf/wkt';
 
 /**
  * Describes the file prompt/v1/prompt.proto.
  */
-export const file_prompt_v1_prompt: GenFile = /*@__PURE__*/
-  fileDesc("ChZwcm9tcHQvdjEvcHJvbXB0LnByb3RvEglwcm9tcHQudjEiSQoMVG9vbEZ1bmN0aW9uEgwKBG5hbWUYASABKAkSKwoKcGFyYW1ldGVycxgCIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QiSQoOVG9vbERlZmluaXRpb24SDAoEdHlwZRgBIAEoCRIpCghmdW5jdGlvbhgCIAEoCzIXLnByb21wdC52MS5Ub29sRnVuY3Rpb24iRAoIVG9vbENhbGwSDAoEbmFtZRgBIAEoCRIqCglhcmd1bWVudHMYAiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0IlIKDENvbnRlbnRCbG9jaxIMCgR0eXBlGAEgASgJEgwKBHRleHQYAiABKAkSJgoJdG9vbF9jYWxsGAMgASgLMhMucHJvbXB0LnYxLlRvb2xDYWxsIkoKBVVzYWdlEhQKDGlucHV0X3Rva2VucxgBIAEoBRIVCg1vdXRwdXRfdG9rZW5zGAIgASgFEhQKDHRvdGFsX3Rva2VucxgDIAEoBSK1AQoQUHJvbXB0UnVuUmVxdWVzdBIRCgl0b29sX25hbWUYASABKAkSDQoFbW9kZWwYAiABKAkSJQoFaW5wdXQYAyABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUSKAoFdG9vbHMYBCADKAsyGS5wcm9tcHQudjEuVG9vbERlZmluaXRpb24SEwoLdGVtcGVyYXR1cmUYBSABKAISGQoRbWF4X291dHB1dF90b2tlbnMYBiABKAUimQEKEVByb21wdFJ1blJlc3BvbnNlEgoKAmlkGAEgASgJEg4KBm9iamVjdBgCIAEoCRINCgVtb2RlbBgDIAEoCRIPCgdjcmVhdGVkGAQgASgDEicKBm91dHB1dBgFIAMoCzIXLnByb21wdC52MS5Db250ZW50QmxvY2sSHwoFdXNhZ2UYBiABKAsyEC5wcm9tcHQudjEuVXNhZ2UyUQoNUHJvbXB0U2VydmljZRJACgNSdW4SGy5wcm9tcHQudjEuUHJvbXB0UnVuUmVxdWVzdBocLnByb21wdC52MS5Qcm9tcHRSdW5SZXNwb25zZUJFWkNnaXRodWIuY29tL2ZsYXJlYnl0ZS9iYWxkcmljay1yZWJlYy9pbnRlcm5hbC9nZW4vcHJvbXB0L3YxO3Byb21wdHYxYgZwcm90bzM", [file_google_protobuf_struct]);
+export const file_prompt_v1_prompt: GenFile =
+  /*@__PURE__*/
+  fileDesc(
+    'ChZwcm9tcHQvdjEvcHJvbXB0LnByb3RvEglwcm9tcHQudjEiSQoMVG9vbEZ1bmN0aW9uEgwKBG5hbWUYASABKAkSKwoKcGFyYW1ldGVycxgCIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QiSQoOVG9vbERlZmluaXRpb24SDAoEdHlwZRgBIAEoCRIpCghmdW5jdGlvbhgCIAEoCzIXLnByb21wdC52MS5Ub29sRnVuY3Rpb24iRAoIVG9vbENhbGwSDAoEbmFtZRgBIAEoCRIqCglhcmd1bWVudHMYAiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0IlIKDENvbnRlbnRCbG9jaxIMCgR0eXBlGAEgASgJEgwKBHRleHQYAiABKAkSJgoJdG9vbF9jYWxsGAMgASgLMhMucHJvbXB0LnYxLlRvb2xDYWxsIkoKBVVzYWdlEhQKDGlucHV0X3Rva2VucxgBIAEoBRIVCg1vdXRwdXRfdG9rZW5zGAIgASgFEhQKDHRvdGFsX3Rva2VucxgDIAEoBSK1AQoQUHJvbXB0UnVuUmVxdWVzdBIRCgl0b29sX25hbWUYASABKAkSDQoFbW9kZWwYAiABKAkSJQoFaW5wdXQYAyABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUSKAoFdG9vbHMYBCADKAsyGS5wcm9tcHQudjEuVG9vbERlZmluaXRpb24SEwoLdGVtcGVyYXR1cmUYBSABKAISGQoRbWF4X291dHB1dF90b2tlbnMYBiABKAUimQEKEVByb21wdFJ1blJlc3BvbnNlEgoKAmlkGAEgASgJEg4KBm9iamVjdBgCIAEoCRINCgVtb2RlbBgDIAEoCRIPCgdjcmVhdGVkGAQgASgDEicKBm91dHB1dBgFIAMoCzIXLnByb21wdC52MS5Db250ZW50QmxvY2sSHwoFdXNhZ2UYBiABKAsyEC5wcm9tcHQudjEuVXNhZ2UyUQoNUHJvbXB0U2VydmljZRJACgNSdW4SGy5wcm9tcHQudjEuUHJvbXB0UnVuUmVxdWVzdBocLnByb21wdC52MS5Qcm9tcHRSdW5SZXNwb25zZUJFWkNnaXRodWIuY29tL2ZsYXJlYnl0ZS9iYWxkcmljay1yZWJlYy9pbnRlcm5hbC9nZW4vcHJvbXB0L3YxO3Byb21wdHYxYgZwcm90bzM',
+    [file_google_protobuf_struct],
+  );
 
 /**
  * @generated from message prompt.v1.ToolFunction
  */
-export type ToolFunction = Message<"prompt.v1.ToolFunction"> & {
+export type ToolFunction = Message<'prompt.v1.ToolFunction'> & {
   /**
    * @generated from field: string name = 1;
    */
@@ -33,13 +45,14 @@ export type ToolFunction = Message<"prompt.v1.ToolFunction"> & {
  * Describes the message prompt.v1.ToolFunction.
  * Use `create(ToolFunctionSchema)` to create a new message.
  */
-export const ToolFunctionSchema: GenMessage<ToolFunction> = /*@__PURE__*/
+export const ToolFunctionSchema: GenMessage<ToolFunction> =
+  /*@__PURE__*/
   messageDesc(file_prompt_v1_prompt, 0);
 
 /**
  * @generated from message prompt.v1.ToolDefinition
  */
-export type ToolDefinition = Message<"prompt.v1.ToolDefinition"> & {
+export type ToolDefinition = Message<'prompt.v1.ToolDefinition'> & {
   /**
    * always "function"
    *
@@ -57,13 +70,14 @@ export type ToolDefinition = Message<"prompt.v1.ToolDefinition"> & {
  * Describes the message prompt.v1.ToolDefinition.
  * Use `create(ToolDefinitionSchema)` to create a new message.
  */
-export const ToolDefinitionSchema: GenMessage<ToolDefinition> = /*@__PURE__*/
+export const ToolDefinitionSchema: GenMessage<ToolDefinition> =
+  /*@__PURE__*/
   messageDesc(file_prompt_v1_prompt, 1);
 
 /**
  * @generated from message prompt.v1.ToolCall
  */
-export type ToolCall = Message<"prompt.v1.ToolCall"> & {
+export type ToolCall = Message<'prompt.v1.ToolCall'> & {
   /**
    * @generated from field: string name = 1;
    */
@@ -79,13 +93,14 @@ export type ToolCall = Message<"prompt.v1.ToolCall"> & {
  * Describes the message prompt.v1.ToolCall.
  * Use `create(ToolCallSchema)` to create a new message.
  */
-export const ToolCallSchema: GenMessage<ToolCall> = /*@__PURE__*/
+export const ToolCallSchema: GenMessage<ToolCall> =
+  /*@__PURE__*/
   messageDesc(file_prompt_v1_prompt, 2);
 
 /**
  * @generated from message prompt.v1.ContentBlock
  */
-export type ContentBlock = Message<"prompt.v1.ContentBlock"> & {
+export type ContentBlock = Message<'prompt.v1.ContentBlock'> & {
   /**
    * "output_text" or "tool_call"
    *
@@ -112,13 +127,14 @@ export type ContentBlock = Message<"prompt.v1.ContentBlock"> & {
  * Describes the message prompt.v1.ContentBlock.
  * Use `create(ContentBlockSchema)` to create a new message.
  */
-export const ContentBlockSchema: GenMessage<ContentBlock> = /*@__PURE__*/
+export const ContentBlockSchema: GenMessage<ContentBlock> =
+  /*@__PURE__*/
   messageDesc(file_prompt_v1_prompt, 3);
 
 /**
  * @generated from message prompt.v1.Usage
  */
-export type Usage = Message<"prompt.v1.Usage"> & {
+export type Usage = Message<'prompt.v1.Usage'> & {
   /**
    * @generated from field: int32 input_tokens = 1;
    */
@@ -139,13 +155,14 @@ export type Usage = Message<"prompt.v1.Usage"> & {
  * Describes the message prompt.v1.Usage.
  * Use `create(UsageSchema)` to create a new message.
  */
-export const UsageSchema: GenMessage<Usage> = /*@__PURE__*/
+export const UsageSchema: GenMessage<Usage> =
+  /*@__PURE__*/
   messageDesc(file_prompt_v1_prompt, 4);
 
 /**
  * @generated from message prompt.v1.PromptRunRequest
  */
-export type PromptRunRequest = Message<"prompt.v1.PromptRunRequest"> & {
+export type PromptRunRequest = Message<'prompt.v1.PromptRunRequest'> & {
   /**
    * @generated from field: string tool_name = 1;
    */
@@ -181,13 +198,14 @@ export type PromptRunRequest = Message<"prompt.v1.PromptRunRequest"> & {
  * Describes the message prompt.v1.PromptRunRequest.
  * Use `create(PromptRunRequestSchema)` to create a new message.
  */
-export const PromptRunRequestSchema: GenMessage<PromptRunRequest> = /*@__PURE__*/
+export const PromptRunRequestSchema: GenMessage<PromptRunRequest> =
+  /*@__PURE__*/
   messageDesc(file_prompt_v1_prompt, 5);
 
 /**
  * @generated from message prompt.v1.PromptRunResponse
  */
-export type PromptRunResponse = Message<"prompt.v1.PromptRunResponse"> & {
+export type PromptRunResponse = Message<'prompt.v1.PromptRunResponse'> & {
   /**
    * @generated from field: string id = 1;
    */
@@ -223,7 +241,8 @@ export type PromptRunResponse = Message<"prompt.v1.PromptRunResponse"> & {
  * Describes the message prompt.v1.PromptRunResponse.
  * Use `create(PromptRunResponseSchema)` to create a new message.
  */
-export const PromptRunResponseSchema: GenMessage<PromptRunResponse> = /*@__PURE__*/
+export const PromptRunResponseSchema: GenMessage<PromptRunResponse> =
+  /*@__PURE__*/
   messageDesc(file_prompt_v1_prompt, 6);
 
 /**
@@ -234,10 +253,8 @@ export const PromptService: GenService<{
    * @generated from rpc prompt.v1.PromptService.Run
    */
   run: {
-    methodKind: "unary";
+    methodKind: 'unary';
     input: typeof PromptRunRequestSchema;
     output: typeof PromptRunResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_prompt_v1_prompt, 0);
-
+  };
+}> = /*@__PURE__*/ serviceDesc(file_prompt_v1_prompt, 0);
