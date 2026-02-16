@@ -25,4 +25,11 @@ export type E2EContext = {
   step: number;
   state: E2EState;
   nextStep: (msg: string) => void;
+  check: (cond: unknown, msg: string) => void;
+  checkStep: (
+    stepName: string,
+    cond: unknown,
+    msg?: string,
+    details?: string,
+  ) => Promise<void>;
 };

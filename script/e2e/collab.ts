@@ -1,7 +1,5 @@
 import { createConnectGrpcJsonClient } from '../grpc-json-client-connect.mjs';
 import {
-  assert,
-  assertStep,
   conversationGetJSON,
   conversationListJSON,
   conversationSet,
@@ -104,7 +102,7 @@ export async function runCollab(ctx: E2EContext) {
       c2.tags &&
       typeof c2.tags === 'object' &&
       c2.tags.area === 'qa';
-    await assertStep(
+    await ctx.checkStep(
       'conversation 2 validated',
       okConv2,
       'conv2 fields mismatch',
@@ -195,7 +193,7 @@ export async function runCollab(ctx: E2EContext) {
         x?.title === 'Integration: DB connect smoke' &&
         x?.status?.toUpperCase() === 'TODO',
     );
-    await assertStep(
+    await ctx.checkStep(
       'testcases created',
       Array.isArray(tcs) &&
         tcs.length >= 5 &&
@@ -262,7 +260,7 @@ export async function runCollab(ctx: E2EContext) {
     const gotStrings = items2.find(
       (x) => x?.title === 'Unit: string utils' && x?.status === 'OK',
     );
-    await assertStep(
+    await ctx.checkStep(
       'testcases exp2 created',
       Array.isArray(tcs2) && tcs2.length >= 3 && !!gotAPI && !!gotStrings,
       'expected testcases missing in second experiment',
@@ -283,14 +281,14 @@ export async function runCollab(ctx: E2EContext) {
       file: 'grpc.json',
       line: 1,
     });
-    assert(created?.id, 'grpc testcase create missing id');
+    ctx.check(created?.id, 'grpc testcase create missing id');
     const listed = await client.testcase.List({
       role: ctx.TEST_ROLE_USER,
       experiment: ctx.state.expID,
       limit: 10,
       offset: 0,
     });
-    assert(
+    ctx.check(
       listed && Array.isArray(listed.items),
       'grpc testcase list missing items',
     );
@@ -298,9 +296,9 @@ export async function runCollab(ctx: E2EContext) {
       Array.isArray(listed?.items) ? listed.items : []
     ) as TestcaseListItem[];
     const found = listedItems.find((x) => x?.id === created.id);
-    assert(!!found, 'grpc testcase not found in list');
+    ctx.check(!!found, 'grpc testcase not found in list');
     const del = await client.testcase.Delete({ id: created.id });
-    assert(
+    ctx.check(
       del && (del.deleted === 1 || del.deleted === '1'),
       'grpc delete did not report 1',
     );

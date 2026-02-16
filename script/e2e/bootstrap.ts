@@ -1,6 +1,4 @@
 import {
-  assert,
-  assertStep,
   createScript,
   dbReset,
   dbScaffoldAll,
@@ -43,7 +41,7 @@ export async function runBootstrap(ctx: E2EContext) {
   );
   await dbScaffoldAll();
   await enableAssertConnect();
-  await assertStep('db scaffolded', true, 'db scaffold should succeed');
+  await ctx.checkStep('db scaffolded', true, 'db scaffold should succeed');
 
   ctx.nextStep('Ensuring roles for test users (FK for packages)');
   await runSetRole({ name: ctx.TEST_ROLE_USER, title: 'RBCTest User' });
@@ -56,7 +54,7 @@ export async function runBootstrap(ctx: E2EContext) {
     validateRoleContract(rQA, { allowEmptyTitle: false });
     const rList = await roleListJSON({ limit: 200 });
     const parsed = validateRoleListContract(rList, { allowEmptyTitle: false });
-    await assertStep(
+    await ctx.checkStep(
       'roles seeded',
       parsed.length >= 3,
       'expected at least the 3 test roles in role list',
@@ -87,7 +85,7 @@ export async function runBootstrap(ctx: E2EContext) {
     });
     validateWorkflowListContract(wfList, { allowEmptyTitle: false });
   }
-  await assertStep(
+  await ctx.checkStep(
     'workflows created',
     true,
     'workflows were created and listed',
@@ -137,24 +135,24 @@ export async function runBootstrap(ctx: E2EContext) {
     });
     const byId = (id: string) => parsedScripts.find((x) => x.id === id);
     const ju = byId(ctx.state.sidUnit || '');
-    assert(ju, 'script list json missing unit script');
-    assert(
+    ctx.check(ju, 'script list json missing unit script');
+    ctx.check(
       ju.name === 'Unit: go test',
       'unit script name mismatch in list json',
     );
-    assert(
+    ctx.check(
       (ju.variant ?? '') === '',
       'unit script variant should be empty in list json',
     );
 
     const ji = byId(ctx.state.sidInteg || '');
-    assert(
+    ctx.check(
       ji && ji.name === 'Integration: compose+test',
       'integration script not present or name mismatch',
     );
 
     const jl = byId(ctx.state.sidLint || '');
-    assert(
+    ctx.check(
       jl && jl.name === 'Lint & Vet',
       'lint script not present or name mismatch',
     );
@@ -164,12 +162,12 @@ export async function runBootstrap(ctx: E2EContext) {
       variant: '',
       role: ctx.TEST_ROLE_USER,
     });
-    assert(
+    ctx.check(
       foundUnit && foundUnit.id === ctx.state.sidUnit,
       'script find did not resolve unit by complex name',
     );
   }
-  await assertStep(
+  await ctx.checkStep(
     'scripts created',
     true,
     'scripts were created and validated',

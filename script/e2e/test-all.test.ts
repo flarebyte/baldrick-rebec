@@ -28,12 +28,31 @@ async function runSerial(fn: () => Promise<void>) {
   }
 }
 
+function withBunExpectContext(
+  overrides: { skipSnapshot?: boolean; showSteps?: boolean } = {},
+) {
+  const ctx = createContext({ ...TEST_CONTEXT_OPTS, ...overrides });
+  ctx.check = (cond: unknown, msg: string) => {
+    expect(Boolean(cond), msg).toBeTrue();
+  };
+  ctx.checkStep = async (
+    stepName: string,
+    cond: unknown,
+    msg = '',
+    details = '',
+  ) => {
+    const fullMsg = [stepName, msg, details].filter(Boolean).join(' | ');
+    expect(Boolean(cond), fullMsg).toBeTrue();
+  };
+  return ctx;
+}
+
 describe('E2E Integration', () => {
   test(
     'bootstrap phase',
     async () => {
       await runSerial(async () => {
-        const ctx = createContext(TEST_CONTEXT_OPTS);
+        const ctx = withBunExpectContext();
         await runBootstrap(ctx);
         expect(ctx.state.sidUnit).toBeTruthy();
         expect(ctx.state.tUnit).toBeTruthy();
@@ -46,7 +65,7 @@ describe('E2E Integration', () => {
     'project phase',
     async () => {
       await runSerial(async () => {
-        const ctx = createContext(TEST_CONTEXT_OPTS);
+        const ctx = withBunExpectContext();
         await runUntilProject(ctx);
         expect(ctx.step).toBeGreaterThan(0);
         expect(await Bun.file('main.project.yaml').exists()).toBe(true);
@@ -59,7 +78,7 @@ describe('E2E Integration', () => {
     'blackboard phase',
     async () => {
       await runSerial(async () => {
-        const ctx = createContext(TEST_CONTEXT_OPTS);
+        const ctx = withBunExpectContext();
         await runUntilBlackboard(ctx);
         expect(ctx.state.bb1).toBeTruthy();
         expect(ctx.state.st1).toBeTruthy();
@@ -72,7 +91,7 @@ describe('E2E Integration', () => {
     'collaboration phase',
     async () => {
       await runSerial(async () => {
-        const ctx = createContext(TEST_CONTEXT_OPTS);
+        const ctx = withBunExpectContext();
         await runUntilCollab(ctx);
         expect(ctx.state.convID).toBeTruthy();
         expect(ctx.state.expID).toBeTruthy();
@@ -85,7 +104,7 @@ describe('E2E Integration', () => {
     'listing, sync and import phase',
     async () => {
       await runSerial(async () => {
-        const ctx = createContext(TEST_CONTEXT_OPTS);
+        const ctx = withBunExpectContext();
         await runUntilListing(ctx);
         expect(
           await Bun.file('temp/blackboard-test/blackboard.yaml').exists(),
@@ -100,7 +119,7 @@ describe('E2E Integration', () => {
     async () => {
       await runSerial(async () => {
         const includeSnapshot = process.env.E2E_INCLUDE_SNAPSHOT === '1';
-        const ctx = createContext({
+        const ctx = withBunExpectContext({
           skipSnapshot: !includeSnapshot,
           showSteps: false,
         });

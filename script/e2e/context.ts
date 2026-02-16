@@ -1,6 +1,6 @@
 import { runBlackboardStickie } from './blackboard-stickie';
 import { runBootstrap } from './bootstrap';
-import { logStep } from './cli-helper';
+import { assert, assertStep, logStep } from './cli-helper';
 import { runCollab } from './collab';
 import { runListingSyncImport } from './listing-sync-import';
 import { runProjectToolPrompt } from './project-tool-prompt';
@@ -33,6 +33,17 @@ export function createContext(
       if (showSteps) {
         logStep(this.step, this.total, msg);
       }
+    },
+    check(cond: unknown, msg: string) {
+      assert(cond, msg);
+    },
+    async checkStep(
+      stepName: string,
+      cond: unknown,
+      msg = '',
+      details = '',
+    ): Promise<void> {
+      await assertStep(stepName, cond, msg, details);
     },
   };
 }

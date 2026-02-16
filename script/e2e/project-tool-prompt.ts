@@ -1,7 +1,5 @@
 import { createConnectGrpcJsonClient } from '../grpc-json-client-connect.mjs';
 import {
-  assert,
-  assertStep,
   projectGetJSON,
   projectListJSON,
   projectSet,
@@ -75,7 +73,7 @@ export async function runProjectToolPrompt(ctx: E2EContext) {
   const repoPrj = await runShell(
     'test -f ./main.project.yaml && echo OK || echo MISSING',
   );
-  await assertStep(
+  await ctx.checkStep(
     'repo project yaml exists',
     String(repoPrj.stdout || '').includes('OK'),
     'expected main.project.yaml at repo root',
@@ -91,7 +89,7 @@ export async function runProjectToolPrompt(ctx: E2EContext) {
       pj.name === 'acme/complete' &&
       pj.description === 'Complete metadata project' &&
       pj.notes === 'Project notes filled';
-    await assertStep(
+    await ctx.checkStep(
       'project complete validated',
       okProject,
       'project complete: fields mismatch or missing',
@@ -124,7 +122,7 @@ export async function runProjectToolPrompt(ctx: E2EContext) {
   const hasRole = String(content.stdout || '').includes(
     `role: ${ctx.TEST_ROLE_USER}`,
   );
-  await assertStep(
+  await ctx.checkStep(
     'project synced to folder',
     String(prjYaml.stdout || '').includes('OK') && hasName && hasRole,
     'expected exported project YAML missing or missing required fields (name, role)',
@@ -139,9 +137,9 @@ export async function runProjectToolPrompt(ctx: E2EContext) {
       ctx.TEST_ROLE_USER,
       '--dry-run',
     );
-    await assertStep('project sync dry-run ok', true);
+    await ctx.checkStep('project sync dry-run ok', true);
   } catch {
-    await assertStep(
+    await ctx.checkStep(
       'project sync dry-run ok',
       false,
       'expected project sync dry-run to succeed',
@@ -171,7 +169,7 @@ export async function runProjectToolPrompt(ctx: E2EContext) {
       !!pj2 &&
       pj2.description === 'Updated via import' &&
       pj2.notes === 'Updated via import';
-    await assertStep(
+    await ctx.checkStep(
       'project imported and updated',
       ok2,
       'project import did not update fields as expected',
@@ -206,13 +204,13 @@ export async function runProjectToolPrompt(ctx: E2EContext) {
     const hasFmt = tools.find(
       (x) => x && x.name === 'acme-formatter' && x.title === 'Acme Formatter',
     );
-    await assertStep(
+    await ctx.checkStep(
       'tools listed',
       Array.isArray(tList) && tList.length >= 2 && !!hasLinter && !!hasFmt,
       'tools list missing expected entries',
     );
     const t1 = await toolGetJSON({ name: 'acme-linter' });
-    await assertStep(
+    await ctx.checkStep(
       'tool get validated',
       t1 &&
         t1.name === 'acme-linter' &&
@@ -245,9 +243,9 @@ export async function runProjectToolPrompt(ctx: E2EContext) {
       maxOutputTokens: 64,
     });
     if (out) {
-      assert(out.object === 'response', 'prompt: expected response object');
-      assert(typeof out.model === 'string', 'prompt: model string');
-      assert(Array.isArray(out.output), 'prompt: output array');
+      ctx.check(out.object === 'response', 'prompt: expected response object');
+      ctx.check(typeof out.model === 'string', 'prompt: model string');
+      ctx.check(Array.isArray(out.output), 'prompt: output array');
     }
   } catch (e) {
     console.error(
@@ -278,11 +276,11 @@ export async function runProjectToolPrompt(ctx: E2EContext) {
       max_output_tokens: 64,
     });
     if (out) {
-      assert(
+      ctx.check(
         out.object === 'response',
         'connect client: expected response object',
       );
-      assert(Array.isArray(out.output), 'connect client: output array');
+      ctx.check(Array.isArray(out.output), 'connect client: output array');
     }
   } finally {
     try {

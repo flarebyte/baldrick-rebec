@@ -1,5 +1,4 @@
 import {
-  assertStep,
   blackboardListJSON,
   dbCountJSON,
   dbCountPerRole,
@@ -61,7 +60,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
       name: 'Onboarding Refresh',
       blackboard: bb1,
     });
-    await assertStep(
+    await ctx.checkStep(
       'stickies validated',
       s1json &&
         s1json.name === 'Onboarding Refresh' &&
@@ -71,7 +70,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
         f1.id === st1,
       'stickies list/find validation failed',
     );
-    await assertStep(
+    await ctx.checkStep(
       'stickie list includes note/code',
       typeof s2json?.note === 'string' &&
         s2json.note.length > 0 &&
@@ -99,9 +98,9 @@ export async function runListingSyncImport(ctx: E2EContext) {
       'folder:temp/blackboard-test',
       '--dry-run',
     );
-    await assertStep('sync id:_ (id->folder) ok', true);
+    await ctx.checkStep('sync id:_ (id->folder) ok', true);
   } catch {
-    await assertStep(
+    await ctx.checkStep(
       'sync id:_ (id->folder) ok',
       false,
       'expected id:_ shortcut to resolve from folder',
@@ -117,7 +116,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
   const st2Yaml = await runShell(
     'test -f temp/blackboard-test/about-devops-caching.stickie.yaml && echo OK || echo MISSING',
   );
-  await assertStep(
+  await ctx.checkStep(
     'blackboard synced to folder',
     String(bbYaml.stdout || '').includes('OK') &&
       String(st1Yaml.stdout || '').includes('OK') &&
@@ -132,7 +131,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
     `id:${bb1}`,
     'folder:temp/blackboard-test',
   );
-  await assertStep(
+  await ctx.checkStep(
     'diff unchanged concise',
     String(diffUnchanged.stdout || '').includes('= blackboard id=') &&
       String(diffUnchanged.stdout || '').includes('= stickie id='),
@@ -145,7 +144,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
     'id:_',
     'folder:temp/blackboard-test',
   );
-  await assertStep(
+  await ctx.checkStep(
     'diff id:_ shortcut works',
     String(diffUnchangedAlias.stdout || '').includes('= blackboard id=') &&
       String(diffUnchangedAlias.stdout || '').includes('= stickie id='),
@@ -170,7 +169,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
   const st2NoId = await runShell(
     'grep -q "^id:" temp/blackboard-noids/about-devops-caching.stickie.yaml && echo HAS_ID || echo NO_ID',
   );
-  await assertStep(
+  await ctx.checkStep(
     'clear-ids omitted id field',
     String(st1NoId.stdout || '').includes('NO_ID') &&
       String(st2NoId.stdout || '').includes('NO_ID'),
@@ -191,7 +190,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
     `id:${bb1}`,
     'folder:temp/blackboard-test',
   );
-  await assertStep(
+  await ctx.checkStep(
     'diff detects stickie change (concise)',
     String(diffChanged.stdout || '').includes(`~ stickie id=${st1}`),
     'expected diff to show changed stickie for st1',
@@ -204,7 +203,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
     'folder:temp/blackboard-test',
     '--detailed',
   );
-  await assertStep(
+  await ctx.checkStep(
     'diff detailed shows field info',
     String(diffChangedDet.stdout || '').includes(`~ stickie id=${st1}`) &&
       String(diffChangedDet.stdout || '').includes('note['),
@@ -226,9 +225,9 @@ export async function runListingSyncImport(ctx: E2EContext) {
       'id:_',
       '--dry-run',
     );
-    await assertStep('sync id:_ (folder->id) ok', true);
+    await ctx.checkStep('sync id:_ (folder->id) ok', true);
   } catch {
-    await assertStep(
+    await ctx.checkStep(
       'sync id:_ (folder->id) ok',
       false,
       'expected id:_ shortcut to resolve from folder',
@@ -236,7 +235,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
   }
   {
     const s1after = await stickieGetJSON({ id: st1 });
-    await assertStep(
+    await ctx.checkStep(
       'folder->id updated existing stickie',
       s1after &&
         s1after.id === st1 &&
@@ -261,7 +260,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
       name: 'Created by folder sync',
       blackboard: bb1,
     });
-    await assertStep(
+    await ctx.checkStep(
       'folder->id created new stickie',
       created?.id && created.blackboard_id === bb1,
       'expected new stickie to be created with assigned UUID',
@@ -280,7 +279,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
   } catch {
     failed = true;
   }
-  await assertStep(
+  await ctx.checkStep(
     'folder->id rejects unknown/foreign id',
     failed,
     'expected sync to fail when a .stickie.yaml contains an id not on destination blackboard',
@@ -345,7 +344,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
     });
     const boards = (Array.isArray(bbl) ? bbl : []) as IdLike[];
     const got = boards.find((b) => b && b.id === BB_IMPORT);
-    await assertStep(
+    await ctx.checkStep(
       'import: blackboard inserted',
       !!got,
       'expected imported blackboard in list',
@@ -355,7 +354,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
     const importedStickies = (Array.isArray(lst) ? lst : []) as IdLike[];
     const has1 = importedStickies.find((x) => x && x.id === ST_IMPORT_1);
     const has2 = importedStickies.find((x) => x && x.id === ST_IMPORT_2);
-    await assertStep(
+    await ctx.checkStep(
       'import: stickies inserted',
       !!has1 && !!has2,
       'expected both imported stickies',
@@ -372,7 +371,7 @@ export async function runListingSyncImport(ctx: E2EContext) {
       const err = e as StdioLikeError;
       details = err.stderr || err.stdout || String(e || '');
     }
-    await assertStep(
+    await ctx.checkStep(
       'import: duplicates rejected',
       failedDup,
       'expected import to fail when ids already exist',

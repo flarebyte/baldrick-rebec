@@ -1,5 +1,4 @@
 import {
-  assert,
   blackboardListJSON,
   blackboardSet,
   idFrom,
@@ -50,7 +49,7 @@ export async function runBlackboardStickie(ctx: E2EContext) {
   );
   {
     const meta = JSON.parse(String(bbYamlOut.stdout || 'null'));
-    assert(
+    ctx.check(
       !!meta &&
         !!meta.id &&
         meta.role === ctx.TEST_ROLE_USER &&
@@ -99,13 +98,13 @@ export async function runBlackboardStickie(ctx: E2EContext) {
   });
   {
     const g1 = await stickieGetJSON({ id: ctx.state.st1 || '' });
-    assert(
+    ctx.check(
       typeof g1.score === 'number' && Math.abs(g1.score - 0.42) < 1e-9,
       'stickie st1 score should be 0.42 after create',
     );
     await stickieSet({ id: ctx.state.st2, score: 0.99 });
     const g2 = await stickieGetJSON({ id: ctx.state.st2 || '' });
-    assert(
+    ctx.check(
       typeof g2.score === 'number' && Math.abs(g2.score - 0.99) < 1e-9,
       'stickie st2 score should be 0.99 after update',
     );

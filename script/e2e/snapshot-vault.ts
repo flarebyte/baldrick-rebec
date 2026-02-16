@@ -1,6 +1,4 @@
 import {
-  assert,
-  assertStep,
   idFrom,
   snapshotBackupJSON,
   snapshotDelete,
@@ -37,7 +35,7 @@ export async function runSnapshotVault(ctx: E2EContext) {
     await snapshotShow({ id: bkpID });
     const verifyRows = await snapshotVerifyJSON({ id: bkpID });
     const prunePreview = await snapshotPrunePreviewJSON({ olderThan: '0d' });
-    await assertStep(
+    await ctx.checkStep(
       'snapshot verified',
       Array.isArray(verifyRows) &&
         prunePreview &&
@@ -59,10 +57,10 @@ export async function runSnapshotVault(ctx: E2EContext) {
     if (exists) {
       const md = await vaultShow('rbctest-key');
       validateVaultShowContract(md);
-      assert(md.name === 'rbctest-key', 'vault.show name matches');
-      assert(md.status === 'set', 'vault.show status is set');
+      ctx.check(md.name === 'rbctest-key', 'vault.show name matches');
+      ctx.check(md.status === 'set', 'vault.show status is set');
       const backend = await vaultBackendCurrent();
-      assert(backend === 'keychain', 'vault backend current is keychain');
+      ctx.check(backend === 'keychain', 'vault backend current is keychain');
       await vaultDoctor();
     } else {
       console.error('vault: rbctest-key not set; skipping deep checks');
