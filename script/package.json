@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Local scripting for rebec",
   "type": "module",
-  "main": "test-all.mjs",
+  "main": "e2e/test-all.ts",
   "dependencies": {
     "@bufbuild/buf": "^1.61.0",
     "@bufbuild/protobuf": "^2.10.1",
@@ -22,7 +22,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "buf:gen": "buf generate",
     "gen:clean": "rm -rf gen/prompt/v1/*.js gen/prompt/v1/*.d.ts 2>/dev/null || true",
-    "gen": "npm run gen:clean && npm run buf:gen"
+    "gen": "npm run gen:clean && npm run buf:gen",
+    "e2e": "bun run e2e/test-all.ts"
   },
   "author": "Olivier Huin <npm.olivier.huin@flarebyte.com> (http://flarebyte.com/)",
   "license": "MIT"

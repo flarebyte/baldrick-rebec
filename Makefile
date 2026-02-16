@@ -25,7 +25,7 @@ format_unsafe:
 	npx @biomejs/biome check script --write --unsafe
 # Generic test: end-to-end script
 e2e: gen
-	$(ZX) script/test-all.mjs
+	$(BUN) run script/e2e/test-all.ts
 	$(RBC) blackboard import notes
 	$(RBC) conversation set --role dev --title "rebec dev" --project "github/flarebyte/baldrick-rebec"
 
