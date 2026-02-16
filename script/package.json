@@ -19,11 +19,12 @@
     "@bufbuild/protoc-gen-es": "^2.10.1"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "bun test e2e/test-all.test.ts",
     "buf:gen": "buf generate",
     "gen:clean": "rm -rf gen/prompt/v1/*.js gen/prompt/v1/*.d.ts 2>/dev/null || true",
     "gen": "npm run gen:clean && npm run buf:gen",
-    "e2e": "bun run e2e/test-all.ts"
+    "e2e": "bun run e2e/test-all.ts",
+    "e2e:test": "bun test e2e/test-all.test.ts"
   },
   "author": "Olivier Huin <npm.olivier.huin@flarebyte.com> (http://flarebyte.com/)",
   "license": "MIT"

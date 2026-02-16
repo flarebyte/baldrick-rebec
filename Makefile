@@ -5,7 +5,7 @@
 # - Avoid variables that compute values; keep only stable constants.
 # - Do not add pattern rules, arguments, or conditionals.
 
-.PHONY: lint format test gen build release release-dry clean help
+.PHONY: lint format test gen build release release-dry clean help e2e-test
 
 ZX := npx zx
 BUN := bun
@@ -28,6 +28,9 @@ e2e: gen
 	$(BUN) run script/e2e/test-all.ts
 	$(RBC) blackboard import notes
 	$(RBC) conversation set --role dev --title "rebec dev" --project "github/flarebyte/baldrick-rebec"
+
+e2e-test: gen
+	cd script && bun test e2e/test-all.test.ts
 
 lintb: 
 	$(ZX) script/generate-bespoke-rules.mjs
@@ -78,6 +81,7 @@ help:
 # - biome-check  : Runs Biome twice via script (rdjson for AI, colored for humans)
 # - biome-format : Applies formatting with Biome to script/*.mjs
 # - e2e          : Runs the Bun end-to-end test script (script/e2e/test-all.ts)
+# - e2e-test     : Runs Bun's test runner on e2e phase tests (script/e2e/test-all.test.ts)
 #
 # Usage:
 #   make biome-check
