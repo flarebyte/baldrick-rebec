@@ -109,7 +109,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 27;
+const TOTAL = 28;
 let step = 0;
 
 try {
@@ -403,8 +403,19 @@ try {
     role: 'dev',
     description: 'Main repository',
     notes: 'Project for dev role',
-    tags: 'source=github,org=flarebyte',
+    tags: 'source=github,org=flarebyte,version=0.6.0',
   });
+  // 7.1) Keep repo project YAML in sync at repo root
+  step++;
+  logStep(step, TOTAL, 'Syncing baldrick-rebec project YAML to repo root');
+  await $`go run main.go project sync name:github/flarebyte/baldrick-rebec folder:. --role dev`;
+  const repoPrj =
+    await $`test -f ./github-flarebyte-baldrick-rebec.project.yaml && echo OK || echo MISSING`;
+  await assertStep(
+    'repo project yaml exists',
+    String(repoPrj.stdout || '').includes('OK'),
+    'expected github-flarebyte-baldrick-rebec.project.yaml at repo root',
+  );
   {
     const pj = await projectGetJSON({
       name: 'acme/complete',

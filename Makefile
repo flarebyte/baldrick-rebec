@@ -23,7 +23,7 @@ format:
 format_unsafe:
 	npx @biomejs/biome check script --write --unsafe
 # Generic test: end-to-end script
-test: gen
+e2e: gen
 	$(ZX) script/test-all.mjs
 	$(RBC) blackboard import notes
 	$(RBC) conversation set --role dev --title "rebec dev" --project "github/flarebyte/baldrick-rebec"
@@ -61,7 +61,7 @@ help:
 	@printf "Make targets (generic):\n"
 	@printf "  lint    Run project linters (fast, generic).\n"
 	@printf "  format  Apply basic formatting.\n"
-	@printf "  test    Run end-to-end tests.\n"
+	@printf "  e2e     Run end-to-end tests.\n"
 	@printf "  build   Build rbc binaries with version/date (ZX).\n"
 	@printf "  gen     Generate artifacts (e.g., client stubs).\n"
 	@printf "  clean   Clean generated artifacts.\n"
