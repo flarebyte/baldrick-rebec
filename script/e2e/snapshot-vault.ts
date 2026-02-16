@@ -1,4 +1,3 @@
-import type { E2EContext } from './types';
 import {
   assert,
   assertStep,
@@ -15,7 +14,11 @@ import {
   vaultList,
   vaultShow,
 } from './cli-helper';
-import { validateVaultListContract, validateVaultShowContract } from './contract-helper';
+import {
+  validateVaultListContract,
+  validateVaultShowContract,
+} from './contract-helper';
+import type { E2EContext } from './types';
 
 export async function runSnapshotVault(ctx: E2EContext) {
   ctx.nextStep(
@@ -36,7 +39,10 @@ export async function runSnapshotVault(ctx: E2EContext) {
     const prunePreview = await snapshotPrunePreviewJSON({ olderThan: '0d' });
     await assertStep(
       'snapshot verified',
-      Array.isArray(verifyRows) && prunePreview && typeof prunePreview.candidates === 'number' && prunePreview.candidates >= 1,
+      Array.isArray(verifyRows) &&
+        prunePreview &&
+        typeof prunePreview.candidates === 'number' &&
+        prunePreview.candidates >= 1,
       'snapshot verify/prune preview unexpected',
     );
     await snapshotRestoreDry({ id: bkpID, mode: 'append' });
@@ -47,7 +53,9 @@ export async function runSnapshotVault(ctx: E2EContext) {
   try {
     const items = await vaultList();
     validateVaultListContract(items);
-    const exists = items.find((x: any) => x.name === 'rbctest-key' && x.status === 'set');
+    const exists = items.find(
+      (x: any) => x.name === 'rbctest-key' && x.status === 'set',
+    );
     if (exists) {
       const md = await vaultShow('rbctest-key');
       validateVaultShowContract(md);
@@ -60,6 +68,9 @@ export async function runSnapshotVault(ctx: E2EContext) {
       console.error('vault: rbctest-key not set; skipping deep checks');
     }
   } catch (e) {
-    console.error('vault: checks skipped due to error:', (e as Error)?.message || e);
+    console.error(
+      'vault: checks skipped due to error:',
+      (e as Error)?.message || e,
+    );
   }
 }

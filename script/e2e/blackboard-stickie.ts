@@ -1,4 +1,3 @@
-import type { E2EContext } from './types';
 import {
   assert,
   blackboardListJSON,
@@ -10,6 +9,7 @@ import {
   stickieSet,
 } from './cli-helper';
 import { validateBlackboardListContract } from './contract-helper';
+import type { E2EContext } from './types';
 
 export async function runBlackboardStickie(ctx: E2EContext) {
   ctx.nextStep('Creating blackboards');
@@ -31,7 +31,10 @@ export async function runBlackboardStickie(ctx: E2EContext) {
     }),
   );
   {
-    const bbs = await blackboardListJSON({ role: ctx.TEST_ROLE_USER, limit: 50 });
+    const bbs = await blackboardListJSON({
+      role: ctx.TEST_ROLE_USER,
+      limit: 50,
+    });
     validateBlackboardListContract(bbs);
   }
 
@@ -42,10 +45,18 @@ export async function runBlackboardStickie(ctx: E2EContext) {
   await runShell(
     `cat > temp/blackboard-input.yaml <<EOF\nrole: ${ctx.TEST_ROLE_USER}\nproject: acme/complete\nbackground: Created via YAML\nguidelines: From YAML\nlifecycle: weekly\nEOF`,
   );
-  const bbYamlOut = await runShell('cat temp/blackboard-input.yaml | go run main.go blackboard set --cli-input-yaml');
+  const bbYamlOut = await runShell(
+    'cat temp/blackboard-input.yaml | go run main.go blackboard set --cli-input-yaml',
+  );
   {
     const meta = JSON.parse(String(bbYamlOut.stdout || 'null'));
-    assert(!!meta && !!meta.id && meta.role === ctx.TEST_ROLE_USER && meta.lifecycle === 'weekly', 'expected blackboard to be created via YAML with matching role and lifecycle');
+    assert(
+      !!meta &&
+        !!meta.id &&
+        meta.role === ctx.TEST_ROLE_USER &&
+        meta.lifecycle === 'weekly',
+      'expected blackboard to be created via YAML with matching role and lifecycle',
+    );
   }
 
   ctx.nextStep('Creating stickies and relations');
@@ -80,14 +91,35 @@ export async function runBlackboardStickie(ctx: E2EContext) {
     }),
   );
 
-  await stickieRelSet({ from: ctx.state.st1 || '', to: ctx.state.st2 || '', type: 'uses', labels: 'ref,dependency' });
+  await stickieRelSet({
+    from: ctx.state.st1 || '',
+    to: ctx.state.st2 || '',
+    type: 'uses',
+    labels: 'ref,dependency',
+  });
   {
     const g1 = await stickieGetJSON({ id: ctx.state.st1 || '' });
-    assert(typeof g1.score === 'number' && Math.abs(g1.score - 0.42) < 1e-9, 'stickie st1 score should be 0.42 after create');
+    assert(
+      typeof g1.score === 'number' && Math.abs(g1.score - 0.42) < 1e-9,
+      'stickie st1 score should be 0.42 after create',
+    );
     await stickieSet({ id: ctx.state.st2, score: 0.99 });
     const g2 = await stickieGetJSON({ id: ctx.state.st2 || '' });
-    assert(typeof g2.score === 'number' && Math.abs(g2.score - 0.99) < 1e-9, 'stickie st2 score should be 0.99 after update');
+    assert(
+      typeof g2.score === 'number' && Math.abs(g2.score - 0.99) < 1e-9,
+      'stickie st2 score should be 0.99 after update',
+    );
   }
-  await stickieRelSet({ from: ctx.state.st2 || '', to: ctx.state.st3 || '', type: 'includes', labels: 'backlog' });
-  await stickieRelSet({ from: ctx.state.st1 || '', to: ctx.state.st3 || '', type: 'contrasts_with', labels: 'tradeoff' });
+  await stickieRelSet({
+    from: ctx.state.st2 || '',
+    to: ctx.state.st3 || '',
+    type: 'includes',
+    labels: 'backlog',
+  });
+  await stickieRelSet({
+    from: ctx.state.st1 || '',
+    to: ctx.state.st3 || '',
+    type: 'contrasts_with',
+    labels: 'tradeoff',
+  });
 }

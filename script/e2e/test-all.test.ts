@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { runBootstrap } from './bootstrap';
 import {
   createContext,
   runAllPhases,
@@ -7,7 +8,6 @@ import {
   runUntilListing,
   runUntilProject,
 } from './context';
-import { runBootstrap } from './bootstrap';
 
 const TEST_TIMEOUT_MS = 30 * 60 * 1000;
 const TEST_CONTEXT_OPTS = { skipSnapshot: true, showSteps: false } as const;
@@ -87,7 +87,9 @@ describe('E2E Integration', () => {
       await runSerial(async () => {
         const ctx = createContext(TEST_CONTEXT_OPTS);
         await runUntilListing(ctx);
-        expect(await Bun.file('temp/blackboard-test/blackboard.yaml').exists()).toBe(true);
+        expect(
+          await Bun.file('temp/blackboard-test/blackboard.yaml').exists(),
+        ).toBe(true);
       });
     },
     TEST_TIMEOUT_MS,
@@ -98,7 +100,10 @@ describe('E2E Integration', () => {
     async () => {
       await runSerial(async () => {
         const includeSnapshot = process.env.E2E_INCLUDE_SNAPSHOT === '1';
-        const ctx = createContext({ skipSnapshot: !includeSnapshot, showSteps: false });
+        const ctx = createContext({
+          skipSnapshot: !includeSnapshot,
+          showSteps: false,
+        });
         await runAllPhases(ctx);
         expect(ctx.step).toBeGreaterThan(0);
       });

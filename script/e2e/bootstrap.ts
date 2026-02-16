@@ -1,4 +1,3 @@
-import type { E2EContext } from './types';
 import {
   assert,
   assertStep,
@@ -27,14 +26,21 @@ import {
   validateTaskListContract,
   validateWorkflowListContract,
 } from './contract-helper';
+import type { E2EContext } from './types';
 
 export async function runBootstrap(ctx: E2EContext) {
-  ctx.nextStep(ctx.SKIP_RESET ? 'Skipping reset (--skip-reset)' : 'Resetting database (destructive)');
+  ctx.nextStep(
+    ctx.SKIP_RESET
+      ? 'Skipping reset (--skip-reset)'
+      : 'Resetting database (destructive)',
+  );
   if (!ctx.SKIP_RESET) {
     await dbReset({ dropAppRole: false });
   }
 
-  ctx.nextStep('Scaffolding roles, database, privileges, schema, content index, backup grants');
+  ctx.nextStep(
+    'Scaffolding roles, database, privileges, schema, content index, backup grants',
+  );
   await dbScaffoldAll();
   await enableAssertConnect();
   await assertStep('db scaffolded', true, 'db scaffold should succeed');
@@ -50,7 +56,11 @@ export async function runBootstrap(ctx: E2EContext) {
     validateRoleContract(rQA, { allowEmptyTitle: false });
     const rList = await roleListJSON({ limit: 200 });
     const parsed = validateRoleListContract(rList, { allowEmptyTitle: false });
-    await assertStep('roles seeded', parsed.length >= 3, 'expected at least the 3 test roles in role list');
+    await assertStep(
+      'roles seeded',
+      parsed.length >= 3,
+      'expected at least the 3 test roles in role list',
+    );
     const rDev = await roleGetJSON({ name: 'dev' });
     validateRoleContract(rDev, { allowEmptyTitle: false });
   }
@@ -71,10 +81,17 @@ export async function runBootstrap(ctx: E2EContext) {
     role: ctx.TEST_ROLE_USER,
   });
   {
-    const wfList = await workflowListJSON({ role: ctx.TEST_ROLE_USER, limit: 50 });
+    const wfList = await workflowListJSON({
+      role: ctx.TEST_ROLE_USER,
+      limit: 50,
+    });
     validateWorkflowListContract(wfList, { allowEmptyTitle: false });
   }
-  await assertStep('workflows created', true, 'workflows were created and listed');
+  await assertStep(
+    'workflows created',
+    true,
+    'workflows were created and listed',
+  );
 
   ctx.nextStep('Creating scripts and capturing ids');
   ctx.state.sidUnit = await createScript(
@@ -116,26 +133,46 @@ export async function runBootstrap(ctx: E2EContext) {
   {
     const listJSON = await scriptListJSON({ role: ctx.TEST_ROLE_USER });
     validateScriptListContract(listJSON, { allowEmptyTitle: false });
-    const byId = (id: string) => (listJSON || []).find((x: any) => x && (x.id === id || x.ID === id));
+    const byId = (id: string) =>
+      (listJSON || []).find((x: any) => x && (x.id === id || x.ID === id));
     const ju = byId(ctx.state.sidUnit || '');
     assert(ju, 'script list json missing unit script');
-    assert(ju.name === 'Unit: go test', 'unit script name mismatch in list json');
-    assert((ju.variant ?? '') === '', 'unit script variant should be empty in list json');
+    assert(
+      ju.name === 'Unit: go test',
+      'unit script name mismatch in list json',
+    );
+    assert(
+      (ju.variant ?? '') === '',
+      'unit script variant should be empty in list json',
+    );
 
     const ji = byId(ctx.state.sidInteg || '');
-    assert(ji && ji.name === 'Integration: compose+test', 'integration script not present or name mismatch');
+    assert(
+      ji && ji.name === 'Integration: compose+test',
+      'integration script not present or name mismatch',
+    );
 
     const jl = byId(ctx.state.sidLint || '');
-    assert(jl && jl.name === 'Lint & Vet', 'lint script not present or name mismatch');
+    assert(
+      jl && jl.name === 'Lint & Vet',
+      'lint script not present or name mismatch',
+    );
 
     const foundUnit = await scriptFind({
       name: 'Unit: go test',
       variant: '',
       role: ctx.TEST_ROLE_USER,
     });
-    assert(foundUnit && foundUnit.id === ctx.state.sidUnit, 'script find did not resolve unit by complex name');
+    assert(
+      foundUnit && foundUnit.id === ctx.state.sidUnit,
+      'script find did not resolve unit by complex name',
+    );
   }
-  await assertStep('scripts created', true, 'scripts were created and validated');
+  await assertStep(
+    'scripts created',
+    true,
+    'scripts were created and validated',
+  );
 
   ctx.nextStep('Creating tasks');
   ctx.state.tUnit = idFrom(
@@ -196,9 +233,21 @@ export async function runBootstrap(ctx: E2EContext) {
     }),
   );
 
-  await taskScriptAdd({ task: ctx.state.tList || '', script: ctx.state.sidLs || '', name: 'list' });
-  await taskScriptAdd({ task: ctx.state.tList || '', script: ctx.state.sidLsAll || '', name: 'list-all' });
-  await taskScriptAdd({ task: ctx.state.tList || '', script: ctx.state.sidLsDirs || '', name: 'list-dirs' });
+  await taskScriptAdd({
+    task: ctx.state.tList || '',
+    script: ctx.state.sidLs || '',
+    name: 'list',
+  });
+  await taskScriptAdd({
+    task: ctx.state.tList || '',
+    script: ctx.state.sidLsAll || '',
+    name: 'list-all',
+  });
+  await taskScriptAdd({
+    task: ctx.state.tList || '',
+    script: ctx.state.sidLsDirs || '',
+    name: 'list-dirs',
+  });
 
   await taskSetReplacement({
     workflow: 'ci-test',
@@ -226,5 +275,9 @@ export async function runBootstrap(ctx: E2EContext) {
   });
 
   ctx.nextStep('Creating tags');
-  await tagSet({ name: 'priority-high', title: 'High Priority', role: ctx.TEST_ROLE_USER });
+  await tagSet({
+    name: 'priority-high',
+    title: 'High Priority',
+    role: ctx.TEST_ROLE_USER,
+  });
 }

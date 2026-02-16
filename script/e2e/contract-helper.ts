@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-function roleSchemaFactory({ allowEmptyTitle = false }: { allowEmptyTitle?: boolean } = {}) {
+function roleSchemaFactory({
+  allowEmptyTitle = false,
+}: {
+  allowEmptyTitle?: boolean;
+} = {}) {
   const titleSchema = allowEmptyTitle ? z.string() : z.string().min(1);
   return z.object({
     name: z.string().min(1),
@@ -13,15 +17,25 @@ function roleSchemaFactory({ allowEmptyTitle = false }: { allowEmptyTitle?: bool
   });
 }
 
-export function validateRoleContract(obj: unknown, opts: { allowEmptyTitle?: boolean } = {}) {
+export function validateRoleContract(
+  obj: unknown,
+  opts: { allowEmptyTitle?: boolean } = {},
+) {
   return roleSchemaFactory(opts).parse(obj);
 }
 
-export function validateRoleListContract(arr: unknown, opts: { allowEmptyTitle?: boolean } = {}) {
+export function validateRoleListContract(
+  arr: unknown,
+  opts: { allowEmptyTitle?: boolean } = {},
+) {
   return z.array(roleSchemaFactory(opts)).parse(arr);
 }
 
-function workflowSchemaFactory({ allowEmptyTitle = false }: { allowEmptyTitle?: boolean } = {}) {
+function workflowSchemaFactory({
+  allowEmptyTitle = false,
+}: {
+  allowEmptyTitle?: boolean;
+} = {}) {
   const titleSchema = allowEmptyTitle ? z.string() : z.string().min(1);
   return z.object({
     name: z.string().min(1),
@@ -33,11 +47,18 @@ function workflowSchemaFactory({ allowEmptyTitle = false }: { allowEmptyTitle?: 
   });
 }
 
-export function validateWorkflowListContract(arr: unknown, opts: { allowEmptyTitle?: boolean } = {}) {
+export function validateWorkflowListContract(
+  arr: unknown,
+  opts: { allowEmptyTitle?: boolean } = {},
+) {
   return z.array(workflowSchemaFactory(opts)).parse(arr);
 }
 
-function scriptSchemaFactory({ allowEmptyTitle = false }: { allowEmptyTitle?: boolean } = {}) {
+function scriptSchemaFactory({
+  allowEmptyTitle = false,
+}: {
+  allowEmptyTitle?: boolean;
+} = {}) {
   const titleSchema = allowEmptyTitle ? z.string() : z.string().min(1);
   return z.object({
     id: z.string().min(1),
@@ -54,11 +75,18 @@ function scriptSchemaFactory({ allowEmptyTitle = false }: { allowEmptyTitle?: bo
   });
 }
 
-export function validateScriptListContract(arr: unknown, opts: { allowEmptyTitle?: boolean } = {}) {
+export function validateScriptListContract(
+  arr: unknown,
+  opts: { allowEmptyTitle?: boolean } = {},
+) {
   return z.array(scriptSchemaFactory(opts)).parse(arr);
 }
 
-function taskSchemaFactory({ allowEmptyTitle = true }: { allowEmptyTitle?: boolean } = {}) {
+function taskSchemaFactory({
+  allowEmptyTitle = true,
+}: {
+  allowEmptyTitle?: boolean;
+} = {}) {
   const titleSchema = allowEmptyTitle ? z.string() : z.string().min(1);
   return z.object({
     id: z.string().min(1),
@@ -72,7 +100,10 @@ function taskSchemaFactory({ allowEmptyTitle = true }: { allowEmptyTitle?: boole
   });
 }
 
-export function validateTaskListContract(arr: unknown, opts: { allowEmptyTitle?: boolean } = {}) {
+export function validateTaskListContract(
+  arr: unknown,
+  opts: { allowEmptyTitle?: boolean } = {},
+) {
   return z.array(taskSchemaFactory(opts)).parse(arr);
 }
 

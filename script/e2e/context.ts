@@ -1,6 +1,6 @@
-import { logStep } from './cli-helper';
 import { runBlackboardStickie } from './blackboard-stickie';
 import { runBootstrap } from './bootstrap';
+import { logStep } from './cli-helper';
 import { runCollab } from './collab';
 import { runListingSyncImport } from './listing-sync-import';
 import { runProjectToolPrompt } from './project-tool-prompt';
@@ -9,14 +9,16 @@ import type { E2EContext } from './types';
 
 const DEFAULT_TOTAL = 33;
 
-export function createContext(opts: {
-  testRoleUser?: string;
-  testRoleQa?: string;
-  skipReset?: boolean;
-  skipSnapshot?: boolean;
-  total?: number;
-  showSteps?: boolean;
-} = {}): E2EContext {
+export function createContext(
+  opts: {
+    testRoleUser?: string;
+    testRoleQa?: string;
+    skipReset?: boolean;
+    skipSnapshot?: boolean;
+    total?: number;
+    showSteps?: boolean;
+  } = {},
+): E2EContext {
   const showSteps = opts.showSteps ?? true;
   return {
     TEST_ROLE_USER: opts.testRoleUser ?? 'rbctest-user',

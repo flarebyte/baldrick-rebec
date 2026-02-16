@@ -1,4 +1,4 @@
-import type { E2EContext } from './types';
+import { createConnectGrpcJsonClient } from '../grpc-json-client-connect.mjs';
 import {
   assert,
   assertStep,
@@ -20,8 +20,11 @@ import {
   testcaseListJSON,
   workspaceSet,
 } from './cli-helper';
-import { createConnectGrpcJsonClient } from '../grpc-json-client-connect.mjs';
-import { validateConversationListContract, validateMessageListContract } from './contract-helper';
+import {
+  validateConversationListContract,
+  validateMessageListContract,
+} from './contract-helper';
+import type { E2EContext } from './types';
 
 export async function runCollab(ctx: E2EContext) {
   ctx.nextStep('Creating workspaces and packages');
@@ -47,12 +50,32 @@ export async function runCollab(ctx: E2EContext) {
     role: ctx.TEST_ROLE_USER,
   });
   ctx.state.convID = idFrom(convMeta);
-  const expMeta = await experimentCreate({ conversation: ctx.state.convID || '' });
+  const expMeta = await experimentCreate({
+    conversation: ctx.state.convID || '',
+  });
   ctx.state.expID = idFrom(expMeta);
 
-  await messageSet({ text: 'Hello from user12', experiment: ctx.state.expID, title: 'Greeting', tags: 'hello', role: ctx.TEST_ROLE_USER });
-  await messageSet({ text: 'Build started', experiment: ctx.state.expID, title: 'BuildStart', tags: 'build', role: ctx.TEST_ROLE_USER });
-  await messageSet({ text: 'Onboarding checklist updated', experiment: ctx.state.expID, title: 'DocsUpdate', tags: 'docs,update', role: ctx.TEST_ROLE_USER });
+  await messageSet({
+    text: 'Hello from user12',
+    experiment: ctx.state.expID,
+    title: 'Greeting',
+    tags: 'hello',
+    role: ctx.TEST_ROLE_USER,
+  });
+  await messageSet({
+    text: 'Build started',
+    experiment: ctx.state.expID,
+    title: 'BuildStart',
+    tags: 'build',
+    role: ctx.TEST_ROLE_USER,
+  });
+  await messageSet({
+    text: 'Onboarding checklist updated',
+    experiment: ctx.state.expID,
+    title: 'DocsUpdate',
+    tags: 'docs,update',
+    role: ctx.TEST_ROLE_USER,
+  });
 
   const convMeta2 = await conversationSet({
     title: 'QA Discussion',
@@ -75,7 +98,11 @@ export async function runCollab(ctx: E2EContext) {
       c2.tags &&
       typeof c2.tags === 'object' &&
       c2.tags.area === 'qa';
-    await assertStep('conversation 2 validated', okConv2, 'conv2 fields mismatch');
+    await assertStep(
+      'conversation 2 validated',
+      okConv2,
+      'conv2 fields mismatch',
+    );
   }
 
   ctx.nextStep('Creating testcases and verifying listing');
@@ -145,18 +172,36 @@ export async function runCollab(ctx: E2EContext) {
     executionTime: 0.05,
   });
   {
-    const tcs = await testcaseListJSON({ role: ctx.TEST_ROLE_USER, experiment: ctx.state.expID || '', limit: 50 });
-    const gotVet = tcs.find((x: any) => x?.title === 'Unit: go vet' && x?.status === 'OK');
-    const gotMisspell = tcs.find((x: any) => x?.title === 'Lint: misspell' && x?.status === 'KO');
-    const gotTodo = tcs.find((x: any) => x?.title === 'Integration: DB connect smoke' && x?.status?.toUpperCase() === 'TODO');
+    const tcs = await testcaseListJSON({
+      role: ctx.TEST_ROLE_USER,
+      experiment: ctx.state.expID || '',
+      limit: 50,
+    });
+    const gotVet = tcs.find(
+      (x: any) => x?.title === 'Unit: go vet' && x?.status === 'OK',
+    );
+    const gotMisspell = tcs.find(
+      (x: any) => x?.title === 'Lint: misspell' && x?.status === 'KO',
+    );
+    const gotTodo = tcs.find(
+      (x: any) =>
+        x?.title === 'Integration: DB connect smoke' &&
+        x?.status?.toUpperCase() === 'TODO',
+    );
     await assertStep(
       'testcases created',
-      Array.isArray(tcs) && tcs.length >= 5 && !!gotVet && !!gotMisspell && !!gotTodo,
+      Array.isArray(tcs) &&
+        tcs.length >= 5 &&
+        !!gotVet &&
+        !!gotMisspell &&
+        !!gotTodo,
       'expected testcases missing in first experiment',
     );
   }
 
-  const expMeta2 = await experimentCreate({ conversation: ctx.state.convID || '' });
+  const expMeta2 = await experimentCreate({
+    conversation: ctx.state.convID || '',
+  });
   const expID2 = idFrom(expMeta2);
   await testcaseCreate({
     title: 'Unit: string utils',
@@ -198,9 +243,17 @@ export async function runCollab(ctx: E2EContext) {
     line: 3,
   });
   {
-    const tcs2 = await testcaseListJSON({ role: ctx.TEST_ROLE_USER, experiment: expID2, limit: 50 });
-    const gotAPI = tcs2.find((x: any) => x?.title === 'Integration: API smoke' && x?.status === 'KO');
-    const gotStrings = tcs2.find((x: any) => x?.title === 'Unit: string utils' && x?.status === 'OK');
+    const tcs2 = await testcaseListJSON({
+      role: ctx.TEST_ROLE_USER,
+      experiment: expID2,
+      limit: 50,
+    });
+    const gotAPI = tcs2.find(
+      (x: any) => x?.title === 'Integration: API smoke' && x?.status === 'KO',
+    );
+    const gotStrings = tcs2.find(
+      (x: any) => x?.title === 'Unit: string utils' && x?.status === 'OK',
+    );
     await assertStep(
       'testcases exp2 created',
       Array.isArray(tcs2) && tcs2.length >= 3 && !!gotAPI && !!gotStrings,
@@ -211,7 +264,9 @@ export async function runCollab(ctx: E2EContext) {
   ctx.nextStep('Testcases via Connect JSON service');
   try {
     await enableAssertConnect();
-    const client = createConnectGrpcJsonClient({ baseUrl: 'http://127.0.0.1:53051' });
+    const client = createConnectGrpcJsonClient({
+      baseUrl: 'http://127.0.0.1:53051',
+    });
     const created = await client.testcase.Create({
       title: 'GRPC: smoke',
       role: ctx.TEST_ROLE_USER,
@@ -227,11 +282,17 @@ export async function runCollab(ctx: E2EContext) {
       limit: 10,
       offset: 0,
     });
-    assert(listed && Array.isArray(listed.items), 'grpc testcase list missing items');
+    assert(
+      listed && Array.isArray(listed.items),
+      'grpc testcase list missing items',
+    );
     const found = (listed?.items ?? []).find((x: any) => x?.id === created.id);
     assert(!!found, 'grpc testcase not found in list');
     const del = await client.testcase.Delete({ id: created.id });
-    assert(del && (del.deleted === 1 || del.deleted === '1'), 'grpc delete did not report 1');
+    assert(
+      del && (del.deleted === 1 || del.deleted === '1'),
+      'grpc delete did not report 1',
+    );
   } catch (e) {
     const msg = (e as Error)?.message ?? String(e);
     if (msg?.includes('404')) {
@@ -270,7 +331,10 @@ export async function runCollab(ctx: E2EContext) {
   await queueSize();
   await queueTake({ id: q1 });
   {
-    const convs = await conversationListJSON({ role: ctx.TEST_ROLE_USER, limit: 50 });
+    const convs = await conversationListJSON({
+      role: ctx.TEST_ROLE_USER,
+      limit: 50,
+    });
     validateConversationListContract(convs);
     const msgs = await messageListJSON({ role: ctx.TEST_ROLE_USER, limit: 50 });
     validateMessageListContract(msgs);
