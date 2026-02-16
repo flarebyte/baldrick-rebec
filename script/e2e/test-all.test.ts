@@ -1,4 +1,4 @@
-import { test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import {
   createContext,
   runAllPhases,
@@ -11,56 +11,97 @@ import { runBootstrap } from './bootstrap';
 
 const TEST_TIMEOUT_MS = 30 * 60 * 1000;
 
-let testChain = Promise.resolve();
+let serialChain = Promise.resolve();
 
-function serialTest(name: string, fn: () => Promise<void>) {
+async function runSerial(fn: () => Promise<void>) {
+  const previous = serialChain;
+  let release: (() => void) | undefined;
+  serialChain = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    await fn();
+  } finally {
+    release?.();
+  }
+}
+
+describe('E2E Integration', () => {
   test(
-    name,
+    'bootstrap phase',
     async () => {
-      const previous = testChain;
-      let release: (() => void) | undefined;
-      testChain = new Promise<void>((resolve) => {
-        release = resolve;
+      await runSerial(async () => {
+        const ctx = createContext({ skipSnapshot: true });
+        await runBootstrap(ctx);
+        expect(ctx.state.sidUnit).toBeTruthy();
+        expect(ctx.state.tUnit).toBeTruthy();
       });
-
-      await previous;
-      try {
-        await fn();
-      } finally {
-        release?.();
-      }
     },
     TEST_TIMEOUT_MS,
   );
-}
 
-serialTest('e2e bootstrap', async () => {
-  const ctx = createContext({ skipSnapshot: true });
-  await runBootstrap(ctx);
-});
+  test(
+    'project phase',
+    async () => {
+      await runSerial(async () => {
+        const ctx = createContext({ skipSnapshot: true });
+        await runUntilProject(ctx);
+        expect(ctx.step).toBeGreaterThan(0);
+        expect(await Bun.file('main.project.yaml').exists()).toBe(true);
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
 
-serialTest('e2e project', async () => {
-  const ctx = createContext({ skipSnapshot: true });
-  await runUntilProject(ctx);
-});
+  test(
+    'blackboard phase',
+    async () => {
+      await runSerial(async () => {
+        const ctx = createContext({ skipSnapshot: true });
+        await runUntilBlackboard(ctx);
+        expect(ctx.state.bb1).toBeTruthy();
+        expect(ctx.state.st1).toBeTruthy();
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
 
-serialTest('e2e blackboard', async () => {
-  const ctx = createContext({ skipSnapshot: true });
-  await runUntilBlackboard(ctx);
-});
+  test(
+    'collaboration phase',
+    async () => {
+      await runSerial(async () => {
+        const ctx = createContext({ skipSnapshot: true });
+        await runUntilCollab(ctx);
+        expect(ctx.state.convID).toBeTruthy();
+        expect(ctx.state.expID).toBeTruthy();
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
 
-serialTest('e2e collab', async () => {
-  const ctx = createContext({ skipSnapshot: true });
-  await runUntilCollab(ctx);
-});
+  test(
+    'listing, sync and import phase',
+    async () => {
+      await runSerial(async () => {
+        const ctx = createContext({ skipSnapshot: true });
+        await runUntilListing(ctx);
+        expect(await Bun.file('temp/blackboard-test/blackboard.yaml').exists()).toBe(true);
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
 
-serialTest('e2e listing-sync-import', async () => {
-  const ctx = createContext({ skipSnapshot: true });
-  await runUntilListing(ctx);
-});
-
-serialTest('e2e full pipeline', async () => {
-  const includeSnapshot = process.env.E2E_INCLUDE_SNAPSHOT === '1';
-  const ctx = createContext({ skipSnapshot: !includeSnapshot });
-  await runAllPhases(ctx);
+  test(
+    'full pipeline',
+    async () => {
+      await runSerial(async () => {
+        const includeSnapshot = process.env.E2E_INCLUDE_SNAPSHOT === '1';
+        const ctx = createContext({ skipSnapshot: !includeSnapshot });
+        await runAllPhases(ctx);
+        expect(ctx.step).toBeGreaterThan(0);
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
 });
