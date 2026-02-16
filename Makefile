@@ -5,7 +5,7 @@
 # - Avoid variables that compute values; keep only stable constants.
 # - Do not add pattern rules, arguments, or conditionals.
 
-.PHONY: lint format test gen build release clean help
+.PHONY: lint format test gen build release release-dry clean help
 
 ZX := npx zx
 BUN := bun
@@ -51,16 +51,10 @@ termsc:
 	CONVERSATION_ID=$(CONV) osascript -l JavaScript script/terminals-conversation.js
 
 release:
-	# Ensure main.project.yaml and gh are available
-	@test -s main.project.yaml || (echo "main.project.yaml missing" && exit 1)
-	@command -v gh >/dev/null || (echo "gh (GitHub CLI) is required" && exit 1)
-	# Extract version from tags.version in main.project.yaml
-	@version=$$(sed -n '/^tags:/,/^[^[:space:]]/p' main.project.yaml | sed -n 's/^[[:space:]]*version:[[:space:]]*//p' | head -n1 | tr -d '"\''\''' ); \
-		if [ -z "$$version" ]; then echo "version not found in main.project.yaml (tags.version)" && exit 1; fi; \
-		rm -rf build; \
-		$(BUN) run build-go.ts; \
-		echo "Creating GitHub release v$$version"; \
-		gh release create v$$version ./build/* --generate-notes
+	$(BUN) run release-go.ts
+
+release-dry:
+	$(BUN) run release-go.ts --dry-run
 
 # HUMAN: Print a clear list of available Make targets and what they do.
 # AI: Keep this static and explicit; do not auto-parse or add shell logic.
@@ -72,7 +66,8 @@ help:
 	@printf "  build   Build rbc binaries with version/date (Bun).\n"
 	@printf "  gen     Generate artifacts (e.g., client stubs).\n"
 	@printf "  clean   Clean generated artifacts.\n"
-	@printf "  release Build (multi-OS) and create GitHub release from VERSION.\n"
+	@printf "  release Build (multi-OS) and create GitHub release (version from main.project.yaml).\n"
+	@printf "  release-dry Preview release steps without building or publishing.\n"
 
 # --- HUMAN VERSION BELOW ---
 # Goal:
