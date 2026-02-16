@@ -25,5 +25,5 @@
     "gen": "npm run gen:clean && npm run buf:gen"
   },
   "author": "Olivier Huin <npm.olivier.huin@flarebyte.com> (http://flarebyte.com/)",
-  "license": "MIT" 
+  "license": "MIT"
 }

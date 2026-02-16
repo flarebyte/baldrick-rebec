@@ -408,11 +408,14 @@ try {
   // 7.1) Keep repo project YAML in sync at repo root
   step++;
   logStep(step, TOTAL, 'Syncing baldrick-rebec project YAML to repo root');
-  try { await $`rm -f ./main.project.yaml ./github-flarebyte-baldrick-rebec.project.yaml`; } catch {}
+  try {
+    await $`rm -f ./main.project.yaml ./github-flarebyte-baldrick-rebec.project.yaml`;
+  } catch {}
   await $`go run main.go project sync name:github/flarebyte/baldrick-rebec folder:. --role dev`;
   // Rename default exported filename to canonical main.project.yaml
   await $`bash -lc 'if [ -f ./github-flarebyte-baldrick-rebec.project.yaml ]; then mv ./github-flarebyte-baldrick-rebec.project.yaml ./main.project.yaml; fi'`;
-  const repoPrj = await $`test -f ./main.project.yaml && echo OK || echo MISSING`;
+  const repoPrj =
+    await $`test -f ./main.project.yaml && echo OK || echo MISSING`;
   await assertStep(
     'repo project yaml exists',
     String(repoPrj.stdout || '').includes('OK'),
