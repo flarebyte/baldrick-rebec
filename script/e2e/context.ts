@@ -15,7 +15,9 @@ export function createContext(opts: {
   skipReset?: boolean;
   skipSnapshot?: boolean;
   total?: number;
+  showSteps?: boolean;
 } = {}): E2EContext {
+  const showSteps = opts.showSteps ?? true;
   return {
     TEST_ROLE_USER: opts.testRoleUser ?? 'rbctest-user',
     TEST_ROLE_QA: opts.testRoleQa ?? 'rbctest-qa',
@@ -26,7 +28,9 @@ export function createContext(opts: {
     state: {},
     nextStep(msg: string) {
       this.step += 1;
-      logStep(this.step, this.total, msg);
+      if (showSteps) {
+        logStep(this.step, this.total, msg);
+      }
     },
   };
 }

@@ -83,7 +83,7 @@ export function idFrom(obj: unknown) {
 }
 
 export function logStep(i: number, total: number, msg: string) {
-  console.error(`[${i}/${total}] ${msg}`);
+  console.log(`[${i}/${total}] ${msg}`);
 }
 
 export function assert(cond: unknown, msg: string) {
