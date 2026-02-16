@@ -12,7 +12,7 @@ const ctx = createContext({
 });
 
 runAllPhases(ctx).catch((err) => {
-  const e = err as any;
+  const e = err as StdioLikeError;
   const msg = e && (e.stack || e.stderr || e.message || String(e));
   const extra =
     e &&
@@ -21,3 +21,9 @@ runAllPhases(ctx).catch((err) => {
   console.error('Test-all failed:', msg, extra);
   process.exit(1);
 });
+type StdioLikeError = {
+  stack?: string;
+  stderr?: string;
+  stdout?: string;
+  message?: string;
+};

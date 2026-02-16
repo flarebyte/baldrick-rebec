@@ -18,6 +18,19 @@ import {
 import { validateStickieListContract } from './contract-helper';
 import type { E2EContext } from './types';
 
+type IdLike = {
+  id?: string;
+  name?: string;
+  note?: string;
+  code?: string;
+  blackboard_id?: string;
+};
+
+type StdioLikeError = {
+  stdout?: string;
+  stderr?: string;
+};
+
 export async function runListingSyncImport(ctx: E2EContext) {
   const bb1 = ctx.state.bb1 || '';
   const st1 = ctx.state.st1 || '';
@@ -38,11 +51,12 @@ export async function runListingSyncImport(ctx: E2EContext) {
 
   {
     const stList = await stickieListJSON({ blackboard: bb1 });
-    validateStickieListContract(stList);
-    const byId = (id: string) =>
-      (stList || []).find((x: any) => x && (x.id === id || x.ID === id));
-    const s1json = byId(st1);
-    const s2json = byId(st2);
+    const parsedStickies = validateStickieListContract(stList);
+    const rawStickies = (Array.isArray(stList) ? stList : []) as IdLike[];
+    const byId = (items: IdLike[], id: string) =>
+      items.find((x) => x && x.id === id);
+    const s1json = byId(parsedStickies, st1);
+    const s2json = byId(rawStickies, st2);
     const f1 = await stickieFind({
       name: 'Onboarding Refresh',
       blackboard: bb1,
@@ -329,9 +343,8 @@ export async function runListingSyncImport(ctx: E2EContext) {
       role: ctx.TEST_ROLE_USER,
       limit: 200,
     });
-    const got = (bbl || []).find(
-      (b: any) => b && (b.id === BB_IMPORT || b.ID === BB_IMPORT),
-    );
+    const boards = (Array.isArray(bbl) ? bbl : []) as IdLike[];
+    const got = boards.find((b) => b && b.id === BB_IMPORT);
     await assertStep(
       'import: blackboard inserted',
       !!got,
@@ -339,12 +352,9 @@ export async function runListingSyncImport(ctx: E2EContext) {
     );
 
     const lst = await stickieListJSON({ blackboard: BB_IMPORT });
-    const has1 = (lst || []).find(
-      (x: any) => x && (x.id === ST_IMPORT_1 || x.ID === ST_IMPORT_1),
-    );
-    const has2 = (lst || []).find(
-      (x: any) => x && (x.id === ST_IMPORT_2 || x.ID === ST_IMPORT_2),
-    );
+    const importedStickies = (Array.isArray(lst) ? lst : []) as IdLike[];
+    const has1 = importedStickies.find((x) => x && x.id === ST_IMPORT_1);
+    const has2 = importedStickies.find((x) => x && x.id === ST_IMPORT_2);
     await assertStep(
       'import: stickies inserted',
       !!has1 && !!has2,
@@ -359,7 +369,8 @@ export async function runListingSyncImport(ctx: E2EContext) {
       await runRbc('blackboard', 'import', 'temp/blackboard-import');
     } catch (e) {
       failedDup = true;
-      details = (e as any)?.stderr || (e as any)?.stdout || String(e || '');
+      const err = e as StdioLikeError;
+      details = err.stderr || err.stdout || String(e || '');
     }
     await assertStep(
       'import: duplicates rejected',

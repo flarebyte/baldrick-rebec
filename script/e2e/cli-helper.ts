@@ -13,6 +13,12 @@ type RunResult = {
   exitCode: number;
 };
 
+type ProcStdinCompat = {
+  write?: (chunk: string | Uint8Array) => unknown;
+  end?: () => unknown;
+  getWriter?: () => WritableStreamDefaultWriter<Uint8Array>;
+};
+
 async function runCmd(cmd: string[], opts: RunOpts = {}): Promise<RunResult> {
   const proc = Bun.spawn(cmd, {
     cwd: opts.cwd,
@@ -23,12 +29,12 @@ async function runCmd(cmd: string[], opts: RunOpts = {}): Promise<RunResult> {
   });
 
   if (opts.stdin !== undefined) {
-    const stdinAny = proc.stdin as any;
-    if (typeof stdinAny?.write === 'function') {
-      stdinAny.write(opts.stdin);
-      if (typeof stdinAny?.end === 'function') stdinAny.end();
-    } else if (typeof stdinAny?.getWriter === 'function') {
-      const writer = stdinAny.getWriter();
+    const stdin = proc.stdin as ProcStdinCompat;
+    if (typeof stdin.write === 'function') {
+      stdin.write(opts.stdin);
+      if (typeof stdin.end === 'function') stdin.end();
+    } else if (typeof stdin.getWriter === 'function') {
+      const writer = stdin.getWriter();
       await writer.write(new TextEncoder().encode(opts.stdin));
       await writer.close();
     } else {

@@ -54,7 +54,7 @@ export async function runSnapshotVault(ctx: E2EContext) {
     const items = await vaultList();
     validateVaultListContract(items);
     const exists = items.find(
-      (x: any) => x.name === 'rbctest-key' && x.status === 'set',
+      (x) => x.name === 'rbctest-key' && x.status === 'set',
     );
     if (exists) {
       const md = await vaultShow('rbctest-key');

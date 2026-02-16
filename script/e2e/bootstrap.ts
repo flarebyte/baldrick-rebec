@@ -132,9 +132,10 @@ export async function runBootstrap(ctx: E2EContext) {
   );
   {
     const listJSON = await scriptListJSON({ role: ctx.TEST_ROLE_USER });
-    validateScriptListContract(listJSON, { allowEmptyTitle: false });
-    const byId = (id: string) =>
-      (listJSON || []).find((x: any) => x && (x.id === id || x.ID === id));
+    const parsedScripts = validateScriptListContract(listJSON, {
+      allowEmptyTitle: false,
+    });
+    const byId = (id: string) => parsedScripts.find((x) => x.id === id);
     const ju = byId(ctx.state.sidUnit || '');
     assert(ju, 'script list json missing unit script');
     assert(

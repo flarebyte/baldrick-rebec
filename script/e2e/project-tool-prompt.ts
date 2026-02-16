@@ -15,6 +15,11 @@ import {
 import { validateProjectListContract } from './contract-helper';
 import type { E2EContext } from './types';
 
+type ToolListItem = {
+  name?: string;
+  title?: string;
+};
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -194,12 +199,12 @@ export async function runProjectToolPrompt(ctx: E2EContext) {
   });
   {
     const tList = await toolListJSON({ role: ctx.TEST_ROLE_USER, limit: 50 });
-    const hasLinter = tList.find(
-      (x: any) => x && x.name === 'acme-linter' && x.title === 'Acme Linter',
+    const tools = (Array.isArray(tList) ? tList : []) as ToolListItem[];
+    const hasLinter = tools.find(
+      (x) => x && x.name === 'acme-linter' && x.title === 'Acme Linter',
     );
-    const hasFmt = tList.find(
-      (x: any) =>
-        x && x.name === 'acme-formatter' && x.title === 'Acme Formatter',
+    const hasFmt = tools.find(
+      (x) => x && x.name === 'acme-formatter' && x.title === 'Acme Formatter',
     );
     await assertStep(
       'tools listed',

@@ -26,6 +26,12 @@ import {
 } from './contract-helper';
 import type { E2EContext } from './types';
 
+type TestcaseListItem = {
+  id?: string;
+  title?: string;
+  status?: string;
+};
+
 export async function runCollab(ctx: E2EContext) {
   ctx.nextStep('Creating workspaces and packages');
   await workspaceSet({
@@ -177,14 +183,15 @@ export async function runCollab(ctx: E2EContext) {
       experiment: ctx.state.expID || '',
       limit: 50,
     });
-    const gotVet = tcs.find(
-      (x: any) => x?.title === 'Unit: go vet' && x?.status === 'OK',
+    const items = (Array.isArray(tcs) ? tcs : []) as TestcaseListItem[];
+    const gotVet = items.find(
+      (x) => x?.title === 'Unit: go vet' && x?.status === 'OK',
     );
-    const gotMisspell = tcs.find(
-      (x: any) => x?.title === 'Lint: misspell' && x?.status === 'KO',
+    const gotMisspell = items.find(
+      (x) => x?.title === 'Lint: misspell' && x?.status === 'KO',
     );
-    const gotTodo = tcs.find(
-      (x: any) =>
+    const gotTodo = items.find(
+      (x) =>
         x?.title === 'Integration: DB connect smoke' &&
         x?.status?.toUpperCase() === 'TODO',
     );
@@ -248,11 +255,12 @@ export async function runCollab(ctx: E2EContext) {
       experiment: expID2,
       limit: 50,
     });
-    const gotAPI = tcs2.find(
-      (x: any) => x?.title === 'Integration: API smoke' && x?.status === 'KO',
+    const items2 = (Array.isArray(tcs2) ? tcs2 : []) as TestcaseListItem[];
+    const gotAPI = items2.find(
+      (x) => x?.title === 'Integration: API smoke' && x?.status === 'KO',
     );
-    const gotStrings = tcs2.find(
-      (x: any) => x?.title === 'Unit: string utils' && x?.status === 'OK',
+    const gotStrings = items2.find(
+      (x) => x?.title === 'Unit: string utils' && x?.status === 'OK',
     );
     await assertStep(
       'testcases exp2 created',
@@ -286,7 +294,10 @@ export async function runCollab(ctx: E2EContext) {
       listed && Array.isArray(listed.items),
       'grpc testcase list missing items',
     );
-    const found = (listed?.items ?? []).find((x: any) => x?.id === created.id);
+    const listedItems = (
+      Array.isArray(listed?.items) ? listed.items : []
+    ) as TestcaseListItem[];
+    const found = listedItems.find((x) => x?.id === created.id);
     assert(!!found, 'grpc testcase not found in list');
     const del = await client.testcase.Delete({ id: created.id });
     assert(
