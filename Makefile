@@ -8,6 +8,7 @@
 .PHONY: lint format test gen build release clean help
 
 ZX := npx zx
+BUN := bun
 RBC := go run main.go
 
 # Generic lint (abstract across languages): delegate to project script
@@ -39,6 +40,9 @@ gen:
 # Clean generated artifacts
 clean:
 	cd script && npm run gen:clean
+
+build:
+	$(BUN) run build-go.ts
 
 terms:
 	osascript -l JavaScript script/terminals.js
@@ -83,7 +87,4 @@ help:
 #
 # Why so simple:
 # - Biome config (biome.json) defines the scope (script/*.mjs). Calling the tool directly is sufficient.
-# Build rbc binaries with version/date injected via ldflags (see build-go.mjs)
-build:
-		$(ZX) build-go.mjs
 # - No shell logic in Makefile, no arguments or conditionals, no pattern rules.
