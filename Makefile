@@ -77,7 +77,7 @@ help:
 # Targets:
 # - biome-check  : Runs Biome twice via script (rdjson for AI, colored for humans)
 # - biome-format : Applies formatting with Biome to script/*.mjs
-# - test-all     : Runs the ZX end-to-end test script (script/test-all.mjs)
+# - e2e          : Runs the Bun end-to-end test script (script/e2e/test-all.ts)
 #
 # Usage:
 #   make biome-check

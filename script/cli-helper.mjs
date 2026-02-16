@@ -88,7 +88,7 @@ export async function assertStep(stepName, cond, msg = '', details = '') {
         role: 'rbctest-user',
         experiment,
         status: ok ? 'OK' : 'KO',
-        file: 'script/test-all.mjs',
+        file: 'script/e2e/test-all.ts',
       });
       return; // connect-json success
     }
@@ -103,7 +103,7 @@ export async function assertStep(stepName, cond, msg = '', details = '') {
       role: 'rbctest-user',
       experiment,
       status: ok ? 'OK' : 'KO',
-      file: 'script/test-all.mjs',
+      file: 'script/e2e/test-all.ts',
     });
   } catch (e2) {
     console.error('assertStep: CLI fallback failed:', e2?.message || e2);

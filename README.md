@@ -133,4 +133,4 @@ const sid = await createScript('rbctest-user', 'Unit: go test', 'Run unit tests'
 const script = await scriptFind({ name: 'Unit: go test', variant: '', role: 'rbctest-user' });
 ```
 
-The test script `script/test-all.mjs` demonstrates broader usage across entities.
+The test script `script/e2e/test-all.ts` demonstrates broader usage across entities.
