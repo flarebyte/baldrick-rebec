@@ -109,7 +109,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 25;
+const TOTAL = 26;
 let step = 0;
 
 try {
@@ -424,6 +424,39 @@ try {
   {
     const prj = await projectListJSON({ role: TEST_ROLE_USER, limit: 50 });
     validateProjectListContract(prj);
+  }
+
+  // 7.4) Project sync to folder
+  step++;
+  logStep(step, TOTAL, 'Exporting project to temp/project-test');
+  try {
+    await $`rm -rf temp/project-test`;
+  } catch {}
+  await $`go run main.go project sync name:acme/complete folder:temp/project-test --role ${TEST_ROLE_USER}`;
+  const prjYaml =
+    await $`test -f temp/project-test/acme-complete.project.yaml && echo OK || echo MISSING`;
+  // Validate basic content: must include name and role
+  const content =
+    await $`bash -lc 'cat temp/project-test/acme-complete.project.yaml || true'`;
+  const hasName = String(content.stdout || '').includes('name: acme/complete');
+  const hasRole = String(content.stdout || '').includes(
+    `role: ${TEST_ROLE_USER}`,
+  );
+  await assertStep(
+    'project synced to folder',
+    String(prjYaml.stdout || '').includes('OK') && hasName && hasRole,
+    'expected exported project YAML missing or missing required fields (name, role)',
+  );
+  // Dry-run should not error
+  try {
+    await $`go run main.go project sync name:acme/complete folder:temp/project-test --role ${TEST_ROLE_USER} --dry-run`;
+    await assertStep('project sync dry-run ok', true);
+  } catch (_e) {
+    await assertStep(
+      'project sync dry-run ok',
+      false,
+      'expected project sync dry-run to succeed',
+    );
   }
 
   // 7.5) Tools
