@@ -51,13 +51,16 @@ termsc:
 	CONVERSATION_ID=$(CONV) osascript -l JavaScript script/terminals-conversation.js
 
 release:
-    # Ensure version and GitHub CLI are available (no heavy logic)
-	@test -s VERSION || (echo "VERSION file missing (e.g., 1.2.3)" && exit 1)
+	# Ensure main.project.yaml and gh are available
+	@test -s main.project.yaml || (echo "main.project.yaml missing" && exit 1)
 	@command -v gh >/dev/null || (echo "gh (GitHub CLI) is required" && exit 1)
-	rm -rf build
-	$(ZX) build-go.mjs
-	@echo "Creating GitHub release v$$(cat VERSION)"
-	gh release create v$$(cat VERSION) ./build/* --generate-notes
+	# Extract version from tags.version in main.project.yaml
+	@version=$$(sed -n '/^tags:/,/^[^[:space:]]/p' main.project.yaml | sed -n 's/^[[:space:]]*version:[[:space:]]*//p' | head -n1 | tr -d '"\''\''' ); \
+		if [ -z "$$version" ]; then echo "version not found in main.project.yaml (tags.version)" && exit 1; fi; \
+		rm -rf build; \
+		$(BUN) run build-go.ts; \
+		echo "Creating GitHub release v$$version"; \
+		gh release create v$$version ./build/* --generate-notes
 
 # HUMAN: Print a clear list of available Make targets and what they do.
 # AI: Keep this static and explicit; do not auto-parse or add shell logic.
@@ -66,7 +69,7 @@ help:
 	@printf "  lint    Run project linters (fast, generic).\n"
 	@printf "  format  Apply basic formatting.\n"
 	@printf "  e2e     Run end-to-end tests.\n"
-	@printf "  build   Build rbc binaries with version/date (ZX).\n"
+	@printf "  build   Build rbc binaries with version/date (Bun).\n"
 	@printf "  gen     Generate artifacts (e.g., client stubs).\n"
 	@printf "  clean   Clean generated artifacts.\n"
 	@printf "  release Build (multi-OS) and create GitHub release from VERSION.\n"
