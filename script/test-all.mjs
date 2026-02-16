@@ -109,7 +109,7 @@ import {
 // -----------------------------
 // Flow
 // -----------------------------
-const TOTAL = 26;
+const TOTAL = 27;
 let step = 0;
 
 try {
@@ -456,6 +456,35 @@ try {
       'project sync dry-run ok',
       false,
       'expected project sync dry-run to succeed',
+    );
+  }
+
+  // 7.4b) Project import from folder (folder -> name)
+  step++;
+  logStep(
+    step,
+    TOTAL,
+    'Importing project from temp/project-import (folder->name)',
+  );
+  try {
+    await $`rm -rf temp/project-import`;
+  } catch {}
+  await $`mkdir -p temp/project-import`;
+  await $`bash -lc 'cat > temp/project-import/acme-complete.project.yaml <<EOF\nname: acme/complete\nrole: ${TEST_ROLE_USER}\ndescription: Updated via import\nnotes: Updated via import\ntags:\n  imported: true\nEOF'`;
+  await $`go run main.go project sync folder:temp/project-import name:acme/complete`;
+  {
+    const pj2 = await projectGetJSON({
+      name: 'acme/complete',
+      role: TEST_ROLE_USER,
+    });
+    const ok2 =
+      !!pj2 &&
+      pj2.description === 'Updated via import' &&
+      pj2.notes === 'Updated via import';
+    await assertStep(
+      'project imported and updated',
+      ok2,
+      'project import did not update fields as expected',
     );
   }
 

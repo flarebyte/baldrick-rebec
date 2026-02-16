@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -25,8 +26,8 @@ var (
 // It exports a single project row to <SANITIZED_NAME>.project.yaml in the target folder.
 var syncCmd = &cobra.Command{
 	Use:   "sync <source> <target>",
-	Short: "Sync a project from DB to folder",
-	Long:  "Sync a project identified by name (and role) to a folder as <sanitized>.project.yaml.",
+	Short: "Sync a project between folder and DB",
+	Long:  "Sync a project using name:<PROJECT_NAME> and folder:<RELATIVE_PATH>. Supports name->folder and folder->name.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		src, err := parsePrjEndpoint(args[0])
@@ -37,13 +38,16 @@ var syncCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if src.kind != epName || dst.kind != epFolder {
-			return errors.New("supported direction: name:<PROJECT_NAME> -> folder:<RELATIVE_PATH>")
+		if src.kind == epName && dst.kind == epFolder {
+			if strings.TrimSpace(flagPrjSyncRole) == "" {
+				return errors.New("--role is required to select the project")
+			}
+			return syncNameToFolder(src.value, dst.value, flagPrjSyncRole, flagPrjSyncDryRun)
 		}
-		if strings.TrimSpace(flagPrjSyncRole) == "" {
-			return errors.New("--role is required to select the project")
+		if src.kind == epFolder && dst.kind == epName {
+			return syncFolderToName(src.value, dst.value, flagPrjSyncDryRun)
 		}
-		return syncNameToFolder(src.value, dst.value, flagPrjSyncRole, flagPrjSyncDryRun)
+		return errors.New("supported directions: name:<PROJECT_NAME>->folder:<PATH> and folder:<PATH>->name:<PROJECT_NAME>")
 	},
 }
 
@@ -180,6 +184,90 @@ func syncNameToFolder(projectName, relFolder, role string, dryRun bool) error {
 	return nil
 }
 
+// folder -> name implementation
+func syncFolderToName(relFolder, projectName string, dryRun bool) error {
+	// Validate folder
+	srcDir := filepath.Clean(relFolder)
+	if strings.HasPrefix(srcDir, "..") {
+		return errors.New("folder path must not escape current directory")
+	}
+	// Find exactly one *.project.yaml file
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return fmt.Errorf("read folder: %w", err)
+	}
+	var files []string
+	for _, e := range entries {
+		if e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".project.yaml") {
+			files = append(files, filepath.Join(srcDir, e.Name()))
+		}
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("no *.project.yaml found in %s", srcDir)
+	}
+	if len(files) > 1 {
+		return fmt.Errorf("multiple *.project.yaml files found in %s; expected exactly one", srcDir)
+	}
+	pth := files[0]
+
+	// Parse YAML
+	b, err := os.ReadFile(pth)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", pth, err)
+	}
+	var y ProjectYAML
+	if err := yaml.Unmarshal(b, &y); err != nil {
+		return fmt.Errorf("parse %s: %w", pth, err)
+	}
+	// Validate
+	if strings.TrimSpace(y.Role) == "" {
+		return errors.New("yaml: role is required for project import")
+	}
+	if nm := strings.TrimSpace(y.Name); nm != "" && nm != projectName {
+		return fmt.Errorf("yaml name %q does not match target name %q", nm, projectName)
+	}
+
+	if dryRun {
+		fmt.Fprintf(os.Stderr, "[dry-run] upsert project name=%q role=%q from %s\n", projectName, y.Role, pth)
+		return nil
+	}
+
+	// Open DB
+	cfg, err := cfgpkg.Load()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	db, err := pgdao.OpenApp(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	// Map to DAO and upsert
+	var desc, notes sqlNullString
+	if y.Description != nil {
+		desc = mkNullString(string(*y.Description))
+	}
+	if y.Notes != nil {
+		notes = mkNullString(string(*y.Notes))
+	}
+
+	p := &pgdao.Project{
+		Name:        projectName,
+		RoleName:    y.Role,
+		Description: desc.toSQL(),
+		Notes:       notes.toSQL(),
+		Tags:        y.Tags,
+	}
+	if err := pgdao.UpsertProject(ctx, db, p); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "project upserted name=%q role=%q\n", p.Name, p.RoleName)
+	return nil
+}
+
 // writeYAML writes YAML atomically (tmp + rename).
 func writeYAML(path string, v any) error {
 	b, err := yaml.Marshal(v)
@@ -218,4 +306,24 @@ func sanitizeForFile(s string) string {
 	}
 	out := strings.Trim(b.String(), "-")
 	return out
+}
+
+// small helper to build sql.NullString only when non-empty
+type sqlNullString struct {
+	s     string
+	valid bool
+}
+
+func mkNullString(v string) sqlNullString {
+	if strings.TrimSpace(v) == "" {
+		return sqlNullString{}
+	}
+	return sqlNullString{s: v, valid: true}
+}
+
+func (n sqlNullString) toSQL() sql.NullString {
+	if !n.valid {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: n.s, Valid: true}
 }
