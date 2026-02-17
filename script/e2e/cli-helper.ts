@@ -1,12 +1,84 @@
-// Common CLI helpers for ZX-based admin scripts
-// Note: Keep ZX idioms only; do not import fs/path. ZX globals ($, argv) are provided by the zx runner.
+import { createConnectGrpcJsonClient } from '../grpc-json-client-connect.mjs';
 
-// Core runners
-export async function runRbc(...args) {
-  return await $`go run main.go ${args}`;
+type RunOpts = {
+  cwd?: string;
+  env?: Record<string, string | undefined>;
+  stdin?: string;
+  allowFailure?: boolean;
+};
+
+type RunResult = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+};
+
+type ProcStdinCompat = {
+  write?: (chunk: string | Uint8Array) => unknown;
+  end?: () => unknown;
+  getWriter?: () => WritableStreamDefaultWriter<Uint8Array>;
+};
+
+async function runCmd(cmd: string[], opts: RunOpts = {}): Promise<RunResult> {
+  const proc = Bun.spawn(cmd, {
+    cwd: opts.cwd,
+    env: opts.env,
+    stdin: opts.stdin !== undefined ? 'pipe' : 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+
+  if (opts.stdin !== undefined) {
+    const stdin = proc.stdin as ProcStdinCompat;
+    if (typeof stdin.write === 'function') {
+      stdin.write(opts.stdin);
+      if (typeof stdin.end === 'function') stdin.end();
+    } else if (typeof stdin.getWriter === 'function') {
+      const writer = stdin.getWriter();
+      await writer.write(new TextEncoder().encode(opts.stdin));
+      await writer.close();
+    } else {
+      throw new Error(
+        `stdin piping not supported for command: ${cmd.join(' ')}`,
+      );
+    }
+  }
+
+  const [exitCode, stdout, stderr] = await Promise.all([
+    proc.exited,
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+
+  if (exitCode !== 0 && !opts.allowFailure) {
+    const err = new Error(
+      `Command failed (${exitCode}): ${cmd.join(' ')}`,
+    ) as Error & {
+      stdout?: string;
+      stderr?: string;
+      exitCode?: number;
+    };
+    err.stdout = stdout;
+    err.stderr = stderr;
+    err.exitCode = exitCode;
+    throw err;
+  }
+
+  return { stdout, stderr, exitCode };
 }
 
-export async function runRbcJSON(...args) {
+export async function runShell(
+  script: string,
+  opts: Omit<RunOpts, 'stdin'> & { stdin?: string } = {},
+) {
+  return await runCmd(['bash', '-lc', script], opts);
+}
+
+export async function runRbc(...args: string[]) {
+  return await runCmd(['go', 'run', 'main.go', ...args]);
+}
+
+export async function runRbcJSON(...args: string[]) {
   const p = await runRbc(...args);
   try {
     return JSON.parse(p.stdout || 'null');
@@ -17,56 +89,30 @@ export async function runRbcJSON(...args) {
   }
 }
 
-// Small utilities
-export function idFrom(obj) {
+export function idFrom(obj: unknown) {
   if (!obj || typeof obj !== 'object') return '';
-  return obj.id || obj.ID || '';
+  const o = obj as Record<string, unknown>;
+  return String(o.id || o.ID || '');
 }
 
-export function logStep(i, total, msg) {
-  console.error(`[${i}/${total}] ${msg}`);
+export function logStep(i: number, total: number, msg: string) {
+  console.log(`[${i}/${total}] ${msg}`);
 }
 
-export function assert(cond, msg) {
+export function assert(cond: unknown, msg: string) {
   if (!cond) {
     throw new Error(`Assertion failed: ${msg}`);
   }
 }
 
-// -----------------------------
-// Step assertion -> records testcase via Connect JSON
-// -----------------------------
-let __connectClient = null;
-let __assertExperimentId = null;
-let __assertConnectEnabled = false;
-async function __ensureConnectClient() {
-  if (__connectClient) return __connectClient;
-  let createConnectGrpcJsonClient;
-  try {
-    ({ createConnectGrpcJsonClient } = await import(
-      './grpc-json-client-connect.mjs'
-    ));
-  } catch (e) {
-    const msg = e?.message || String(e || '');
-    if (
-      msg.includes("'@connectrpc/connect-node'") ||
-      msg.includes('@bufbuild')
-    ) {
-      await $`npm --prefix script install --silent`;
-      ({ createConnectGrpcJsonClient } = await import(
-        './grpc-json-client-connect.mjs'
-      ));
-    } else {
-      throw e;
-    }
-  }
-  __connectClient = createConnectGrpcJsonClient({
-    baseUrl: 'http://127.0.0.1:53051',
-  });
-  return __connectClient;
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function __ensureAssertExperiment() {
+let __assertExperimentId = '';
+let __assertConnectEnabled = false;
+
+async function ensureAssertExperiment() {
   if (__assertExperimentId) return __assertExperimentId;
   const conv = await conversationSet({
     title: 'Test-All Assert Steps',
@@ -77,12 +123,19 @@ async function __ensureAssertExperiment() {
   return __assertExperimentId;
 }
 
-export async function assertStep(stepName, cond, msg = '', details = '') {
+export async function assertStep(
+  stepName: string,
+  cond: unknown,
+  msg = '',
+  details = '',
+) {
   const ok = !!cond;
   try {
     if (__assertConnectEnabled) {
-      const client = await __ensureConnectClient();
-      const experiment = await __ensureAssertExperiment();
+      const client = createConnectGrpcJsonClient({
+        baseUrl: 'http://127.0.0.1:53051',
+      });
+      const experiment = await ensureAssertExperiment();
       await client.testcase.Create({
         title: String(stepName || 'unnamed-step'),
         role: 'rbctest-user',
@@ -90,14 +143,14 @@ export async function assertStep(stepName, cond, msg = '', details = '') {
         status: ok ? 'OK' : 'KO',
         file: 'script/e2e/test-all.ts',
       });
-      return; // connect-json success
+      if (ok) return;
     }
-  } catch (_e) {
-    // Silent fallback to CLI when connect-json isn't available
+  } catch {
+    // fallback below
   }
-  // Ensure testcase persists via CLI
+
   try {
-    const experiment = await __ensureAssertExperiment();
+    const experiment = await ensureAssertExperiment();
     await testcaseCreate({
       title: String(stepName || 'unnamed-step'),
       role: 'rbctest-user',
@@ -106,8 +159,12 @@ export async function assertStep(stepName, cond, msg = '', details = '') {
       file: 'script/e2e/test-all.ts',
     });
   } catch (e2) {
-    console.error('assertStep: CLI fallback failed:', e2?.message || e2);
+    console.error(
+      'assertStep: CLI fallback failed:',
+      (e2 as Error)?.message || e2,
+    );
   }
+
   if (!ok) {
     const detailStr = details
       ? `\nGot:\n${String(details).slice(0, 2000)}`
@@ -118,10 +175,10 @@ export async function assertStep(stepName, cond, msg = '', details = '') {
 
 export async function enableAssertConnect() {
   try {
-    await $`go run main.go server stop`;
+    await runRbc('server', 'stop');
   } catch {}
   try {
-    await $`go run main.go server start --detach`;
+    await runRbc('server', 'start', '--detach');
   } catch {}
   try {
     for (let i = 0; i < 50; i++) {
@@ -135,12 +192,16 @@ export async function enableAssertConnect() {
   __assertConnectEnabled = true;
 }
 
-// Command helpers
 export async function runSetRole({
   name,
   title,
   description = '',
   notes = '',
+}: {
+  name: string;
+  title: string;
+  description?: string;
+  notes?: string;
 }) {
   return await runRbc(
     'role',
@@ -154,11 +215,17 @@ export async function runSetRole({
   );
 }
 
-export async function roleGetJSON({ name }) {
+export async function roleGetJSON({ name }: { name: string }) {
   return await runRbcJSON('role', 'get', '--name', name);
 }
 
-export async function roleListJSON({ limit = 100, offset = 0 } = {}) {
+export async function roleListJSON({
+  limit = 100,
+  offset = 0,
+}: {
+  limit?: number;
+  offset?: number;
+} = {}) {
   return await runRbcJSON(
     'role',
     'list',
@@ -177,6 +244,12 @@ export async function runSetWorkflow({
   description = '',
   role = 'user',
   notes = '',
+}: {
+  name: string;
+  title: string;
+  description?: string;
+  role?: string;
+  notes?: string;
 }) {
   return await runRbc(
     'workflow',
@@ -192,20 +265,33 @@ export async function runSetWorkflow({
   );
 }
 
-export async function createScript(role, title, description, body, opts = {}) {
+export async function createScript(
+  role: string,
+  title: string,
+  description: string,
+  body: string,
+  opts: { name?: string; variant?: string; archived?: boolean } = {},
+) {
   const args = ['script', 'set', '--role', role, '--title', title];
   if (description) args.push('--description', description);
   if (opts.name !== undefined) args.push('--name', opts.name);
   if (opts.variant !== undefined) args.push('--variant', opts.variant);
   if (opts.archived) args.push('--archived');
-  const proc = $`go run main.go ${args}`;
-  proc.stdin.write(body || '');
-  proc.stdin.end();
-  const out = await proc;
+  const out = await runCmd(['go', 'run', 'main.go', ...args], {
+    stdin: body || '',
+  });
   return JSON.parse(out.stdout).id;
 }
 
-export async function scriptListJSON({ role, limit = 100, offset = 0 }) {
+export async function scriptListJSON({
+  role,
+  limit = 100,
+  offset = 0,
+}: {
+  role: string;
+  limit?: number;
+  offset?: number;
+}) {
   return await runRbcJSON(
     'script',
     'list',
@@ -225,6 +311,11 @@ export async function scriptFind({
   variant = '',
   archived = false,
   role = '',
+}: {
+  name: string;
+  variant?: string;
+  archived?: boolean;
+  role?: string;
 }) {
   const args = ['script', 'find', '--name', name, '--variant', variant];
   if (archived) args.push('--archived');
@@ -243,6 +334,17 @@ export async function runSetTask({
   timeout = '',
   tags = '',
   level = '',
+}: {
+  workflow: string;
+  command: string;
+  variant?: string;
+  role?: string;
+  title?: string;
+  description?: string;
+  shell?: string;
+  timeout?: string;
+  tags?: string;
+  level?: string;
 }) {
   const args = [
     'task',
@@ -265,7 +367,17 @@ export async function runSetTask({
   return await runRbcJSON(...args);
 }
 
-export async function taskScriptAdd({ task, script, name, alias = '' }) {
+export async function taskScriptAdd({
+  task,
+  script,
+  name,
+  alias = '',
+}: {
+  task: string;
+  script: string;
+  name: string;
+  alias?: string;
+}) {
   const args = [
     'task',
     'script-add',
@@ -286,6 +398,12 @@ export async function blackboardSet({
   background = '',
   guidelines = '',
   lifecycle = '',
+}: {
+  role?: string;
+  project?: string;
+  background?: string;
+  guidelines?: string;
+  lifecycle?: string;
 }) {
   const args = ['blackboard', 'set', '--role', role];
   if (project) args.push('--project', project);
@@ -302,6 +420,13 @@ export async function conversationSet({
   project = '',
   tags = '',
   notes = '',
+}: {
+  title: string;
+  role?: string;
+  description?: string;
+  project?: string;
+  tags?: string;
+  notes?: string;
 }) {
   const args = ['conversation', 'set', '--title', title, '--role', role];
   if (description) args.push('--description', description);
@@ -311,7 +436,11 @@ export async function conversationSet({
   return await runRbcJSON(...args);
 }
 
-export async function experimentCreate({ conversation }) {
+export async function experimentCreate({
+  conversation,
+}: {
+  conversation: string;
+}) {
   return await runRbcJSON(
     'experiment',
     'create',
@@ -325,6 +454,11 @@ export async function queueAdd({
   status = '',
   why = '',
   tags = '',
+}: {
+  description: string;
+  status?: string;
+  why?: string;
+  tags?: string;
 }) {
   const args = ['queue', 'add', '--description', description];
   if (status) args.push('--status', status);
@@ -335,7 +469,7 @@ export async function queueAdd({
 
 export async function stickieSet({
   id = '',
-  blackboard,
+  blackboard = '',
   topicName = '',
   topicRole = '',
   note = '',
@@ -345,6 +479,20 @@ export async function stickieSet({
   name = '',
   archived = false,
   score = null,
+  priority: _priority = '',
+}: {
+  id?: string;
+  blackboard?: string;
+  topicName?: string;
+  topicRole?: string;
+  note?: string;
+  code?: string;
+  labels?: string[];
+  createdByTask?: string;
+  name?: string;
+  archived?: boolean;
+  score?: number | null;
+  priority?: string;
 }) {
   const args = ['stickie', 'set'];
   if (id) args.push('--id', id);
@@ -366,6 +514,10 @@ export async function stickieListJSON({
   blackboard = '',
   limit = 100,
   offset = 0,
+}: {
+  blackboard?: string;
+  limit?: number;
+  offset?: number;
 }) {
   const args = ['stickie', 'list', '--output', 'json'];
   if (blackboard) args.push('--blackboard', blackboard);
@@ -373,11 +525,19 @@ export async function stickieListJSON({
   return await runRbcJSON(...args);
 }
 
-export async function stickieGetJSON({ id }) {
+export async function stickieGetJSON({ id }: { id: string }) {
   return await runRbcJSON('stickie', 'get', '--id', id);
 }
 
-export async function workflowListJSON({ role, limit = 100, offset = 0 } = {}) {
+export async function workflowListJSON({
+  role,
+  limit = 100,
+  offset = 0,
+}: {
+  role: string;
+  limit?: number;
+  offset?: number;
+}) {
   return await runRbcJSON(
     'workflow',
     'list',
@@ -397,7 +557,12 @@ export async function taskListJSON({
   workflow = '',
   limit = 100,
   offset = 0,
-} = {}) {
+}: {
+  role: string;
+  workflow?: string;
+  limit?: number;
+  offset?: number;
+}) {
   const args = [
     'task',
     'list',
@@ -414,34 +579,53 @@ export async function taskListJSON({
   return await runRbcJSON(...args);
 }
 
-export async function stickieFind({ name, archived = false, blackboard = '' }) {
+export async function stickieFind({
+  name,
+  archived = false,
+  blackboard = '',
+}: {
+  name: string;
+  archived?: boolean;
+  blackboard?: string;
+}) {
   const args = ['stickie', 'find', '--name', name];
   if (archived) args.push('--archived');
   if (blackboard) args.push('--blackboard', blackboard);
   return await runRbcJSON(...args);
 }
 
-// Messages (stdin body)
 export async function messageSet({
   text = '',
   experiment = '',
   title = '',
   tags = '',
   role = 'user',
+}: {
+  text?: string;
+  experiment?: string;
+  title?: string;
+  tags?: string;
+  role?: string;
 }) {
   const args = ['message', 'set'];
   if (experiment) args.push('--experiment', experiment);
   if (title) args.push('--title', title);
   if (tags) args.push('--tags', tags);
   if (role) args.push('--role', role);
-  const proc = $`go run main.go ${args}`;
-  proc.stdin.write(text || '');
-  proc.stdin.end();
-  return await proc;
+  return await runCmd(['go', 'run', 'main.go', ...args], { stdin: text || '' });
 }
 
-// Stickie relations
-export async function stickieRelSet({ from, to, type, labels = '' }) {
+export async function stickieRelSet({
+  from,
+  to,
+  type,
+  labels = '',
+}: {
+  from: string;
+  to: string;
+  type: string;
+  labels?: string;
+}) {
   const args = [
     'stickie-rel',
     'set',
@@ -456,7 +640,13 @@ export async function stickieRelSet({ from, to, type, labels = '' }) {
   return await runRbc(...args);
 }
 
-export async function stickieRelList({ id, direction = 'out' }) {
+export async function stickieRelList({
+  id,
+  direction = 'out',
+}: {
+  id: string;
+  direction?: string;
+}) {
   return await runRbc(
     'stickie-rel',
     'list',
@@ -467,7 +657,17 @@ export async function stickieRelList({ id, direction = 'out' }) {
   );
 }
 
-export async function stickieRelGet({ from, to, type, ignoreMissing = false }) {
+export async function stickieRelGet({
+  from,
+  to,
+  type,
+  ignoreMissing = false,
+}: {
+  from: string;
+  to: string;
+  type: string;
+  ignoreMissing?: boolean;
+}) {
   const args = [
     'stickie-rel',
     'get',
@@ -482,8 +682,11 @@ export async function stickieRelGet({ from, to, type, ignoreMissing = false }) {
   return await runRbc(...args);
 }
 
-// Non-JSON convenience wrappers
-export async function dbReset({ dropAppRole = false } = {}) {
+export async function dbReset({
+  dropAppRole = false,
+}: {
+  dropAppRole?: boolean;
+} = {}) {
   return await runRbc(
     'db',
     'reset',
@@ -507,6 +710,17 @@ export async function taskSetReplacement({
   replaces = '',
   replaceLevel = '',
   replaceComment = '',
+}: {
+  workflow: string;
+  command: string;
+  variant?: string;
+  role?: string;
+  title?: string;
+  description?: string;
+  shell?: string;
+  replaces?: string;
+  replaceLevel?: string;
+  replaceComment?: string;
 }) {
   const args = [
     'task',
@@ -529,7 +743,15 @@ export async function taskSetReplacement({
   return await runRbc(...args);
 }
 
-export async function tagSet({ name, title, role = 'user' }) {
+export async function tagSet({
+  name,
+  title,
+  role = 'user',
+}: {
+  name: string;
+  title: string;
+  role?: string;
+}) {
   return await runRbc(
     'tag',
     'set',
@@ -548,6 +770,12 @@ export async function projectSet({
   description = '',
   notes = '',
   tags = '',
+}: {
+  name: string;
+  role?: string;
+  description?: string;
+  notes?: string;
+  tags?: string;
 }) {
   const args = ['project', 'set', '--name', name, '--role', role];
   if (description) args.push('--description', description);
@@ -556,7 +784,6 @@ export async function projectSet({
   return await runRbc(...args);
 }
 
-// Tools
 export async function toolSet({
   name,
   title,
@@ -564,8 +791,17 @@ export async function toolSet({
   description = '',
   notes = '',
   tags = '',
-  settings = '', // JSON string
+  settings = '',
   type = '',
+}: {
+  name: string;
+  title: string;
+  role?: string;
+  description?: string;
+  notes?: string;
+  tags?: string;
+  settings?: string;
+  type?: string;
 }) {
   const args = [
     'tool',
@@ -585,11 +821,19 @@ export async function toolSet({
   return await runRbc(...args);
 }
 
-export async function toolGetJSON({ name }) {
+export async function toolGetJSON({ name }: { name: string }) {
   return await runRbcJSON('tool', 'get', '--name', name);
 }
 
-export async function toolListJSON({ role, limit = 100, offset = 0 }) {
+export async function toolListJSON({
+  role,
+  limit = 100,
+  offset = 0,
+}: {
+  role: string;
+  limit?: number;
+  offset?: number;
+}) {
   return await runRbcJSON(
     'tool',
     'list',
@@ -604,24 +848,16 @@ export async function toolListJSON({ role, limit = 100, offset = 0 }) {
   );
 }
 
-export async function toolDelete({
-  name,
-  force = true,
-  ignoreMissing = false,
-}) {
-  const args = ['tool', 'delete', '--name', name];
-  if (force) args.push('--force');
-  if (ignoreMissing) args.push('--ignore-missing');
-  return await runRbc(...args);
-}
-
-// store helpers removed
-
 export async function workspaceSet({
   role = 'user',
   project = '',
   description = '',
   tags = '',
+}: {
+  role?: string;
+  project?: string;
+  description?: string;
+  tags?: string;
 }) {
   const args = ['workspace', 'set', '--role', role];
   if (project) args.push('--project', project);
@@ -630,30 +866,47 @@ export async function workspaceSet({
   return await runRbc(...args);
 }
 
-export async function packageSet({ role = 'user', variant }) {
+export async function packageSet({
+  role = 'user',
+  variant,
+}: {
+  role?: string;
+  variant: string;
+}) {
   return await runRbc('package', 'set', '--role', role, '--variant', variant);
 }
 
-export async function queuePeek({ limit = 2 } = {}) {
+export async function queuePeek({ limit = 2 }: { limit?: number } = {}) {
   return await runRbc('queue', 'peek', '--limit', String(limit));
 }
+
 export async function queueSize() {
   return await runRbc('queue', 'size');
 }
-export async function queueTake({ id }) {
+
+export async function queueTake({ id }: { id: string }) {
   return await runRbc('queue', 'take', '--id', id);
 }
 
-export async function listWithRole(cmd, role, limit = 50) {
+export async function listWithRole(cmd: string, role: string, limit = 50) {
   return await runRbc(cmd, 'list', '--role', role, '--limit', String(limit));
 }
+
 export async function experimentList(limit = 50) {
   return await runRbc('experiment', 'list', '--limit', String(limit));
 }
+
 export async function stickieList(limit = 50) {
   return await runRbc('stickie', 'list', '--limit', String(limit));
 }
-export async function stickieListByBlackboard({ blackboard, limit = 50 }) {
+
+export async function stickieListByBlackboard({
+  blackboard,
+  limit = 50,
+}: {
+  blackboard: string;
+  limit?: number;
+}) {
   return await runRbc(
     'stickie',
     'list',
@@ -663,16 +916,22 @@ export async function stickieListByBlackboard({ blackboard, limit = 50 }) {
     String(limit),
   );
 }
-// topics removed: use labels filters via higher-level logic if needed
 
 export async function dbCountPerRole() {
   return await runRbc('db', 'count', '--per-role');
 }
+
 export async function dbCountJSON() {
   return await runRbc('db', 'count', '--json');
 }
 
-export async function snapshotBackupJSON({ description, who }) {
+export async function snapshotBackupJSON({
+  description,
+  who,
+}: {
+  description: string;
+  who: string;
+}) {
   return await runRbcJSON(
     'snapshot',
     'backup',
@@ -683,20 +942,36 @@ export async function snapshotBackupJSON({ description, who }) {
     '--json',
   );
 }
-export async function snapshotList({ limit = 5 } = {}) {
+
+export async function snapshotList({ limit = 5 }: { limit?: number } = {}) {
   return await runRbc('snapshot', 'list', '--limit', String(limit));
 }
-export async function snapshotShow({ id }) {
+
+export async function snapshotShow({ id }: { id: string }) {
   return await runRbc('snapshot', 'show', id);
 }
-export async function snapshotRestoreDry({ id, mode = 'append' }) {
+
+export async function snapshotRestoreDry({
+  id,
+  mode = 'append',
+}: {
+  id: string;
+  mode?: string;
+}) {
   return await runRbc('snapshot', 'restore', id, '--mode', mode, '--dry-run');
 }
-export async function snapshotDelete({ id }) {
+
+export async function snapshotDelete({ id }: { id: string }) {
   return await runRbc('snapshot', 'delete', id, '--force');
 }
 
-export async function snapshotVerifyJSON({ id, schema = 'backup' }) {
+export async function snapshotVerifyJSON({
+  id,
+  schema = 'backup',
+}: {
+  id: string;
+  schema?: string;
+}) {
   return await runRbcJSON(
     'snapshot',
     'verify',
@@ -710,6 +985,9 @@ export async function snapshotVerifyJSON({ id, schema = 'backup' }) {
 export async function snapshotPrunePreviewJSON({
   olderThan = '90d',
   schema = 'backup',
+}: {
+  olderThan?: string;
+  schema?: string;
 }) {
   return await runRbcJSON(
     'snapshot',
@@ -722,23 +1000,15 @@ export async function snapshotPrunePreviewJSON({
   );
 }
 
-export async function snapshotPruneYesJSON({
-  olderThan = '90d',
-  schema = 'backup',
+export async function projectListJSON({
+  role,
+  limit = 100,
+  offset = 0,
+}: {
+  role: string;
+  limit?: number;
+  offset?: number;
 }) {
-  return await runRbcJSON(
-    'snapshot',
-    'prune',
-    '--older-than',
-    olderThan,
-    '--schema',
-    schema,
-    '--yes',
-    '--json',
-  );
-}
-
-export async function projectListJSON({ role, limit = 100, offset = 0 }) {
   return await runRbcJSON(
     'project',
     'list',
@@ -752,7 +1022,16 @@ export async function projectListJSON({ role, limit = 100, offset = 0 }) {
     String(offset),
   );
 }
-export async function blackboardListJSON({ role, limit = 100, offset = 0 }) {
+
+export async function blackboardListJSON({
+  role,
+  limit = 100,
+  offset = 0,
+}: {
+  role: string;
+  limit?: number;
+  offset?: number;
+}) {
   return await runRbcJSON(
     'blackboard',
     'list',
@@ -766,11 +1045,17 @@ export async function blackboardListJSON({ role, limit = 100, offset = 0 }) {
     String(offset),
   );
 }
+
 export async function conversationListJSON({
   role,
   project = '',
   limit = 100,
   offset = 0,
+}: {
+  role: string;
+  project?: string;
+  limit?: number;
+  offset?: number;
 }) {
   const args = [
     'conversation',
@@ -787,12 +1072,21 @@ export async function conversationListJSON({
   if (project) args.push('--project', project);
   return await runRbcJSON(...args);
 }
-export async function conversationGetJSON({ id }) {
+
+export async function conversationGetJSON({ id }: { id: string }) {
   return await runRbcJSON('conversation', 'get', '--id', id);
 }
-export async function projectGetJSON({ name, role }) {
+
+export async function projectGetJSON({
+  name,
+  role,
+}: {
+  name: string;
+  role: string;
+}) {
   return await runRbcJSON('project', 'get', '--name', name, '--role', role);
 }
+
 export async function messageListJSON({
   role,
   experiment = '',
@@ -800,6 +1094,13 @@ export async function messageListJSON({
   status = '',
   limit = 100,
   offset = 0,
+}: {
+  role: string;
+  experiment?: string;
+  task?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
 }) {
   const args = [
     'message',
@@ -819,18 +1120,14 @@ export async function messageListJSON({
   return await runRbcJSON(...args);
 }
 
-// -----------------------------
-// Vault helpers (read-only; never print secrets)
-// -----------------------------
 export async function vaultList() {
   const p = await runRbc('vault', 'list');
   const lines = (p.stdout || '')
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
-  const items = [];
+  const items: Array<{ name: string; status: string; backend: string }> = [];
   for (const line of lines) {
-    // Expected format: name\t[set|unset]\tbackend
     const parts = line.split('\t');
     if (parts.length >= 3) {
       const name = parts[0].trim();
@@ -843,7 +1140,7 @@ export async function vaultList() {
   return items;
 }
 
-export async function vaultShow(name) {
+export async function vaultShow(name: string) {
   const p = await runRbc('vault', 'show', name);
   const out = p.stdout || '';
   const obj = { name: '', status: '', backend: '', updated: '' };
@@ -866,14 +1163,10 @@ export async function vaultBackendCurrent() {
 }
 
 export async function vaultDoctor() {
-  // Return raw text for now; callers can inspect for 'status: OK'
   const p = await runRbc('vault', 'doctor');
   return { stdout: String(p.stdout || ''), stderr: String(p.stderr || '') };
 }
 
-// -----------------------------
-// Testcase helpers
-// -----------------------------
 export async function testcaseCreate({
   title,
   role = 'user',
@@ -888,6 +1181,20 @@ export async function testcaseCreate({
   file = '',
   line = 0,
   executionTime = 0,
+}: {
+  title: string;
+  role?: string;
+  experiment?: string;
+  status?: string;
+  name?: string;
+  pkg?: string;
+  classname?: string;
+  error?: string;
+  tags?: string;
+  level?: string;
+  file?: string;
+  line?: number;
+  executionTime?: number;
 }) {
   const args = [
     'testcase',
@@ -918,6 +1225,12 @@ export async function testcaseListJSON({
   status = '',
   limit = 100,
   offset = 0,
+}: {
+  role: string;
+  experiment?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
 }) {
   const args = [
     'testcase',
@@ -936,47 +1249,24 @@ export async function testcaseListJSON({
   return await runRbcJSON(...args);
 }
 
-// -----------------------------
-// Prompt helpers
-// -----------------------------
-export async function promptRun({
-  toolName,
-  input = '',
-  inputFile = '',
-  toolsPath = '',
-  temperature = undefined,
-  maxOutputTokens = undefined,
-  json = false,
+export async function promptRunJSON(opts: {
+  toolName: string;
+  input?: string;
+  inputFile?: string;
+  toolsPath?: string;
+  temperature?: number;
+  maxOutputTokens?: number;
 }) {
-  const args = ['prompt', 'run', '--tool-name', toolName];
-  if (input) args.push('--input', input);
-  if (inputFile) args.push('--input-file', inputFile);
-  if (toolsPath) args.push('--tools', toolsPath);
-  if (typeof temperature === 'number')
-    args.push('--temperature', String(temperature));
-  if (typeof maxOutputTokens === 'number')
-    args.push('--max-output-tokens', String(maxOutputTokens));
-  if (json) args.push('--json');
-  return await runRbc(...args);
-}
-
-export async function promptRunJSON(opts) {
-  return await runRbcJSON(
-    'prompt',
-    'run',
-    ...(() => {
-      const args = [];
-      if (!opts || !opts.toolName) throw new Error('toolName is required');
-      args.push('--tool-name', opts.toolName);
-      if (opts.input) args.push('--input', opts.input);
-      if (opts.inputFile) args.push('--input-file', opts.inputFile);
-      if (opts.toolsPath) args.push('--tools', opts.toolsPath);
-      if (typeof opts.temperature === 'number')
-        args.push('--temperature', String(opts.temperature));
-      if (typeof opts.maxOutputTokens === 'number')
-        args.push('--max-output-tokens', String(opts.maxOutputTokens));
-      args.push('--json');
-      return args;
-    })(),
-  );
+  const args: string[] = [];
+  if (!opts.toolName) throw new Error('toolName is required');
+  args.push('--tool-name', opts.toolName);
+  if (opts.input) args.push('--input', opts.input);
+  if (opts.inputFile) args.push('--input-file', opts.inputFile);
+  if (opts.toolsPath) args.push('--tools', opts.toolsPath);
+  if (typeof opts.temperature === 'number')
+    args.push('--temperature', String(opts.temperature));
+  if (typeof opts.maxOutputTokens === 'number')
+    args.push('--max-output-tokens', String(opts.maxOutputTokens));
+  args.push('--json');
+  return await runRbcJSON('prompt', 'run', ...args);
 }
